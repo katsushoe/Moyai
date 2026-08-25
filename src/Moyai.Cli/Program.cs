@@ -1,2 +1,79 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using System.Globalization;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
+using Moyai.Application.Projects;
+using Moyai.Application.WorkItems;
+using Moyai.Domain.WorkItems;
+using Moyai.Infrastructure.Persistence;
+
+return await RunAsync(args);
+
+static async Task<int> RunAsync(string[] arguments)
+{
+    try
+    {
+        if (arguments.Length == 0) throw new ArgumentException("A command is required.");
+        if (string.Equals(arguments[0], "version", StringComparison.Ordinal))
+        {
+            WriteJson(new { name = "Moyai", version = typeof(ProjectService).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" });
+            return 0;
+        }
+
+        string databasePath = Environment.GetEnvironmentVariable("MOYAI_DB_PATH") ?? throw new InvalidOperationException("MOYAI_DB_PATH is required.");
+        var options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString());
+        await new SqliteDatabaseInitializer(options).InitializeAsync(CancellationToken.None);
+        var repository = new SqliteProjectRepository(options);
+        var projects = new ProjectService(repository, TimeProvider.System);
+        var items = new WorkItemService(repository, new SqliteWorkItemRepository(options), TimeProvider.System);
+        IReadOnlyDictionary<string, string?> values = ParseOptions(arguments[1..]);
+
+        object result = arguments[0] switch
+        {
+            "project-list" => await projects.ListAsync(HasFlag(values, "include-archived")),
+            "project-get" => await projects.GetAsync(Required(values, "name")),
+            "project-create" => await projects.CreateAsync(new CreateProjectCommand(Required(values, "name"), Required(values, "source-path"), Optional(values, "install-path"), Required(values, "repository-url"), Optional(values, "repository-provider"), Required(values, "build-provider"), Required(values, "deploy-mode"), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "project-update" => await projects.UpdateAsync(new UpdateProjectCommand(Required(values, "current-name"), Required(values, "name"), Optional(values, "description"), Optional(values, "build-config-json"), Optional(values, "git-user-name"), Optional(values, "git-user-email"), Required(values, "git-remote-name"), Optional(values, "git-default-branch"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "project-set-archived" => await projects.SetArchivedAsync(Required(values, "name"), Revision(values), RequiredBoolean(values, "archived"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "work-item-list" => await items.ListAsync(Required(values, "project"), HasFlag(values, "include-deleted")),
+            "work-item-get" => await items.GetAsync(Required(values, "project"), Required(values, "key"), HasFlag(values, "include-deleted")),
+            "work-item-create" => await items.CreateAsync(new CreateWorkItemCommand(Required(values, "project"), Enum.Parse<WorkItemType>(Required(values, "type"), true), Required(values, "title"), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "work-item-update" => await items.UpdateAsync(new UpdateWorkItemCommand(Required(values, "project"), Required(values, "key"), Required(values, "title"), Optional(values, "description"), Enum.Parse<WorkItemPriority>(Required(values, "priority"), true), OptionalEnum<WorkItemSeverity>(values, "severity"), Optional(values, "owner"), Optional(values, "metadata-json"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "work-item-set-deleted" => await items.SetDeletedAsync(Required(values, "project"), Required(values, "key"), Revision(values), RequiredBoolean(values, "deleted"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "work-item-transition" => await items.TransitionAsync(new TransitionWorkItemCommand(Required(values, "project"), Required(values, "key"), Required(values, "next-status"), long.Parse(Required(values, "expected-revision"), CultureInfo.InvariantCulture), Required(values, "actor-type"), Required(values, "actor-name"))),
+            _ => throw new ArgumentException($"Unknown command '{arguments[0]}'."),
+        };
+        WriteJson(result);
+        return 0;
+    }
+    catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+    {
+        Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, error = new { code = ErrorCode(exception), message = exception.Message } }, SerializerOptions()));
+        return 1;
+    }
+}
+
+static Dictionary<string, string?> ParseOptions(string[] arguments)
+{
+    var values = new Dictionary<string, string?>(StringComparer.Ordinal);
+    for (int index = 0; index < arguments.Length; index++)
+    {
+        string argument = arguments[index];
+        if (!argument.StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException($"Unexpected argument '{argument}'.");
+        string name = argument[2..];
+        string? value = index + 1 < arguments.Length && !arguments[index + 1].StartsWith("--", StringComparison.Ordinal) ? arguments[++index] : null;
+        if (!values.TryAdd(name, value)) throw new ArgumentException($"Option '--{name}' was specified more than once.");
+    }
+    return values;
+}
+
+static string Required(IReadOnlyDictionary<string, string?> values, string name) =>
+    values.TryGetValue(name, out string? value) && !string.IsNullOrWhiteSpace(value) ? value : throw new ArgumentException($"Option '--{name}' is required.");
+
+static string? Optional(IReadOnlyDictionary<string, string?> values, string name) => values.TryGetValue(name, out string? value) ? value : null;
+static T? OptionalEnum<T>(IReadOnlyDictionary<string, string?> values, string name) where T : struct => Optional(values, name) is string value ? Enum.Parse<T>(value, true) : null;
+static long Revision(IReadOnlyDictionary<string, string?> values) => long.Parse(Required(values, "expected-revision"), CultureInfo.InvariantCulture);
+static bool RequiredBoolean(IReadOnlyDictionary<string, string?> values, string name) => bool.Parse(Required(values, name));
+static bool HasFlag(IReadOnlyDictionary<string, string?> values, string name) => values.TryGetValue(name, out string? value) && value is null;
+static string ErrorCode(Exception exception) => exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
+static JsonSerializerOptions SerializerOptions() => new(JsonSerializerDefaults.Web) { WriteIndented = true };
