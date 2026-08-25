@@ -66,6 +66,59 @@ public sealed class SqliteWorkItemRepositoryTests
         Assert.Equal(2L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
     }
 
+    [Fact]
+    public async Task TransitionAsyncPersistsClosedAndReopenedStatesWithEvents()
+    {
+        using var fixture = new WorkItemFixture();
+        (ProjectService projects, WorkItemService items) = await fixture.CreateServicesAsync();
+        await CreateProjectAsync(projects, "Moyai");
+        WorkItem item = await items.CreateAsync(new CreateWorkItemCommand("Moyai", WorkItemType.Issue, "Issue", "agent", "codex"));
+
+        item = await TransitionAsync(items, item, "triaged");
+        item = await TransitionAsync(items, item, "in_progress");
+        item = await TransitionAsync(items, item, "resolved");
+        item = await TransitionAsync(items, item, "closed");
+
+        Assert.NotNull(item.ClosedAt);
+        WorkItem reopened = await TransitionAsync(items, item, "open");
+        Assert.Equal("open", reopened.Status);
+        Assert.Null(reopened.ClosedAt);
+        Assert.Equal(7L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+    }
+
+    [Fact]
+    public async Task TransitionAsyncRejectsInvalidTransitionWithoutEventOrDataChange()
+    {
+        using var fixture = new WorkItemFixture();
+        (ProjectService projects, WorkItemService items) = await fixture.CreateServicesAsync();
+        await CreateProjectAsync(projects, "Moyai");
+        WorkItem created = await items.CreateAsync(new CreateWorkItemCommand("Moyai", WorkItemType.Bug, "Bug", "agent", "codex"));
+        var command = new TransitionWorkItemCommand("Moyai", created.Key, "closed", created.Revision, "agent", "codex");
+
+        await Assert.ThrowsAsync<InvalidWorkItemTransitionException>(() => items.TransitionAsync(command));
+
+        Assert.Equal("reported", (await items.GetAsync("Moyai", created.Key)).Status);
+        Assert.Equal(2L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+    }
+
+    [Fact]
+    public async Task TransitionAsyncRejectsStaleRevisionWithoutEventOrDataChange()
+    {
+        using var fixture = new WorkItemFixture();
+        (ProjectService projects, WorkItemService items) = await fixture.CreateServicesAsync();
+        await CreateProjectAsync(projects, "Moyai");
+        WorkItem created = await items.CreateAsync(new CreateWorkItemCommand("Moyai", WorkItemType.Feature, "Feature", "agent", "codex"));
+        var command = new TransitionWorkItemCommand("Moyai", created.Key, "planned", created.Revision + 1, "agent", "codex");
+
+        await Assert.ThrowsAsync<RevisionConflictException>(() => items.TransitionAsync(command));
+
+        Assert.Equal("proposed", (await items.GetAsync("Moyai", created.Key)).Status);
+        Assert.Equal(2L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+    }
+
+    private static Task<WorkItem> TransitionAsync(WorkItemService service, WorkItem item, string nextStatus) => service.TransitionAsync(
+        new TransitionWorkItemCommand("Moyai", item.Key, nextStatus, item.Revision, "agent", "codex"));
+
     private static Task<Project> CreateProjectAsync(ProjectService service, string name) => service.CreateAsync(
         new CreateProjectCommand(name, "source", "install", "https://github.com/example/moyai", null, "csharp", "local", "agent", "codex"));
 
