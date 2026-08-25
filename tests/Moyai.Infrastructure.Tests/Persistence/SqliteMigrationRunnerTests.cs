@@ -19,12 +19,14 @@ public sealed class SqliteMigrationRunnerTests
         string backupPath = Assert.Single(Directory.GetFiles(fixture.BackupDirectory, "*.db"));
         Assert.True(File.Exists(backupPath));
         Assert.Equal(1L, await fixture.ScalarAsync("SELECT version FROM schema_version;"));
+        Assert.Equal("preserved", await MigrationFixture.BackupScalarAsync(backupPath, "SELECT value FROM legacy_data;"));
     }
 
     [Fact]
     public async Task MigrateAsyncRollsBackFailedMigration()
     {
         using var fixture = new MigrationFixture();
+        await fixture.ExecuteAsync("CREATE TABLE legacy_data(value TEXT NOT NULL); INSERT INTO legacy_data(value) VALUES ('unchanged');");
         var options = new SqliteDatabaseOptions(fixture.ConnectionString, BackupDirectory: fixture.BackupDirectory);
         var runner = new SqliteMigrationRunner(options, new SqliteBackupService(options, TimeProvider.System),
             [new SqliteMigration(1, "CREATE TABLE schema_version(version INTEGER NOT NULL); CREATE TABLE first_table(value TEXT); invalid SQL;")]);
@@ -32,6 +34,23 @@ public sealed class SqliteMigrationRunnerTests
         await Assert.ThrowsAsync<SqliteException>(() => runner.MigrateAsync(CancellationToken.None));
 
         Assert.Equal(0L, await fixture.ScalarAsync("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'first_table';"));
+        Assert.Equal("unchanged", await fixture.ScalarTextAsync("SELECT value FROM legacy_data;"));
+        Assert.Single(Directory.GetFiles(fixture.BackupDirectory, "*.db"));
+    }
+
+    [Fact]
+    public async Task MigrateAsyncRejectsNewerDatabaseWithoutModification()
+    {
+        using var fixture = new MigrationFixture();
+        await fixture.ExecuteAsync("CREATE TABLE schema_version(version INTEGER NOT NULL); INSERT INTO schema_version(version) VALUES (2); CREATE TABLE existing(value TEXT); INSERT INTO existing(value) VALUES ('kept');");
+        var options = new SqliteDatabaseOptions(fixture.ConnectionString, BackupDirectory: fixture.BackupDirectory);
+        var runner = new SqliteMigrationRunner(options, new SqliteBackupService(options, TimeProvider.System),
+            [new SqliteMigration(1, "CREATE TABLE migrated(value TEXT);")]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runner.MigrateAsync(CancellationToken.None));
+
+        Assert.Equal("kept", await fixture.ScalarTextAsync("SELECT value FROM existing;"));
+        Assert.False(Directory.Exists(fixture.BackupDirectory));
     }
 
     private sealed class MigrationFixture : IDisposable
@@ -65,6 +84,24 @@ public sealed class SqliteMigrationRunnerTests
             await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = sql;
             return (long)(await command.ExecuteScalarAsync(CancellationToken.None) ?? 0L);
+        }
+
+        public async Task<string> ScalarTextAsync(string sql) =>
+            await ScalarTextFromAsync(ConnectionString, sql);
+
+        public static async Task<string> BackupScalarAsync(string backupPath, string sql)
+        {
+            string connectionString = new SqliteConnectionStringBuilder { DataSource = backupPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString();
+            return await ScalarTextFromAsync(connectionString, sql);
+        }
+
+        private static async Task<string> ScalarTextFromAsync(string connectionString, string sql)
+        {
+            await using var connection = new SqliteConnection(connectionString);
+            await connection.OpenAsync(CancellationToken.None);
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = sql;
+            return Convert.ToString(await command.ExecuteScalarAsync(CancellationToken.None), System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
         }
 
         public void Dispose()
