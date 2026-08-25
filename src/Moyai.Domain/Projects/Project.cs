@@ -38,8 +38,26 @@ public sealed class Project
         Revision = 1;
     }
 
+    /// <summary>永続化されたProjectを復元します。</summary>
+    public static Project RestoreState(Guid id, string name, string? description, string sourcePath, string? installPath, string repositoryUrl, string repositoryProvider, string buildProvider, string? buildConfigJson, string deployMode, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, DateTimeOffset createdAt, DateTimeOffset updatedAt, DateTimeOffset? archivedAt, long revision)
+    {
+        var project = new Project(id, name, sourcePath, installPath, repositoryUrl, repositoryProvider, buildProvider, deployMode, createdAt)
+        {
+            Description = description,
+            BuildConfigJson = buildConfigJson,
+            GitUserName = gitUserName,
+            GitUserEmail = gitUserEmail,
+            GitRemoteName = gitRemoteName,
+            GitDefaultBranch = gitDefaultBranch,
+            UpdatedAt = updatedAt,
+            ArchivedAt = archivedAt,
+            Revision = revision,
+        };
+        return project;
+    }
+
     public Guid Id { get; }
-    public string Name { get; }
+    public string Name { get; private set; }
     public string? Description { get; private set; }
     public string SourcePath { get; }
     public string? InstallPath { get; }
@@ -56,6 +74,23 @@ public sealed class Project
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ArchivedAt { get; private set; }
     public long Revision { get; private set; }
+
+    /// <summary>Projectの編集可能な基本情報を更新します。</summary>
+    public void Update(string name, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, TimeProvider timeProvider)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(gitRemoteName);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        Name = name;
+        Description = description;
+        BuildConfigJson = buildConfigJson;
+        GitUserName = gitUserName;
+        GitUserEmail = gitUserEmail;
+        GitRemoteName = gitRemoteName;
+        GitDefaultBranch = gitDefaultBranch;
+        UpdatedAt = timeProvider.GetUtcNow();
+        Revision++;
+    }
 
     /// <summary>プロジェクトをArchive状態にします。</summary>
     public void Archive(TimeProvider timeProvider)
