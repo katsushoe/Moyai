@@ -34,6 +34,24 @@ public sealed class WorkItem
         Revision = 1;
     }
 
+    /// <summary>永続化されたWorkItemを復元します。</summary>
+    public static WorkItem RestoreState(Guid id, Guid projectId, string key, long sequenceNumber, WorkItemType type, string title, string? description, string status, WorkItemPriority priority, WorkItemSeverity? severity, string? owner, string? metadataJson, string createdByType, string createdByName, DateTimeOffset createdAt, DateTimeOffset updatedAt, DateTimeOffset? closedAt, DateTimeOffset? deletedAt, long revision)
+    {
+        var item = new WorkItem(id, projectId, key, sequenceNumber, type, title, status, createdByType, createdByName, createdAt)
+        {
+            Description = description,
+            Priority = priority,
+            Severity = severity,
+            Owner = owner,
+            MetadataJson = metadataJson,
+            UpdatedAt = updatedAt,
+            ClosedAt = closedAt,
+            DeletedAt = deletedAt,
+            Revision = revision,
+        };
+        return item;
+    }
+
     public Guid Id { get; }
     public Guid ProjectId { get; }
     public string Key { get; }
