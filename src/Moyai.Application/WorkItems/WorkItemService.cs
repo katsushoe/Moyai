@@ -69,6 +69,18 @@ public sealed class WorkItemService
         return item;
     }
 
+    /// <summary>仕様で許可された次状態へWorkItemを遷移します。</summary>
+    public async Task<WorkItem> TransitionAsync(TransitionWorkItemCommand command, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        WorkItem item = await GetAsync(command.Project, command.Key, cancellationToken: cancellationToken).ConfigureAwait(false);
+        string beforeJson = JsonSerializer.Serialize(item);
+        item.TransitionTo(command.NextStatus, _timeProvider);
+        ProjectEvent projectEvent = CreateEvent(item, "item_transitioned", command.ActorType, command.ActorName, beforeJson, JsonSerializer.Serialize(item));
+        await _items.UpdateAsync(item, command.ExpectedRevision, projectEvent, cancellationToken).ConfigureAwait(false);
+        return item;
+    }
+
     private async Task<Moyai.Domain.Projects.Project> GetProjectAsync(string name, CancellationToken cancellationToken) =>
         await _projects.GetByNameAsync(name, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(name);
 
