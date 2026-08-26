@@ -57,6 +57,12 @@ public sealed class SqliteServiceTokenRepository : IServiceTokenRepository
             reader.IsDBNull(6) ? null : Parse(reader.GetString(6)));
     }
 
+    public Task<ServiceToken?> FindByAudienceAsync(string audience, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(audience);
+        return FindAsync("audience = $value ORDER BY issued_at DESC LIMIT 1", audience, cancellationToken);
+    }
+
     public async Task UpdateLastUsedAtAsync(Guid id, DateTimeOffset lastUsedAt, CancellationToken cancellationToken = default)
     {
         const string sql = "UPDATE service_tokens SET last_used_at = $last_used WHERE id = $id;";
@@ -91,6 +97,18 @@ public sealed class SqliteServiceTokenRepository : IServiceTokenRepository
         command.Parameters.AddWithValue("$id", id.ToString("D", CultureInfo.InvariantCulture));
         if (valueName is not null) command.Parameters.AddWithValue(valueName, value ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ServiceToken?> FindAsync(string predicate, string value, CancellationToken cancellationToken)
+    {
+        await using SqliteConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = $"SELECT id, token, audience, scopes_json, issued_at, expires_at, last_used_at FROM service_tokens WHERE {predicate};";
+        command.Parameters.AddWithValue("$value", value);
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
+        string[] scopes = JsonSerializer.Deserialize<string[]>(reader.GetString(3)) ?? [];
+        return ServiceToken.Restore(Guid.Parse(reader.GetString(0), CultureInfo.InvariantCulture), reader.GetString(1), reader.GetString(2), scopes, Parse(reader.GetString(4)), reader.IsDBNull(5) ? null : Parse(reader.GetString(5)), reader.IsDBNull(6) ? null : Parse(reader.GetString(6)));
     }
 
     private static string Format(DateTimeOffset value) => value.ToString("O", CultureInfo.InvariantCulture);
