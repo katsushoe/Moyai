@@ -3,6 +3,8 @@
 public sealed record UpdateProjectCommand(
     string CurrentName,
     string Name,
+    string? RepositoryUrl,
+    string? RepositoryProvider,
     string? Description,
     string? BuildConfigJson,
     string? GitUserName,

@@ -61,8 +61,8 @@ public sealed class Project
     public string? Description { get; private set; }
     public string SourcePath { get; }
     public string? InstallPath { get; }
-    public string RepositoryUrl { get; }
-    public string RepositoryProvider { get; }
+    public string RepositoryUrl { get; private set; }
+    public string RepositoryProvider { get; private set; }
     public string BuildProvider { get; }
     public string? BuildConfigJson { get; private set; }
     public string DeployMode { get; }
@@ -76,11 +76,21 @@ public sealed class Project
     public long Revision { get; private set; }
 
     /// <summary>Projectの編集可能な基本情報を更新します。</summary>
-    public void Update(string name, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, TimeProvider timeProvider)
+    public void Update(string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, TimeProvider timeProvider)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(gitRemoteName);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        if (repositoryUrl is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(repositoryUrl);
+            RepositoryUrl = repositoryUrl;
+            RepositoryProvider = ResolveRepositoryProvider(repositoryUrl, repositoryProvider);
+        }
+        else if (!string.IsNullOrWhiteSpace(repositoryProvider))
+        {
+            RepositoryProvider = repositoryProvider.ToLowerInvariant();
+        }
         Name = name;
         Description = description;
         BuildConfigJson = buildConfigJson;

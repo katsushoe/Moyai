@@ -31,4 +31,16 @@ public sealed class ProjectTests
         Assert.Null(project.ArchivedAt);
         Assert.Equal(3, project.Revision);
     }
+
+    [Fact]
+    public void UpdateRepositoryInfersProviderAndIncrementsRevision()
+    {
+        Project project = Project.Create("Moyai", "source", null, "https://github.com/example/repo", null, "csharp", "server", TimeProvider.System);
+
+        project.Update("Moyai", "https://bitbucket.org/example/repo", null, null, null, null, null, "origin", null, TimeProvider.System);
+
+        Assert.Equal("https://bitbucket.org/example/repo", project.RepositoryUrl);
+        Assert.Equal("bitbucket", project.RepositoryProvider);
+        Assert.Equal(2, project.Revision);
+    }
 }
