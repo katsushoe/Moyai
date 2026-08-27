@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Moyai.Application.Diagnostics;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
 using Moyai.Application.Providers;
@@ -10,6 +11,7 @@ using Moyai.Domain.WorkItems;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
 
+GlobalExceptionHandler.Register(exception => WriteError(exception, true));
 return await RunAsync(args);
 
 static async Task<int> RunAsync(string[] arguments)
@@ -68,9 +70,9 @@ static async Task<int> RunAsync(string[] arguments)
         WriteJson(result);
         return 0;
     }
-    catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+    catch (Exception exception)
     {
-        Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, error = new { code = ErrorCode(exception), message = exception.Message } }, SerializerOptions()));
+        WriteError(exception, false);
         return 1;
     }
 }
@@ -99,6 +101,7 @@ static bool RequiredBoolean(IReadOnlyDictionary<string, string?> values, string 
 static DateTimeOffset? OptionalDate(IReadOnlyDictionary<string, string?> values, string name) => Optional(values, name) is string value ? DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : null;
 static bool HasFlag(IReadOnlyDictionary<string, string?> values, string name) => values.TryGetValue(name, out string? value) && value is null;
 static string ErrorCode(Exception exception) => exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = ErrorCode(exception), message = exception.Message } }, SerializerOptions()));
 static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
 static JsonSerializerOptions SerializerOptions() => new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
