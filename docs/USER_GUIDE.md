@@ -2,17 +2,17 @@
 
 ## 1. インストール
 
-1. [v1.0.0リリース](https://github.com/katsushoe/Moyai/releases/tag/v1.0.0)から次の2ファイルをダウンロードします。
-   - `Moyai-1.0.0-x64.msi`
-   - `Moyai-1.0.0-x64.msi.sha256`
+1. [v1.0.1リリース](https://github.com/katsushoe/Moyai/releases/tag/v1.0.1)から次の2ファイルをダウンロードします。
+   - `Moyai-1.0.1-x64.msi`
+   - `Moyai-1.0.1-x64.msi.sha256`
 2. PowerShellでチェックサムを確認します。
 
 ```powershell
-(Get-FileHash .\Moyai-1.0.0-x64.msi -Algorithm SHA256).Hash
-Get-Content .\Moyai-1.0.0-x64.msi.sha256
+(Get-FileHash .\Moyai-1.0.1-x64.msi -Algorithm SHA256).Hash
+Get-Content .\Moyai-1.0.1-x64.msi.sha256
 ```
 
-両方が`BF6CAF8E65F0D8843D088C1BDE85E64A0C8E719E780DF86492513F3534AE4ECD`であることを確認してください。
+両方の値が一致することを確認してください。公開値はリリースページの`.sha256`ファイルを正本とします。
 
 3. MSIを実行して、管理者権限の確認を許可します。
 
