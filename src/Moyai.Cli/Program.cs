@@ -10,6 +10,7 @@ using Moyai.Application.WorkItems;
 using Moyai.Domain.WorkItems;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
+using Moyai.Presentation.Windows;
 
 GlobalExceptionHandler.Register(ReportFatalError);
 return await RunAsync(args);
@@ -111,7 +112,7 @@ static string ErrorCode(Exception exception) => exception.GetType().Name.Replace
 static void ReportFatalError(Exception exception)
 {
     WriteError(exception, true);
-    ErrorDialog.Show("Moyai CLI error", "Moyai CLI encountered an unexpected error. See the error log for details.");
+    ErrorDialog.Show("Moyai CLI", exception);
 }
 static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = ErrorCode(exception), message = exception.Message } }, SerializerOptions()));
 static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
