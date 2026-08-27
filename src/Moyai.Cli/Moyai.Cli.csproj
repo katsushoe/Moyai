@@ -3,11 +3,12 @@
   <ItemGroup>
     <ProjectReference Include="..\Moyai.Application\Moyai.Application.csproj" />
     <ProjectReference Include="..\Moyai.Infrastructure\Moyai.Infrastructure.csproj" />
+    <ProjectReference Include="..\Moyai.Presentation.Windows\Moyai.Presentation.Windows.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

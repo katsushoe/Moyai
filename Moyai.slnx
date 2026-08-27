@@ -5,6 +5,7 @@
     <Project Path="src/Moyai.Domain/Moyai.Domain.csproj" />
     <Project Path="src/Moyai.Infrastructure/Moyai.Infrastructure.csproj" />
     <Project Path="src/Moyai.Mcp/Moyai.Mcp.csproj" />
+    <Project Path="src/Moyai.Presentation.Windows/Moyai.Presentation.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Moyai.Domain.Tests/Moyai.Domain.Tests.csproj" />

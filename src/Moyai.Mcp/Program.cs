@@ -10,6 +10,7 @@ using Moyai.Application.WorkItems;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
 using Moyai.Mcp.Tools;
+using Moyai.Presentation.Windows;
 
 GlobalExceptionHandler.Register(ReportFatalError);
 return await RunAsync(args);
@@ -75,7 +76,7 @@ static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLi
 static void ReportFatalError(Exception exception)
 {
     WriteError(exception, true);
-    ErrorDialog.Show("Moyai MCP error", "Moyai MCP encountered an unexpected error. See the error log for details.");
+    ErrorDialog.Show("Moyai MCP", exception);
 }
 
 static void RegisterProvider(IServiceCollection services, string name, string environmentVariable, string toolPrefix)

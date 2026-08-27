@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="DialogTitle" xml:space="preserve"><value>{0} エラー</value></data>
+  <data name="Summary" xml:space="preserve"><value>予期しないエラーが発生しました。以下の詳細を確認し、必要に応じて管理者へ連絡してください。</value></data>
+  <data name="DetailsLabel" xml:space="preserve"><value>エラー詳細</value></data>
+  <data name="CloseButton" xml:space="preserve"><value>閉じる</value></data>
+</root>
