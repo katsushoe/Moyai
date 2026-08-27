@@ -1,0 +1,52 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Moyai"
+    Manufacturer="Akatsukisoft"
+    Version="$(MoyaiVersion)"
+    UpgradeCode="9DE89A0B-7437-44AD-AB9F-34B3A64CE2B7"
+    Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Moyai is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <SetDirectory Id="INSTALLFOLDER" Value="C:\Moyai" Sequence="both" />
+
+    <Feature Id="Complete" Title="Moyai" Level="1">
+      <ComponentGroupRef Id="ProductFiles" />
+      <ComponentGroupRef Id="DataDirectories" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Moyai">
+        <Directory Id="BinFolder" Name="bin" />
+        <Directory Id="ConfigFolder" Name="config" />
+        <Directory Id="LogsFolder" Name="logs" />
+        <Directory Id="DataFolder" Name="data" />
+      </Directory>
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ProductFiles" Directory="BinFolder">
+      <Files Include="$(PublishDirectory)\**" />
+    </ComponentGroup>
+
+    <ComponentGroup Id="DataDirectories">
+      <Component Id="CreateConfigFolder" Directory="ConfigFolder" Guid="2E311E54-4488-4B68-A9A5-0328CD991DA6">
+        <CreateFolder>
+          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)" />
+        </CreateFolder>
+      </Component>
+      <Component Id="CreateLogsFolder" Directory="LogsFolder" Guid="99FC7854-B5A7-4C27-8557-EBA8EC0507C3">
+        <CreateFolder>
+          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)" />
+        </CreateFolder>
+      </Component>
+      <Component Id="CreateDataFolder" Directory="DataFolder" Guid="72CC2F57-1301-43DE-9298-E3C524126689">
+        <CreateFolder>
+          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)" />
+        </CreateFolder>
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

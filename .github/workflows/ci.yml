@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-package:
+    name: Build, test, and package
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore .\Moyai.slnx
+
+      - name: Verify formatting
+        run: dotnet format .\Moyai.slnx --no-restore --verify-no-changes
+
+      - name: Build solution
+        run: dotnet build .\Moyai.slnx --configuration Release --no-restore --disable-build-servers
+
+      - name: Run tests
+        run: dotnet test .\Moyai.slnx --configuration Release --no-build --disable-build-servers
+
+      - name: Build MSI installer
+        shell: pwsh
+        run: .\scripts\Build-Installer.ps1 -Version 1.0.0
+
+      - name: Upload MSI installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Moyai-1.0.0-win-x64
+          path: artifacts/installer/Moyai-1.0.0-x64.msi
+          if-no-files-found: error
+          retention-days: 14
