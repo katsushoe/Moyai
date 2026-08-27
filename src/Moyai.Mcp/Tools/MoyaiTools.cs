@@ -29,8 +29,8 @@ public sealed class MoyaiTools(ProjectService projects, WorkItemService items, A
         projects.CreateAsync(new CreateProjectCommand(name, sourcePath, installPath, repositoryUrl, repositoryProvider, buildProvider, deployMode, actorType, actorName), cancellationToken);
 
     [McpServerTool(Name = "project_update"), Description("Updates a Moyai project using optimistic concurrency and records an audit event.")]
-    public Task<Project> ProjectUpdate(string currentName, string name, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
-        projects.UpdateAsync(new UpdateProjectCommand(currentName, name, description, buildConfigJson, gitUserName, gitUserEmail, gitRemoteName, gitDefaultBranch, expectedRevision, actorType, actorName), cancellationToken);
+    public Task<Project> ProjectUpdate(string currentName, string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
+        projects.UpdateAsync(new UpdateProjectCommand(currentName, name, repositoryUrl, repositoryProvider, description, buildConfigJson, gitUserName, gitUserEmail, gitRemoteName, gitDefaultBranch, expectedRevision, actorType, actorName), cancellationToken);
 
     [McpServerTool(Name = "project_set_archived"), Description("Archives or restores a Moyai project using optimistic concurrency.")]
     public Task<Project> ProjectSetArchived(string name, long expectedRevision, bool archived, string actorType, string actorName, CancellationToken cancellationToken = default) =>

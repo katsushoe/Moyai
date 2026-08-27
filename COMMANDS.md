@@ -26,8 +26,8 @@ Each command below has the syntax, processing rule, and result contract. Returne
 
 - `project-list`: `project-list [--include-archived]`; returns all non-archived projects unless the flag is present. Example: `Moyai.Cli.exe project-list`.
 - `project-get`: `project-get --name <name>`; returns the persisted project or an error when absent. Example: `Moyai.Cli.exe project-get --name Sample`.
-- `project-create`: requires `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`; optional `--install-path --repository-provider`; creates and returns a project. Names must be unique.
-- `project-update`: requires `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`; optional `--description --build-config-json --git-user-name --git-user-email --git-default-branch`; updates and returns the project, rejecting stale revisions.
+- `project-create`: requires `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`; optional `--install-path --repository-provider`; creates both the Project and its one Repository association. Names must be unique.
+- `project-update`: requires `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`; optional `--repository-url --repository-provider --description --build-config-json --git-user-name --git-user-email --git-default-branch`; updates and returns the project, rejecting stale revisions. A supplied URL with no Provider re-runs Provider inference; a supplied Provider changes routing explicitly.
 - `project-set-archived`: requires `--name --expected-revision --archived --actor-type --actor-name`; archives or restores and returns the project.
 
 ### Work item commands
@@ -65,3 +65,5 @@ Each command below has the syntax, processing rule, and result contract. Returne
 ## Safety Notes
 
 Review Provider targets before commit, push, pull, build, release, or deploy. `release-publish` and `deploy` require explicit approval for the exact target. Never place returned token secrets in logs, source, or documentation.
+
+Moyai v1 models exactly one Repository as part of each Project. It has no independent `repository-register` or `repository-unregister` command; archive the Project to stop using the association.

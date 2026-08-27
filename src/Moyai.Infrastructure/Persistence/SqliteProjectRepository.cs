@@ -72,7 +72,8 @@ public sealed class SqliteProjectRepository : IProjectRepository
             await using SqliteCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
-                UPDATE projects SET name=$name, description=$description, build_config_json=$build_config,
+                UPDATE projects SET name=$name, repository_url=$repository_url, repository_provider=$repository_provider,
+                    description=$description, build_config_json=$build_config,
                     git_user_name=$git_name, git_user_email=$git_email, git_remote_name=$remote,
                     git_default_branch=$default_branch, updated_at=$updated, archived_at=$archived,
                     revision=$revision
@@ -117,8 +118,6 @@ public sealed class SqliteProjectRepository : IProjectRepository
         command.Parameters.AddWithValue("$id", Format(project.Id));
         command.Parameters.AddWithValue("$source", project.SourcePath);
         command.Parameters.AddWithValue("$install", Value(project.InstallPath));
-        command.Parameters.AddWithValue("$repository_url", project.RepositoryUrl);
-        command.Parameters.AddWithValue("$repository_provider", project.RepositoryProvider);
         command.Parameters.AddWithValue("$build_provider", project.BuildProvider);
         command.Parameters.AddWithValue("$deploy_mode", project.DeployMode);
         command.Parameters.AddWithValue("$created", Format(project.CreatedAt));
@@ -129,6 +128,8 @@ public sealed class SqliteProjectRepository : IProjectRepository
     {
         command.Parameters.AddWithValue("$name", project.Name);
         command.Parameters.AddWithValue("$description", Value(project.Description));
+        command.Parameters.AddWithValue("$repository_url", project.RepositoryUrl);
+        command.Parameters.AddWithValue("$repository_provider", project.RepositoryProvider);
         command.Parameters.AddWithValue("$build_config", Value(project.BuildConfigJson));
         command.Parameters.AddWithValue("$git_name", Value(project.GitUserName));
         command.Parameters.AddWithValue("$git_email", Value(project.GitUserEmail));
