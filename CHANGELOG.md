@@ -2,6 +2,13 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.3 - 2026-08-28
+
+- Added repository URL and Provider updates through the Project update command and MCP tool.
+- A repository URL change can infer its Provider again, while an explicit Provider overrides routing.
+- Clarified that Moyai v1 manages one Repository association as part of each Project rather than through independent register/unregister commands.
+- No database format changes from `1.0.2`.
+
 ## 1.0.2 - 2026-08-28
 
 - Reorganized public documentation to follow the project document standard.
