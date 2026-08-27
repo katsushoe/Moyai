@@ -11,6 +11,10 @@ $publishDirectory = Join-Path $artifactsRoot "publish\win-x64"
 $installerDirectory = Join-Path $artifactsRoot "installer"
 $wixSource = Join-Path $repositoryRoot "installer\Moyai.wxs"
 $msiPath = Join-Path $installerDirectory "Moyai-$Version-x64.msi"
+$parsedVersion = [Version]::Parse($Version)
+$buildVersion = [Math]::Max(0, $parsedVersion.Build)
+$revisionVersion = [Math]::Max(0, $parsedVersion.Revision)
+$assemblyVersion = "$($parsedVersion.Major).$($parsedVersion.Minor).$buildVersion.$revisionVersion"
 
 if (Test-Path -LiteralPath $publishDirectory) {
     Remove-Item -LiteralPath $publishDirectory -Recurse -Force
@@ -25,6 +29,8 @@ $publishProperties = @(
     "--self-contained", "true",
     "--output", $publishDirectory,
     "-p:Version=$Version",
+    "-p:AssemblyVersion=$assemblyVersion",
+    "-p:FileVersion=$assemblyVersion",
     "-p:PublishSingleFile=false",
     "--disable-build-servers"
 )
