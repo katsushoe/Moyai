@@ -11,7 +11,7 @@ using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
 using Moyai.Mcp.Tools;
 
-GlobalExceptionHandler.Register(exception => WriteError(exception, true));
+GlobalExceptionHandler.Register(ReportFatalError);
 return await RunAsync(args);
 
 static async Task<int> RunAsync(string[] arguments)
@@ -58,12 +58,25 @@ static async Task<int> RunAsync(string[] arguments)
     }
     catch (Exception exception)
     {
-        WriteError(exception, false);
+        if (exception is ArgumentException or InvalidOperationException)
+        {
+            WriteError(exception, false);
+        }
+        else
+        {
+            ReportFatalError(exception);
+        }
         return 1;
     }
 }
 
 static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant(), message = exception.Message } }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
+static void ReportFatalError(Exception exception)
+{
+    WriteError(exception, true);
+    ErrorDialog.Show("Moyai MCP error", "Moyai MCP encountered an unexpected error. See the error log for details.");
+}
 
 static void RegisterProvider(IServiceCollection services, string name, string environmentVariable, string toolPrefix)
 {
