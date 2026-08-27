@@ -1,22 +1,12 @@
 # Moyai
 
-Moyaiは、プロジェクトと作業項目をSQLiteで管理し、リポジトリ操作、ビルド、リリース、デプロイをProviderへ委譲するWindows向けツールです。CLIと、stateless Streamable HTTPのMCPサーバーを提供します。
+[English](README.md) | [日本語](README.ja.md)
 
-## v1.0.1
+Moyai is a Windows tool for managing projects and work items in SQLite and delegating repository, build, release, and deployment operations to configured providers. It provides a JSON CLI and a stateless Streamable HTTP MCP server.
 
-- 対応OS: Windows x64
-- インストール先: `C:\Moyai`
-- CLI: `C:\Moyai\bin\Moyai.Cli.exe`
-- MCPサーバー: `C:\Moyai\bin\Moyai.Mcp.exe`
-- データベース: 利用者が`MOYAI_DB_PATH`で指定するSQLiteファイル
+## Getting Started
 
-[Moyai v1.0.1をダウンロード](https://github.com/katsushoe/Moyai/releases/tag/v1.0.1)
-
-## クイックスタート
-
-1. リリースページから`Moyai-1.0.1-x64.msi`と`.sha256`をダウンロードします。
-2. SHA-256を検証してMSIを実行します。管理者権限が必要です。
-3. PowerShellでデータベースの場所を設定し、CLIを実行します。
+Install the MSI, then run:
 
 ```powershell
 $env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
@@ -24,35 +14,58 @@ $env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
 & 'C:\Moyai\bin\Moyai.Cli.exe' project-list
 ```
 
-CLIの正常結果は標準出力へ、構造化されたエラーは標準エラーへJSONで出力されます。CLIはエラーダイアログを表示しません。
-
-MCPサーバーを起動する場合は、ループバックの待受URLも設定します。
+To start the MCP server:
 
 ```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
 $env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
 & 'C:\Moyai\bin\Moyai.Mcp.exe'
 ```
 
-MCPエンドポイントは`http://127.0.0.1:43120/mcp`です。従来のSSE transportとブラウザーCORSには対応していません。
+Register `http://127.0.0.1:43120/mcp` as a Streamable HTTP server in the MCP client. See [MCP Setup](MCP_SETUP.md) for complete client configuration.
 
-## ドキュメント
+## Installation
 
-- [インストール・設定・運用ガイド](docs/USER_GUIDE.md)
-- [設定リファレンス](CONFIG.md)
-- [v1.0.1リリースノート](docs/releases/v1.0.1.md)
-- [v1.0.0リリースノート](docs/releases/v1.0.0.md)
-- [初期アーキテクチャADR](docs/adr/0001-initial-architecture.md)
+### Installer
 
-## 開発
+Download `Moyai-1.0.1-x64.msi` and its `.sha256` file from [Moyai v1.0.1](https://github.com/katsushoe/Moyai/releases/tag/v1.0.1). Verify both SHA-256 values match, then run the MSI as an administrator. Moyai is installed in `C:\Moyai`.
+
+### Binary Archive
+
+A binary archive is not distributed. The WiX Toolset MSI is the supported Windows package.
+
+### Source Build
+
+Prerequisites are the .NET 10 SDK, including support for targeting .NET 8, and the repository-local WiX tool manifest.
 
 ```powershell
-dotnet test .\Moyai.slnx
-.\scripts\Build-Installer.ps1
+dotnet restore .\Moyai.slnx
+dotnet build .\Moyai.slnx --configuration Release --no-restore
+dotnet test .\Moyai.slnx --configuration Release --no-build
+.\scripts\Build-Installer.ps1 -Version 1.0.1
 ```
 
-Windows配布物はWiX Toolsetベースのx64 MSIです。CIはpushとpull requestに対してビルド、テスト、MSI作成を検証します。
+## Configuration
 
-## ライセンス
+Moyai reads configuration from environment variables. `MOYAI_DB_PATH` is required for data commands and both `MOYAI_DB_PATH` and `MOYAI_MCP_URL` are required by the MCP server. See [Configuration](CONFIG.md) for types, defaults, constraints, and examples.
 
-[MIT License](LICENSE)
+## Usage
+
+The CLI writes successful JSON to standard output, structured errors to standard error, and returns exit code `0` for success or `1` for failure. See [Commands](COMMANDS.md) for every command, option, result, and safety condition.
+
+## Documentation
+
+- [Configuration](CONFIG.md)
+- [Commands](COMMANDS.md)
+- [MCP Setup](MCP_SETUP.md)
+- [Packages](PACKAGES.md)
+- [Security](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+- [Architecture decision](docs/adr/0001-initial-architecture.md)
+
+## Security
+
+The MCP listener accepts loopback URLs only. Do not place service tokens in source files, command history, logs, or documentation. Review [Security](SECURITY.md) before enabling providers or lifecycle operations.
+
+## License
+
+Moyai is licensed under the [MIT License](LICENSE).
