@@ -11,4 +11,8 @@ public interface IServiceTokenRepository
     Task UpdateLastUsedAtAsync(Guid id, DateTimeOffset lastUsedAt, CancellationToken cancellationToken = default);
     Task<int> DeleteExpiredAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task IssueWithEventAsync(ServiceToken token, string actorType, string actorName, CancellationToken cancellationToken = default);
+    Task RotateWithEventAsync(ServiceToken token, string actorType, string actorName, CancellationToken cancellationToken = default);
+    Task<bool> RevokeWithEventAsync(string audience, string actorType, string actorName, CancellationToken cancellationToken = default);
+    Task<int> DeleteExpiredWithEventsAsync(DateTimeOffset now, string actorType, string actorName, CancellationToken cancellationToken = default);
 }

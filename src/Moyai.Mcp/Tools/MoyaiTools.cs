@@ -2,6 +2,7 @@
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
 using Moyai.Application.Projects;
+using Moyai.Application.Providers;
 using Moyai.Application.WorkItems;
 using Moyai.Domain.Projects;
 using Moyai.Domain.WorkItems;
@@ -10,7 +11,7 @@ namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, WorkItemService items, AuthIntrospectionService authentication)
+public sealed class MoyaiTools(ProjectService projects, WorkItemService items, AuthIntrospectionService authentication, ProviderRoutingService routing)
 {
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
@@ -61,4 +62,19 @@ public sealed class MoyaiTools(ProjectService projects, WorkItemService items, A
     [McpServerTool(Name = "auth_introspect", ReadOnly = true), Description("Validates an internal Moyai service token for a provider audience and scope.")]
     public Task<AuthIntrospectionResult> AuthIntrospect(string token, string audience, string scope, CancellationToken cancellationToken = default) =>
         authentication.IntrospectAsync(token, audience, scope, cancellationToken);
+
+    [McpServerTool(Name = "repository_status", ReadOnly = true), Description("Gets repository status through the Provider configured for a Moyai-managed project.")]
+    public Task<RepositoryProviderResult> RepositoryStatus(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Status, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "repository_diff", ReadOnly = true), Description("Gets repository diff through the Provider configured for a Moyai-managed project.")]
+    public Task<RepositoryProviderResult> RepositoryDiff(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Diff, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "repository_commit"), Description("Commits a Moyai-managed repository through its configured Provider using internal service authentication.")]
+    public Task<RepositoryProviderResult> RepositoryCommit(string project, string message, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Commit, message, cancellationToken);
+
+    [McpServerTool(Name = "repository_push"), Description("Pushes a Moyai-managed repository through its configured Provider using internal service authentication.")]
+    public Task<RepositoryProviderResult> RepositoryPush(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Push, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "repository_pull"), Description("Pulls a Moyai-managed repository through its configured Provider using internal service authentication.")]
+    public Task<RepositoryProviderResult> RepositoryPull(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Pull, cancellationToken: cancellationToken);
 }

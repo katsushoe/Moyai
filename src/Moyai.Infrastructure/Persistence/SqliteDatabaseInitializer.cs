@@ -27,7 +27,7 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
         await ExecuteAsync(connection, $"PRAGMA busy_timeout = {_options.BusyTimeoutMilliseconds};", cancellationToken).ConfigureAwait(false);
         await connection.CloseAsync().ConfigureAwait(false);
         var backupService = new SqliteBackupService(_options, TimeProvider.System);
-        var migrationRunner = new SqliteMigrationRunner(_options, backupService, [new SqliteMigration(1, SchemaSql)]);
+        var migrationRunner = new SqliteMigrationRunner(_options, backupService, [new SqliteMigration(1, SchemaSql), new SqliteMigration(2, ServiceTokenAuditMigrationSql)]);
         await migrationRunner.MigrateAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -82,5 +82,19 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
             expires_at TEXT NULL,
             last_used_at TEXT NULL
         );
+        """;
+
+    private const string ServiceTokenAuditMigrationSql = """
+        CREATE TABLE events_v2 (
+            id TEXT PRIMARY KEY, project_id TEXT NULL, entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL, event_type TEXT NOT NULL, actor_type TEXT NOT NULL,
+            actor_name TEXT NOT NULL, before_json TEXT NULL, after_json TEXT NULL,
+            message TEXT NULL, created_at TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+        INSERT INTO events_v2 SELECT * FROM events;
+        DROP TABLE events;
+        ALTER TABLE events_v2 RENAME TO events;
+        CREATE UNIQUE INDEX service_tokens_audience_unique ON service_tokens(audience);
         """;
 }

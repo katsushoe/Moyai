@@ -1,10 +1,13 @@
 ﻿using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 using Moyai.Application.Projects;
+using Moyai.Application.Providers;
 using Moyai.Application.WorkItems;
 using Moyai.Domain.WorkItems;
 using Moyai.Infrastructure.Persistence;
+using Moyai.Infrastructure.Providers;
 
 return await RunAsync(args);
 
@@ -23,8 +26,12 @@ static async Task<int> RunAsync(string[] arguments)
         var options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString());
         await new SqliteDatabaseInitializer(options).InitializeAsync(CancellationToken.None);
         var repository = new SqliteProjectRepository(options);
+        var tokenRepository = new SqliteServiceTokenRepository(options);
         var projects = new ProjectService(repository, TimeProvider.System);
         var items = new WorkItemService(repository, new SqliteWorkItemRepository(options), TimeProvider.System);
+        using ServiceProvider providerServices = new ServiceCollection().AddHttpClient().BuildServiceProvider();
+        var routing = new ProviderRoutingService(repository, tokenRepository, CreateProviders(providerServices.GetRequiredService<IHttpClientFactory>()), TimeProvider.System);
+        var tokens = new Moyai.Application.Authentication.ServiceTokenLifecycleService(tokenRepository, TimeProvider.System);
         IReadOnlyDictionary<string, string?> values = ParseOptions(arguments[1..]);
 
         object result = arguments[0] switch
@@ -40,6 +47,15 @@ static async Task<int> RunAsync(string[] arguments)
             "work-item-update" => await items.UpdateAsync(new UpdateWorkItemCommand(Required(values, "project"), Required(values, "key"), Required(values, "title"), Optional(values, "description"), Enum.Parse<WorkItemPriority>(Required(values, "priority"), true), OptionalEnum<WorkItemSeverity>(values, "severity"), Optional(values, "owner"), Optional(values, "metadata-json"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name"))),
             "work-item-set-deleted" => await items.SetDeletedAsync(Required(values, "project"), Required(values, "key"), Revision(values), RequiredBoolean(values, "deleted"), Required(values, "actor-type"), Required(values, "actor-name")),
             "work-item-transition" => await items.TransitionAsync(new TransitionWorkItemCommand(Required(values, "project"), Required(values, "key"), Required(values, "next-status"), long.Parse(Required(values, "expected-revision"), CultureInfo.InvariantCulture), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "repository-status" => await routing.ExecuteAsync(Required(values, "project"), RepositoryOperation.Status),
+            "repository-diff" => await routing.ExecuteAsync(Required(values, "project"), RepositoryOperation.Diff),
+            "repository-commit" => await routing.ExecuteAsync(Required(values, "project"), RepositoryOperation.Commit, Required(values, "message")),
+            "repository-push" => await routing.ExecuteAsync(Required(values, "project"), RepositoryOperation.Push),
+            "repository-pull" => await routing.ExecuteAsync(Required(values, "project"), RepositoryOperation.Pull),
+            "token-issue" => await tokens.IssueAsync(Required(values, "audience"), Required(values, "scopes").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), OptionalDate(values, "expires-at"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "token-rotate" => await tokens.RotateAsync(Required(values, "audience"), Required(values, "scopes").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), OptionalDate(values, "expires-at"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "token-revoke" => await tokens.RevokeAsync(Required(values, "audience"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "token-cleanup" => await tokens.DeleteExpiredAsync(Required(values, "actor-type"), Required(values, "actor-name")),
             _ => throw new ArgumentException($"Unknown command '{arguments[0]}'."),
         };
         WriteJson(result);
@@ -73,7 +89,22 @@ static string? Optional(IReadOnlyDictionary<string, string?> values, string name
 static T? OptionalEnum<T>(IReadOnlyDictionary<string, string?> values, string name) where T : struct => Optional(values, name) is string value ? Enum.Parse<T>(value, true) : null;
 static long Revision(IReadOnlyDictionary<string, string?> values) => long.Parse(Required(values, "expected-revision"), CultureInfo.InvariantCulture);
 static bool RequiredBoolean(IReadOnlyDictionary<string, string?> values, string name) => bool.Parse(Required(values, name));
+static DateTimeOffset? OptionalDate(IReadOnlyDictionary<string, string?> values, string name) => Optional(values, name) is string value ? DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : null;
 static bool HasFlag(IReadOnlyDictionary<string, string?> values, string name) => values.TryGetValue(name, out string? value) && value is null;
 static string ErrorCode(Exception exception) => exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
 static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
 static JsonSerializerOptions SerializerOptions() => new(JsonSerializerDefaults.Web) { WriteIndented = true };
+
+static IReadOnlyList<IRepositoryProvider> CreateProviders(IHttpClientFactory httpClientFactory)
+{
+    var providers = new List<IRepositoryProvider>();
+    AddProvider(providers, httpClientFactory, "githubbie", "GITHUBIE_MCP_URL", "github");
+    AddProvider(providers, httpClientFactory, "buckettie", "BUCKETTIE_MCP_URL", "bitbucket");
+    return providers;
+}
+
+static void AddProvider(List<IRepositoryProvider> providers, IHttpClientFactory httpClientFactory, string name, string environmentVariable, string toolPrefix)
+{
+    string? endpoint = Environment.GetEnvironmentVariable(environmentVariable);
+    if (!string.IsNullOrWhiteSpace(endpoint)) providers.Add(new McpRepositoryProvider(new McpRepositoryProviderOptions(name, new Uri(endpoint, UriKind.Absolute), toolPrefix), httpClientFactory));
+}
