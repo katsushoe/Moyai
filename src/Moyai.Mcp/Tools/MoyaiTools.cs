@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
+using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
 using Moyai.Application.Providers;
 using Moyai.Application.WorkItems;
@@ -11,7 +12,7 @@ namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, WorkItemService items, AuthIntrospectionService authentication, ProviderRoutingService routing)
+public sealed class MoyaiTools(ProjectService projects, WorkItemService items, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
 {
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
@@ -77,4 +78,19 @@ public sealed class MoyaiTools(ProjectService projects, WorkItemService items, A
 
     [McpServerTool(Name = "repository_pull"), Description("Pulls a Moyai-managed repository through its configured Provider using internal service authentication.")]
     public Task<RepositoryProviderResult> RepositoryPull(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Pull, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "build", Destructive = true), Description("Builds a Moyai-managed project through its configured build Provider.")]
+    public Task<LifecycleResult> Build(string project, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.Build, actorType, actorName, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "release_create", Destructive = true), Description("Creates a release through the repository Provider. Publishing requires a separate release_publish call and explicit user approval.")]
+    public Task<LifecycleResult> ReleaseCreate(string project, string version, string actorType, string actorName, string? notes = null, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.ReleaseCreate, actorType, actorName, version, notes: notes, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "release_publish", Destructive = true), Description("Publishes an existing release. Call only after explicit user approval for the exact project, version, and destination.")]
+    public Task<LifecycleResult> ReleasePublish(string project, string version, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.ReleasePublish, actorType, actorName, version, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "release_withdraw", Destructive = true), Description("Withdraws an existing release through the repository Provider.")]
+    public Task<LifecycleResult> ReleaseWithdraw(string project, string version, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.ReleaseWithdraw, actorType, actorName, version, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "deploy", Destructive = true), Description("Deploys a verified artifact through the configured deploy Provider. Call only after explicit user approval for the exact target.")]
+    public Task<LifecycleResult> Deploy(string project, string artifactPath, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.Deploy, actorType, actorName, version, artifactPath, cancellationToken: cancellationToken);
 }

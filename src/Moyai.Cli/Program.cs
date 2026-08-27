@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
 using Moyai.Application.Providers;
 using Moyai.Application.WorkItems;
@@ -31,6 +32,7 @@ static async Task<int> RunAsync(string[] arguments)
         var items = new WorkItemService(repository, new SqliteWorkItemRepository(options), TimeProvider.System);
         using ServiceProvider providerServices = new ServiceCollection().AddHttpClient().BuildServiceProvider();
         var routing = new ProviderRoutingService(repository, tokenRepository, CreateProviders(providerServices.GetRequiredService<IHttpClientFactory>()), TimeProvider.System);
+        var lifecycle = new LifecycleService(repository, tokenRepository, CreateLifecycleProviders(providerServices.GetRequiredService<IHttpClientFactory>()), new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System);
         var tokens = new Moyai.Application.Authentication.ServiceTokenLifecycleService(tokenRepository, TimeProvider.System);
         IReadOnlyDictionary<string, string?> values = ParseOptions(arguments[1..]);
 
@@ -56,6 +58,11 @@ static async Task<int> RunAsync(string[] arguments)
             "token-rotate" => await tokens.RotateAsync(Required(values, "audience"), Required(values, "scopes").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), OptionalDate(values, "expires-at"), Required(values, "actor-type"), Required(values, "actor-name")),
             "token-revoke" => await tokens.RevokeAsync(Required(values, "audience"), Required(values, "actor-type"), Required(values, "actor-name")),
             "token-cleanup" => await tokens.DeleteExpiredAsync(Required(values, "actor-type"), Required(values, "actor-name")),
+            "build" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Build, Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-create" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleaseCreate, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version"), notes: Optional(values, "notes")),
+            "release-publish" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleasePublish, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
+            "release-withdraw" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleaseWithdraw, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
+            "deploy" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Deploy, Required(values, "actor-type"), Required(values, "actor-name"), Optional(values, "version"), Required(values, "artifact-path")),
             _ => throw new ArgumentException($"Unknown command '{arguments[0]}'."),
         };
         WriteJson(result);
@@ -103,8 +110,32 @@ static IReadOnlyList<IRepositoryProvider> CreateProviders(IHttpClientFactory htt
     return providers;
 }
 
+static IReadOnlyList<ILifecycleProvider> CreateLifecycleProviders(IHttpClientFactory httpClientFactory)
+{
+    var providers = new List<ILifecycleProvider>();
+    AddLifecycleProvider(providers, httpClientFactory, "githubbie", "GITHUBIE_MCP_URL", "github");
+    AddLifecycleProvider(providers, httpClientFactory, "buckettie", "BUCKETTIE_MCP_URL", "bitbucket");
+    AddOptionalLifecycleProvider(providers, httpClientFactory, "MOYAI_BUILD_PROVIDER_NAME", "MOYAI_BUILD_PROVIDER_URL", "MOYAI_BUILD_PROVIDER_PREFIX");
+    AddOptionalLifecycleProvider(providers, httpClientFactory, "MOYAI_DEPLOY_PROVIDER_NAME", "MOYAI_DEPLOY_PROVIDER_URL", "MOYAI_DEPLOY_PROVIDER_PREFIX");
+    return providers;
+}
+
 static void AddProvider(List<IRepositoryProvider> providers, IHttpClientFactory httpClientFactory, string name, string environmentVariable, string toolPrefix)
 {
     string? endpoint = Environment.GetEnvironmentVariable(environmentVariable);
     if (!string.IsNullOrWhiteSpace(endpoint)) providers.Add(new McpRepositoryProvider(new McpRepositoryProviderOptions(name, new Uri(endpoint, UriKind.Absolute), toolPrefix), httpClientFactory));
+}
+
+static void AddLifecycleProvider(List<ILifecycleProvider> providers, IHttpClientFactory httpClientFactory, string name, string environmentVariable, string toolPrefix)
+{
+    string? endpoint = Environment.GetEnvironmentVariable(environmentVariable);
+    if (!string.IsNullOrWhiteSpace(endpoint)) providers.Add(new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri(endpoint, UriKind.Absolute), toolPrefix), httpClientFactory));
+}
+
+static void AddOptionalLifecycleProvider(List<ILifecycleProvider> providers, IHttpClientFactory httpClientFactory, string nameVariable, string urlVariable, string prefixVariable)
+{
+    string? name = Environment.GetEnvironmentVariable(nameVariable);
+    string? endpoint = Environment.GetEnvironmentVariable(urlVariable);
+    string? prefix = Environment.GetEnvironmentVariable(prefixVariable);
+    if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(endpoint) && !string.IsNullOrWhiteSpace(prefix)) providers.Add(new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri(endpoint, UriKind.Absolute), prefix), httpClientFactory));
 }
