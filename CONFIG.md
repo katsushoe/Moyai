@@ -6,6 +6,8 @@
 - `MOYAI_MCP_URL`: Streamable HTTP listen URL. Required by the MCP server and restricted to a loopback host, for example `http://127.0.0.1:43120`.
 - `GITHUBIE_MCP_URL`: Githubbie Streamable HTTP MCP endpoint on a loopback host.
 - `BUCKETTIE_MCP_URL`: Buckettie Streamable HTTP MCP endpoint on a loopback host.
+- `MOYAI_BUILD_PROVIDER_NAME`, `MOYAI_BUILD_PROVIDER_URL`, `MOYAI_BUILD_PROVIDER_PREFIX`: optional build Provider identity, loopback MCP endpoint, and Tool prefix.
+- `MOYAI_DEPLOY_PROVIDER_NAME`, `MOYAI_DEPLOY_PROVIDER_URL`, `MOYAI_DEPLOY_PROVIDER_PREFIX`: optional deploy Provider identity, loopback MCP endpoint, and Tool prefix.
 
 The MCP endpoint is `${MOYAI_MCP_URL}/mcp`. Legacy SSE transport and browser CORS are not enabled.
 
