@@ -6,7 +6,7 @@ This document is the source of truth for environment configuration used by the C
 
 ## Configuration Directory
 
-Version 1.0.1 reads environment variables only. The MSI creates `C:\Moyai\config` but does not generate or load a configuration file.
+Version 1.0.2 reads environment variables only. The MSI creates `C:\Moyai\config` but does not generate or load a configuration file.
 
 ## File Generation
 
