@@ -14,4 +14,11 @@ public sealed partial class ErrorDialogForm : Form
         detailsTextBox.Text = details;
         errorIconPictureBox.Image = SystemIcons.Error.ToBitmap();
     }
+
+    /// <inheritdoc />
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        _ = closeButtonControl.Focus();
+    }
 }
