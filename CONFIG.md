@@ -4,7 +4,7 @@
 
 - `MOYAI_DB_PATH`: SQLite database file path. Required by the CLI and MCP server.
 - `MOYAI_MCP_URL`: Streamable HTTP listen URL. Required by the MCP server and restricted to a loopback host, for example `http://127.0.0.1:43120`.
-- `GITHUBIE_MCP_URL`: Githubbie Streamable HTTP MCP endpoint on a loopback host.
+- `GITHUBIE_MCP_URL`: Githubie Streamable HTTP MCP endpoint on a loopback host.
 - `BUCKETTIE_MCP_URL`: Buckettie Streamable HTTP MCP endpoint on a loopback host.
 - `MOYAI_BUILD_PROVIDER_NAME`, `MOYAI_BUILD_PROVIDER_URL`, `MOYAI_BUILD_PROVIDER_PREFIX`: optional build Provider identity, loopback MCP endpoint, and Tool prefix.
 - `MOYAI_DEPLOY_PROVIDER_NAME`, `MOYAI_DEPLOY_PROVIDER_URL`, `MOYAI_DEPLOY_PROVIDER_PREFIX`: optional deploy Provider identity, loopback MCP endpoint, and Tool prefix.
@@ -16,6 +16,8 @@ The MCP endpoint is `${MOYAI_MCP_URL}/mcp`. Legacy SSE transport and browser COR
 The CLI returns JSON to standard output and structured errors to standard error. Commands are `version`, `project-list`, `project-get`, `project-create`, `project-update`, `project-set-archived`, `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, and `work-item-transition`.
 
 Options use `--kebab-case`. Mutating commands require `--actor-type` and `--actor-name`; update, archive, delete, and transition commands also require `--expected-revision`.
+
+Repository commands are `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, and `repository-pull`. Authentication commands are `token-issue`, `token-rotate`, `token-revoke`, and `token-cleanup`. Lifecycle commands are `build`, `release-create`, `release-publish`, `release-withdraw`, and `deploy`.
 
 ## MCP
 
