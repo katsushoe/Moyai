@@ -11,7 +11,7 @@ using Moyai.Domain.WorkItems;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
 
-GlobalExceptionHandler.Register(exception => WriteError(exception, true));
+GlobalExceptionHandler.Register(ReportFatalError);
 return await RunAsync(args);
 
 static async Task<int> RunAsync(string[] arguments)
@@ -72,7 +72,14 @@ static async Task<int> RunAsync(string[] arguments)
     }
     catch (Exception exception)
     {
-        WriteError(exception, false);
+        if (exception is ArgumentException or InvalidOperationException)
+        {
+            WriteError(exception, false);
+        }
+        else
+        {
+            ReportFatalError(exception);
+        }
         return 1;
     }
 }
@@ -101,6 +108,11 @@ static bool RequiredBoolean(IReadOnlyDictionary<string, string?> values, string 
 static DateTimeOffset? OptionalDate(IReadOnlyDictionary<string, string?> values, string name) => Optional(values, name) is string value ? DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : null;
 static bool HasFlag(IReadOnlyDictionary<string, string?> values, string name) => values.TryGetValue(name, out string? value) && value is null;
 static string ErrorCode(Exception exception) => exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+static void ReportFatalError(Exception exception)
+{
+    WriteError(exception, true);
+    ErrorDialog.Show("Moyai CLI error", "Moyai CLI encountered an unexpected error. See the error log for details.");
+}
 static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = ErrorCode(exception), message = exception.Message } }, SerializerOptions()));
 static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
 static JsonSerializerOptions SerializerOptions() => new(JsonSerializerDefaults.Web) { WriteIndented = true };
