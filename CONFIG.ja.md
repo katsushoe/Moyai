@@ -6,7 +6,7 @@ MoyaiのCLI、MCPサーバー、Provider接続に使う環境変数の正本で�
 
 ## Configuration Directory
 
-設定ファイルは使用しません。MSIは`C:\Moyai\config`を作成しますが、v1.0.2は環境変数だけを読み込みます。
+設定ファイルは使用しません。MSIは`C:\Moyai\config`を作成しますが、v1.0.3は環境変数だけを読み込みます。
 
 ## File Generation
 

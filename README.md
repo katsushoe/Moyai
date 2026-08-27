@@ -41,7 +41,7 @@ Prerequisites are the .NET 10 SDK, including support for targeting .NET 8, and t
 dotnet restore .\Moyai.slnx
 dotnet build .\Moyai.slnx --configuration Release --no-restore
 dotnet test .\Moyai.slnx --configuration Release --no-build
-.\scripts\Build-Installer.ps1 -Version 1.0.2
+.\scripts\Build-Installer.ps1 -Version 1.0.3
 ```
 
 ## Configuration

@@ -26,8 +26,8 @@ Optionは`--kebab-case`です。変更操作には`--actor-type`と`--actor-name
 
 - `project-list`: `project-list [--include-archived]`。既定ではarchive済みを除外します。
 - `project-get`: `project-get --name <name>`。保存済みProjectを返します。
-- `project-create`: `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`が必須です。
-- `project-update`: `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`が必須です。
+- `project-create`: `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`が必須で、Projectと1つのRepository紐付けを同時に作成します。
+- `project-update`: `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`が必須です。任意の`--repository-url`と`--repository-provider`で紐付けを変更でき、URLだけを指定した場合はProviderを再判定します。
 - `project-set-archived`: `--name --expected-revision --archived --actor-type --actor-name`が必須です。
 
 ### Work item commands
@@ -51,3 +51,5 @@ Optionは`--kebab-case`です。変更操作には`--actor-type`と`--actor-name
 ## Safety Notes
 
 commit、push、pull、build、release、deployの前にProvider対象を確認してください。`release-publish`と`deploy`は正確な対象への明示承認が必要です。token secretをログ、ソース、文書へ記録しません。
+
+Moyai v1は各Projectの一部としてRepositoryを1つだけ管理するため、独立した`repository-register`と`repository-unregister`はありません。紐付けの利用停止はProjectをarchiveします。

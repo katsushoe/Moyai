@@ -38,7 +38,7 @@ public sealed class ProjectService
         ArgumentNullException.ThrowIfNull(command);
         Project project = await GetAsync(command.CurrentName, cancellationToken).ConfigureAwait(false);
         string beforeJson = JsonSerializer.Serialize(project);
-        project.Update(command.Name, command.Description, command.BuildConfigJson, command.GitUserName, command.GitUserEmail, command.GitRemoteName, command.GitDefaultBranch, _timeProvider);
+        project.Update(command.Name, command.RepositoryUrl, command.RepositoryProvider, command.Description, command.BuildConfigJson, command.GitUserName, command.GitUserEmail, command.GitRemoteName, command.GitDefaultBranch, _timeProvider);
         ProjectEvent projectEvent = CreateEvent(project, "project_updated", command.ActorType, command.ActorName, beforeJson, JsonSerializer.Serialize(project));
         await _repository.UpdateAsync(project, command.ExpectedRevision, projectEvent, cancellationToken).ConfigureAwait(false);
         return project;

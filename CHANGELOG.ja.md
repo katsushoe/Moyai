@@ -2,6 +2,13 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.3 - 2026-08-28
+
+- Project更新コマンドとMCPツールからRepository URLおよびProviderを変更できるようにしました。
+- Repository URL変更時のProvider再判定と、明示指定によるroutingの上書きに対応しました。
+- Moyai v1では独立したregister/unregisterコマンドではなく、各Projectの一部としてRepository紐付けを1つ管理することを明記しました。
+- `1.0.2`からDB形式の変更はありません。
+
 ## 1.0.2 - 2026-08-28
 
 - 公開文書をプロジェクトのドキュメント標準に沿って再編しました。
