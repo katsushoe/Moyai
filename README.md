@@ -2,7 +2,7 @@
 
 Moyaiは、プロジェクトと作業項目をSQLiteで管理し、リポジトリ操作、ビルド、リリース、デプロイをProviderへ委譲するWindows向けツールです。CLIと、stateless Streamable HTTPのMCPサーバーを提供します。
 
-## v1.0.0
+## v1.0.1
 
 - 対応OS: Windows x64
 - インストール先: `C:\Moyai`
@@ -10,11 +10,11 @@ Moyaiは、プロジェクトと作業項目をSQLiteで管理し、リポジト
 - MCPサーバー: `C:\Moyai\bin\Moyai.Mcp.exe`
 - データベース: 利用者が`MOYAI_DB_PATH`で指定するSQLiteファイル
 
-[Moyai v1.0.0をダウンロード](https://github.com/katsushoe/Moyai/releases/tag/v1.0.0)
+[Moyai v1.0.1をダウンロード](https://github.com/katsushoe/Moyai/releases/tag/v1.0.1)
 
 ## クイックスタート
 
-1. リリースページから`Moyai-1.0.0-x64.msi`と`.sha256`をダウンロードします。
+1. リリースページから`Moyai-1.0.1-x64.msi`と`.sha256`をダウンロードします。
 2. SHA-256を検証してMSIを実行します。管理者権限が必要です。
 3. PowerShellでデータベースの場所を設定し、CLIを実行します。
 
@@ -40,6 +40,7 @@ MCPエンドポイントは`http://127.0.0.1:43120/mcp`です。従来のSSE tra
 
 - [インストール・設定・運用ガイド](docs/USER_GUIDE.md)
 - [設定リファレンス](CONFIG.md)
+- [v1.0.1リリースノート](docs/releases/v1.0.1.md)
 - [v1.0.0リリースノート](docs/releases/v1.0.0.md)
 - [初期アーキテクチャADR](docs/adr/0001-initial-architecture.md)
 
