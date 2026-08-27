@@ -10,12 +10,12 @@ using Moyai.Application.WorkItems;
 using Moyai.Domain.WorkItems;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
-using Moyai.Presentation.Windows;
 
-GlobalExceptionHandler.Register(ReportFatalError);
-return await RunAsync(args);
+string executedCommand = FormatCommand(args);
+GlobalExceptionHandler.Register(exception => ReportFatalError(exception, executedCommand));
+return await RunAsync(args, executedCommand);
 
-static async Task<int> RunAsync(string[] arguments)
+static async Task<int> RunAsync(string[] arguments, string executedCommand)
 {
     try
     {
@@ -75,11 +75,11 @@ static async Task<int> RunAsync(string[] arguments)
     {
         if (exception is ArgumentException or InvalidOperationException)
         {
-            WriteError(exception, false);
+            WriteError(exception, false, executedCommand);
         }
         else
         {
-            ReportFatalError(exception);
+            ReportFatalError(exception, executedCommand);
         }
         return 1;
     }
@@ -109,12 +109,31 @@ static bool RequiredBoolean(IReadOnlyDictionary<string, string?> values, string 
 static DateTimeOffset? OptionalDate(IReadOnlyDictionary<string, string?> values, string name) => Optional(values, name) is string value ? DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : null;
 static bool HasFlag(IReadOnlyDictionary<string, string?> values, string name) => values.TryGetValue(name, out string? value) && value is null;
 static string ErrorCode(Exception exception) => exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
-static void ReportFatalError(Exception exception)
+static void ReportFatalError(Exception exception, string executedCommand)
 {
-    WriteError(exception, true);
-    ErrorDialog.Show("Moyai CLI", exception);
+    WriteError(exception, true, executedCommand);
 }
-static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = ErrorCode(exception), message = exception.Message } }, SerializerOptions()));
+static void WriteError(Exception exception, bool fatal, string executedCommand) =>
+    Console.Error.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = executedCommand,
+        summary = $"{exception.GetType().Name}: {exception.Message}",
+        ok = false,
+        fatal,
+        error = new { code = ErrorCode(exception), message = exception.Message },
+    }, SerializerOptions()));
+
+static string FormatCommand(IReadOnlyList<string> arguments)
+{
+    string executable = Path.GetFileName(Environment.ProcessPath) ?? "Moyai.Cli";
+    return string.Join(' ', new[] { executable }.Concat(arguments.Select(QuoteArgument)));
+}
+
+static string QuoteArgument(string argument) =>
+    argument.Length == 0 || argument.Any(char.IsWhiteSpace) || argument.Contains('"', StringComparison.Ordinal)
+        ? $"\"{argument.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
+        : argument;
+
 static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
 static JsonSerializerOptions SerializerOptions() => new(JsonSerializerDefaults.Web) { WriteIndented = true };
 

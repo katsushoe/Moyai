@@ -67,8 +67,9 @@ partial class ErrorDialogForm
         detailsTextBox.Font = new Font("Consolas", 9F);
         detailsTextBox.Multiline = true;
         detailsTextBox.ReadOnly = true;
-        detailsTextBox.ScrollBars = ScrollBars.Both;
-        detailsTextBox.WordWrap = false;
+        detailsTextBox.ScrollBars = ScrollBars.Vertical;
+        detailsTextBox.TabStop = false;
+        detailsTextBox.WordWrap = true;
         buttonPanel.Controls.Add(closeButtonControl);
         buttonPanel.Dock = DockStyle.Fill;
         buttonPanel.FlowDirection = FlowDirection.RightToLeft;
