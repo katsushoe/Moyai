@@ -60,6 +60,7 @@ The CLI writes successful JSON to standard output, structured errors to standard
 - [Packages](PACKAGES.md)
 - [Security](SECURITY.md)
 - [Changelog](CHANGELOG.md)
+- [v1 Completion Roadmap](ROADMAP.md)
 - [Architecture decision](docs/adr/0001-initial-architecture.md)
 
 ## Security
