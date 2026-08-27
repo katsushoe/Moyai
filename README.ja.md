@@ -60,6 +60,7 @@ CLIは成功時のJSONを標準出力、構造化エラーを標準エラーへ�
 - [パッケージ（英語）](PACKAGES.md)
 - [セキュリティ（英語）](SECURITY.md)
 - [変更履歴](CHANGELOG.ja.md)
+- [v1完成ロードマップ](ROADMAP.ja.md)
 - [アーキテクチャ判断](docs/adr/0001-initial-architecture.md)
 
 ## Security
