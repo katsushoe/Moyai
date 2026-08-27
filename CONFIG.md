@@ -4,6 +4,8 @@
 
 - `MOYAI_DB_PATH`: SQLite database file path. Required by the CLI and MCP server.
 - `MOYAI_MCP_URL`: Streamable HTTP listen URL. Required by the MCP server and restricted to a loopback host, for example `http://127.0.0.1:43120`.
+- `GITHUBIE_MCP_URL`: Githubbie Streamable HTTP MCP endpoint on a loopback host.
+- `BUCKETTIE_MCP_URL`: Buckettie Streamable HTTP MCP endpoint on a loopback host.
 
 The MCP endpoint is `${MOYAI_MCP_URL}/mcp`. Legacy SSE transport and browser CORS are not enabled.
 
