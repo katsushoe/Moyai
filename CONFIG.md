@@ -24,3 +24,14 @@ The MCP server uses stateless Streamable HTTP. It exposes CLI-equivalent Project
 ## Installation
 
 The Windows MSI installer must install Moyai under `C:\Moyai`.
+
+The x64 MSI is built with WiX Toolset. Run:
+
+```powershell
+.\scripts\Build-Installer.ps1
+```
+
+The installer places self-contained CLI and MCP binaries in `C:\Moyai\bin` and creates
+`C:\Moyai\config`, `C:\Moyai\logs`, and `C:\Moyai\data`. The MSI does not ship settings,
+secrets, user data, or logs. These directories and their user-created contents are preserved
+when they are not empty during upgrade or uninstall.
