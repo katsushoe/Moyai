@@ -1,0 +1,67 @@
+# Moyai Commands
+
+[English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
+
+This document is the public command contract for `Moyai.Cli.exe`. MCP tools use the same operation names with underscores.
+
+## Command Groups
+
+| Group | Commands | Purpose |
+| :--- | :--- | :--- |
+| Project | `project-list`, `project-get`, `project-create`, `project-update`, `project-set-archived` | Project state |
+| Work item | `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, `work-item-transition` | Work tracking |
+| Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
+| Token | `token-issue`, `token-rotate`, `token-revoke`, `token-cleanup` | Internal service authentication |
+| Lifecycle | `build`, `release-create`, `release-publish`, `release-withdraw`, `deploy` | Provider-routed lifecycle operations |
+
+## Common Options
+
+Options use `--kebab-case`. Mutations require `--actor-type` and `--actor-name`; concurrency-protected mutations also require `--expected-revision`. Success is JSON on standard output with exit code `0`. Failure is JSON on standard error with exit code `1`, containing `command`, `summary`, `ok`, `fatal`, and `error`.
+
+## Commands
+
+Each command below has the syntax, processing rule, and result contract. Returned Project or WorkItem fields reflect persisted SQLite state; list filters change inclusion, and mutation results contain the new `revision`.
+
+### Project commands
+
+- `project-list`: `project-list [--include-archived]`; returns all non-archived projects unless the flag is present. Example: `Moyai.Cli.exe project-list`.
+- `project-get`: `project-get --name <name>`; returns the persisted project or an error when absent. Example: `Moyai.Cli.exe project-get --name Sample`.
+- `project-create`: requires `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`; optional `--install-path --repository-provider`; creates and returns a project. Names must be unique.
+- `project-update`: requires `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`; optional `--description --build-config-json --git-user-name --git-user-email --git-default-branch`; updates and returns the project, rejecting stale revisions.
+- `project-set-archived`: requires `--name --expected-revision --archived --actor-type --actor-name`; archives or restores and returns the project.
+
+### Work item commands
+
+- `work-item-list`: `work-item-list --project <name> [--include-deleted]`; returns persisted items, excluding deleted items by default.
+- `work-item-get`: requires `--project --key`; optional `--include-deleted`; returns one item or an error.
+- `work-item-create`: requires `--project --type --title --actor-type --actor-name`; `type` is `Task`, `Bug`, or `Change`; creates an atomic project/type key and returns the item.
+- `work-item-update`: requires `--project --key --title --priority --expected-revision --actor-type --actor-name`; optional `--description --severity --owner --metadata-json`; priority is `Low`, `Medium`, `High`, or `Critical`; severity is `Minor`, `Major`, or `Critical`; returns the updated item.
+- `work-item-set-deleted`: requires `--project --key --expected-revision --deleted --actor-type --actor-name`; soft-deletes or restores and returns the item.
+- `work-item-transition`: requires `--project --key --next-status --expected-revision --actor-type --actor-name`; applies the workflow for the item type and returns the item.
+
+### Repository commands
+
+- `repository-status`: `repository-status --project <name>`; returns Provider status.
+- `repository-diff`: `repository-diff --project <name>`; returns Provider diff.
+- `repository-commit`: requires `--project --message`; creates a Provider commit and returns Provider data.
+- `repository-push`: `repository-push --project <name>`; publishes allowed commits and returns Provider data.
+- `repository-pull`: `repository-pull --project <name>`; performs the Provider's allowed pull and returns Provider data.
+
+### Token commands
+
+- `token-issue`: requires `--audience --scopes --actor-type --actor-name`; optional `--expires-at`; scopes are comma-separated; returns the newly issued secret once.
+- `token-rotate`: same arguments as issue; invalidates the prior audience token and returns the replacement once.
+- `token-revoke`: requires `--audience --actor-type --actor-name`; revokes the audience token and returns the lifecycle result.
+- `token-cleanup`: requires `--actor-type --actor-name`; deletes expired tokens and returns the deleted count.
+
+### Lifecycle commands
+
+- `build`: requires `--project --actor-type --actor-name`; invokes the configured build Provider.
+- `release-create`: also requires `--version`; optional `--notes`; creates but does not publish a release.
+- `release-publish`: requires `--project --version --actor-type --actor-name`; publishes an existing release.
+- `release-withdraw`: requires the same options; withdraws an existing release.
+- `deploy`: requires `--project --artifact-path --actor-type --actor-name`; optional `--version`; deploys the verified artifact through the deploy Provider.
+
+## Safety Notes
+
+Review Provider targets before commit, push, pull, build, release, or deploy. `release-publish` and `deploy` require explicit approval for the exact target. Never place returned token secrets in logs, source, or documentation.
