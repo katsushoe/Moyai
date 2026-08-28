@@ -32,28 +32,27 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             using HttpClient httpClient = _httpClientFactory.CreateClient(Name);
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
-            string toolName = $"{_options.ToolPrefix}_{OperationName(request.Operation)}";
-            var arguments = new Dictionary<string, object?> { ["repository"] = request.Project };
-            if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message ?? throw new ArgumentException("Commit message is required.", nameof(request));
+            string toolName = RepositoryProviderContract.ToolName(_options.ToolPrefix, request.Operation);
+            IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(request);
             CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
             string? output = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
             return result.IsError is true
-                ? new RepositoryProviderResult(false, OperationName(request.Operation), null, "provider_operation_failed", output)
-                : new RepositoryProviderResult(true, OperationName(request.Operation), output, null, null);
+                ? Failure(request.Operation, output)
+                : new RepositoryProviderResult(true, RepositoryProviderContract.OperationName(request.Operation), output, null, null);
         }
-        catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
+        catch (Exception exception) when (exception is HttpRequestException or TimeoutException)
         {
-            return new RepositoryProviderResult(false, OperationName(request.Operation), null, "provider_auth_unavailable", exception.Message);
+            return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(request.Operation), null, "provider_unavailable", exception.Message);
+        }
+        catch (ModelContextProtocol.McpException exception)
+        {
+            return Failure(request.Operation, exception.Message);
         }
     }
 
-    private static string OperationName(RepositoryOperation operation) => operation switch
+    private static RepositoryProviderResult Failure(RepositoryOperation operation, string? detail)
     {
-        RepositoryOperation.Status => "repository_status",
-        RepositoryOperation.Diff => "repository_diff",
-        RepositoryOperation.Commit => "repository_commit",
-        RepositoryOperation.Push => "push",
-        RepositoryOperation.Pull => "pull",
-        _ => throw new ArgumentOutOfRangeException(nameof(operation)),
-    };
+        string code = RepositoryProviderContract.NormalizeErrorCode(detail);
+        return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(operation), null, code, detail);
+    }
 }

@@ -8,8 +8,9 @@ This document is the public command contract for `Moyai.Cli.exe`. MCP tools use 
 
 | Group | Commands | Purpose |
 | :--- | :--- | :--- |
-| Project | `project-list`, `project-get`, `project-create`, `project-update`, `project-set-archived` | Project state |
-| Work item | `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, `work-item-transition` | Work tracking |
+| Project | `project-list`, `project-get`, `project-create`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
+| Work item | `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, `work-item-transition`, `work-item-history`, `item-search` | Work tracking, history, and FTS5 search |
+| Collaboration | `relation-add/remove/list`, `comment-add/list`, `task-link-add/remove/list`, `commit-link-add/remove/list` | Persistent WorkItem collaboration records |
 | Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
 | Token | `token-issue`, `token-rotate`, `token-revoke`, `token-cleanup` | Internal service authentication |
 | Lifecycle | `build`, `release-create`, `release-publish`, `release-withdraw`, `deploy` | Provider-routed lifecycle operations |
@@ -29,15 +30,27 @@ Each command below has the syntax, processing rule, and result contract. Returne
 - `project-create`: requires `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`; optional `--install-path --repository-provider`; creates both the Project and its one Repository association. Names must be unique.
 - `project-update`: requires `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`; optional `--repository-url --repository-provider --description --build-config-json --git-user-name --git-user-email --git-default-branch`; updates and returns the project, rejecting stale revisions. A supplied URL with no Provider re-runs Provider inference; a supplied Provider changes routing explicitly.
 - `project-set-archived`: requires `--name --expected-revision --archived --actor-type --actor-name`; archives or restores and returns the project.
+- `project-overview`: requires `--project`; optional `--recent-limit` defaults to `10` and must be `1..100`; returns open WorkItem counts, blockers, latest stable release, planned release, and recent events.
+- `project-changes-since`: requires `--project --since`; optional `--offset --limit` default to `0` and `50`; returns events strictly after the ISO 8601 timestamp in deterministic chronological order.
 
 ### Work item commands
 
 - `work-item-list`: `work-item-list --project <name> [--include-deleted]`; returns persisted items, excluding deleted items by default.
 - `work-item-get`: requires `--project --key`; optional `--include-deleted`; returns one item or an error.
-- `work-item-create`: requires `--project --type --title --actor-type --actor-name`; `type` is `Task`, `Bug`, or `Change`; creates an atomic project/type key and returns the item.
+- `work-item-create`: requires `--project --type --title --actor-type --actor-name`; `type` is `Issue`, `Bug`, `ChangeRequest`, `Feature`, `Risk`, or `Decision`; creates an atomic project/type key and returns the item.
 - `work-item-update`: requires `--project --key --title --priority --expected-revision --actor-type --actor-name`; optional `--description --severity --owner --metadata-json`; priority is `Low`, `Medium`, `High`, or `Critical`; severity is `Minor`, `Major`, or `Critical`; returns the updated item.
 - `work-item-set-deleted`: requires `--project --key --expected-revision --deleted --actor-type --actor-name`; soft-deletes or restores and returns the item.
 - `work-item-transition`: requires `--project --key --next-status --expected-revision --actor-type --actor-name`; applies the workflow for the item type and returns the item.
+- `work-item-history`: requires `--project --key`; returns append-only audit events for the item and its collaboration records.
+- `item-search`: requires `--project --query`; optional `--type --status --priority --owner --created-after --updated-after --offset --limit`; searches title, description, and Comment body through FTS5. Deleted WorkItems are excluded. Pagination defaults to offset `0`, limit `50`, with a maximum limit of `100`.
+
+### Collaboration commands
+
+- `relation-add`: requires `--project --source-key --target-key --relation --actor-type --actor-name`; returns the relation and warnings. Supported relations are `relates_to`, `depends_on`, `blocks`, `duplicates`, `caused_by`, `implements`, and `supersedes`. A `depends_on`/`blocks` cycle is saved with `relation_cycle_detected`; reverse `relates_to` duplicates are rejected.
+- `relation-remove`: requires `--project --relation-id --actor-type --actor-name`; returns whether a relation was removed. `relation-list` requires `--project --key`.
+- `comment-add`: requires `--project --key --body --actor-type --actor-name`; appends an immutable comment. `comment-list` requires `--project --key`.
+- `task-link-add`: requires `--project --key --task-system --task-id --relation --actor-type --actor-name`; `hataori` is the standard task system. Remove uses `--project --link-id --actor-type --actor-name`; list uses `--project --key`.
+- `commit-link-add`: requires `--project --key --commit-hash --relation --actor-type --actor-name`; relation is `implements`, `fixes`, or `relates_to`. Remove uses `--project --link-id --actor-type --actor-name`; list uses `--project --key`.
 
 ### Repository commands
 

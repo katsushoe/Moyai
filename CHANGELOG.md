@@ -2,6 +2,18 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.5 - 2026-08-29
+
+- Repackaged version 1.0.4 without product behavior or database format changes.
+
+## 1.0.4 - 2026-08-29
+
+- Added SQLite schema v4 with relational constraints, revision contracts, and FTS5 synchronization.
+- Added WorkItem relations, comments, Hataori task links, commit links, search, Project Overview, and Changes Since operations.
+- Expanded the Repository Provider contract with capability, branch, and tag operations and normalized Provider errors.
+- Added matching CLI and MCP operations, tests, and user documentation.
+- Existing v1.0.3 databases migrate automatically with a backup created before migration.
+
 ## 1.0.3 - 2026-08-28
 
 - Added repository URL and Provider updates through the Project update command and MCP tool.
