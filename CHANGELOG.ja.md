@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.5 - 2026-08-29
+
+- 製品動作およびDB形式を変更せず、1.0.4を再パッケージしました。
+
 ## 1.0.4 - 2026-08-29
 
 - 関係制約、revision contract、FTS5同期を備えたSQLite schema v4を追加しました。
