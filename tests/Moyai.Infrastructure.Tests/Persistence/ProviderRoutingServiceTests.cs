@@ -59,6 +59,22 @@ public sealed class ProviderRoutingServiceTests
         Assert.Null(provider.LastRequest);
     }
 
+    [Fact]
+    public async Task ExecuteAsyncRoutesBranchMutationWithRepositoryContext()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+
+        await service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreate, branch: "feature/test");
+
+        RepositoryProviderRequest request = Assert.IsType<RepositoryProviderRequest>(provider.LastRequest);
+        Assert.Equal("feature/test", request.Branch);
+        Assert.Equal("source", request.SourcePath);
+        Assert.Equal("https://github.com/example/moyai", request.RepositoryUrl);
+        Assert.Equal("origin", request.RemoteName);
+        Assert.NotNull(request.ServiceToken);
+    }
+
     private sealed class RoutingFixture : IAsyncDisposable
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-routing-{Guid.NewGuid():N}.db");

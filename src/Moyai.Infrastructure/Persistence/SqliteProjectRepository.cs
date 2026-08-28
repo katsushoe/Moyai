@@ -101,9 +101,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
 
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
     {
-        var connection = new SqliteConnection(_options.ConnectionString);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        return connection;
+        return await SqliteConnectionFactory.OpenAsync(_options, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task InsertProjectAsync(SqliteConnection connection, SqliteTransaction transaction, Project project, CancellationToken cancellationToken)

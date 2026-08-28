@@ -8,4 +8,9 @@ public sealed record RepositoryProviderRequest(
     string RemoteName,
     RepositoryOperation Operation,
     string? Message,
-    string? ServiceToken);
+    string? ServiceToken,
+    string? Branch = null,
+    string? Tag = null,
+    string? DefaultBranch = null,
+    string? GitUserName = null,
+    string? GitUserEmail = null);

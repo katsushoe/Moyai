@@ -12,7 +12,7 @@ namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, WorkItemService items, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
+public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
 {
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
@@ -35,6 +35,12 @@ public sealed class MoyaiTools(ProjectService projects, WorkItemService items, A
     [McpServerTool(Name = "project_set_archived"), Description("Archives or restores a Moyai project using optimistic concurrency.")]
     public Task<Project> ProjectSetArchived(string name, long expectedRevision, bool archived, string actorType, string actorName, CancellationToken cancellationToken = default) =>
         projects.SetArchivedAsync(name, expectedRevision, archived, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "project_overview", ReadOnly = true), Description("Returns an aggregate Project view with open item counts, blockers, releases, and recent changes.")]
+    public Task<ProjectOverview> ProjectOverview(string project, int recentLimit = 10, CancellationToken cancellationToken = default) => queries.GetOverviewAsync(project, recentLimit, cancellationToken);
+
+    [McpServerTool(Name = "project_changes_since", ReadOnly = true), Description("Returns paged append-only Project events after the specified timestamp.")]
+    public Task<ProjectChanges> ProjectChangesSince(string project, DateTimeOffset since, int offset = 0, int limit = 50, CancellationToken cancellationToken = default) => queries.GetChangesSinceAsync(project, since, offset, limit, cancellationToken);
 
     [McpServerTool(Name = "work_item_list", ReadOnly = true), Description("Lists work items for a Moyai project.")]
     public Task<IReadOnlyList<WorkItem>> WorkItemList(string project, bool includeDeleted = false, CancellationToken cancellationToken = default) =>
@@ -60,6 +66,45 @@ public sealed class MoyaiTools(ProjectService projects, WorkItemService items, A
     public Task<WorkItem> WorkItemTransition(string project, string key, string nextStatus, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
         items.TransitionAsync(new TransitionWorkItemCommand(project, key, nextStatus, expectedRevision, actorType, actorName), cancellationToken);
 
+    [McpServerTool(Name = "work_item_history", ReadOnly = true), Description("Lists append-only audit events associated with a work item.")]
+    public Task<IReadOnlyList<Moyai.Domain.Events.ProjectEvent>> WorkItemHistory(string project, string key, CancellationToken cancellationToken = default) => collaboration.ListHistoryAsync(project, key, cancellationToken);
+
+    [McpServerTool(Name = "item_search", ReadOnly = true), Description("Searches WorkItem titles, descriptions, and comments through SQLite FTS5 with optional filters and pagination.")]
+    public Task<PagedResult<WorkItem>> ItemSearch(string project, string query, WorkItemType? type = null, string? status = null, WorkItemPriority? priority = null, string? owner = null, DateTimeOffset? createdAfter = null, DateTimeOffset? updatedAfter = null, int offset = 0, int limit = 50, CancellationToken cancellationToken = default) => queries.SearchAsync(new WorkItemSearchRequest(project, query, type, status, priority, owner, createdAfter, updatedAfter, offset, limit), cancellationToken);
+
+    [McpServerTool(Name = "relation_add"), Description("Adds a WorkItem relation and returns a cycle warning when applicable.")]
+    public Task<RelationAddResult> RelationAdd(string project, string sourceKey, string targetKey, string relation, string actorType, string actorName, CancellationToken cancellationToken = default) => collaboration.AddRelationAsync(project, sourceKey, targetKey, relation, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "relation_remove"), Description("Removes a WorkItem relation and records an audit event.")]
+    public Task<bool> RelationRemove(string project, Guid relationId, string actorType, string actorName, CancellationToken cancellationToken = default) => collaboration.RemoveRelationAsync(project, relationId, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "relation_list", ReadOnly = true), Description("Lists relations involving a WorkItem.")]
+    public Task<IReadOnlyList<WorkItemRelation>> RelationList(string project, string key, CancellationToken cancellationToken = default) => collaboration.ListRelationsAsync(project, key, cancellationToken);
+
+    [McpServerTool(Name = "comment_add"), Description("Appends a persistent WorkItem comment.")]
+    public Task<WorkItemComment> CommentAdd(string project, string key, string body, string authorType, string authorName, CancellationToken cancellationToken = default) => collaboration.AddCommentAsync(project, key, body, authorType, authorName, cancellationToken);
+
+    [McpServerTool(Name = "comment_list", ReadOnly = true), Description("Lists persistent comments for a WorkItem.")]
+    public Task<IReadOnlyList<WorkItemComment>> CommentList(string project, string key, CancellationToken cancellationToken = default) => collaboration.ListCommentsAsync(project, key, cancellationToken);
+
+    [McpServerTool(Name = "task_link_add"), Description("Links a WorkItem to an external task such as Hataori.")]
+    public Task<WorkItemTaskLink> TaskLinkAdd(string project, string key, string taskSystem, string taskId, string relation, string actorType, string actorName, CancellationToken cancellationToken = default) => collaboration.AddTaskLinkAsync(project, key, taskSystem, taskId, relation, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "task_link_remove"), Description("Removes an external task link from a WorkItem.")]
+    public Task<bool> TaskLinkRemove(string project, Guid linkId, string actorType, string actorName, CancellationToken cancellationToken = default) => collaboration.RemoveTaskLinkAsync(project, linkId, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "task_link_list", ReadOnly = true), Description("Lists external task links for a WorkItem.")]
+    public Task<IReadOnlyList<WorkItemTaskLink>> TaskLinkList(string project, string key, CancellationToken cancellationToken = default) => collaboration.ListTaskLinksAsync(project, key, cancellationToken);
+
+    [McpServerTool(Name = "commit_link_add"), Description("Links a repository commit to a WorkItem.")]
+    public Task<WorkItemCommitLink> CommitLinkAdd(string project, string key, string commitHash, string relation, string actorType, string actorName, CancellationToken cancellationToken = default) => collaboration.AddCommitLinkAsync(project, key, commitHash, relation, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "commit_link_remove"), Description("Removes a repository commit link from a WorkItem.")]
+    public Task<bool> CommitLinkRemove(string project, Guid linkId, string actorType, string actorName, CancellationToken cancellationToken = default) => collaboration.RemoveCommitLinkAsync(project, linkId, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "commit_link_list", ReadOnly = true), Description("Lists repository commit links for a WorkItem.")]
+    public Task<IReadOnlyList<WorkItemCommitLink>> CommitLinkList(string project, string key, CancellationToken cancellationToken = default) => collaboration.ListCommitLinksAsync(project, key, cancellationToken);
+
     [McpServerTool(Name = "auth_introspect", ReadOnly = true), Description("Validates an internal Moyai service token for a provider audience and scope.")]
     public Task<AuthIntrospectionResult> AuthIntrospect(string token, string audience, string scope, CancellationToken cancellationToken = default) =>
         authentication.IntrospectAsync(token, audience, scope, cancellationToken);
@@ -67,17 +112,41 @@ public sealed class MoyaiTools(ProjectService projects, WorkItemService items, A
     [McpServerTool(Name = "repository_status", ReadOnly = true), Description("Gets repository status through the Provider configured for a Moyai-managed project.")]
     public Task<RepositoryProviderResult> RepositoryStatus(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Status, cancellationToken: cancellationToken);
 
+    [McpServerTool(Name = "provider_version", ReadOnly = true), Description("Returns version information from the Repository Provider selected by the Project.")]
+    public Task<RepositoryProviderResult> ProviderVersion(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.ProviderVersion, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "provider_capabilities", ReadOnly = true), Description("Returns Repository Provider capabilities for negotiation before optional operations.")]
+    public Task<RepositoryProviderResult> ProviderCapabilities(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.ProviderCapabilities, cancellationToken: cancellationToken);
+
     [McpServerTool(Name = "repository_diff", ReadOnly = true), Description("Gets repository diff through the Provider configured for a Moyai-managed project.")]
     public Task<RepositoryProviderResult> RepositoryDiff(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Diff, cancellationToken: cancellationToken);
 
     [McpServerTool(Name = "repository_commit"), Description("Commits a Moyai-managed repository through its configured Provider using internal service authentication.")]
-    public Task<RepositoryProviderResult> RepositoryCommit(string project, string message, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Commit, message, cancellationToken);
+    public Task<RepositoryProviderResult> RepositoryCommit(string project, string message, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Commit, message, cancellationToken: cancellationToken);
 
     [McpServerTool(Name = "repository_push"), Description("Pushes a Moyai-managed repository through its configured Provider using internal service authentication.")]
     public Task<RepositoryProviderResult> RepositoryPush(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Push, cancellationToken: cancellationToken);
 
     [McpServerTool(Name = "repository_pull"), Description("Pulls a Moyai-managed repository through its configured Provider using internal service authentication.")]
     public Task<RepositoryProviderResult> RepositoryPull(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Pull, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "branch_list", ReadOnly = true), Description("Lists branches through the Project Repository Provider.")]
+    public Task<RepositoryProviderResult> BranchList(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.BranchList, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "branch_create"), Description("Creates a branch through the Project Repository Provider.")]
+    public Task<RepositoryProviderResult> BranchCreate(string project, string branch, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.BranchCreate, branch: branch, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "branch_delete", Destructive = true), Description("Deletes an allowed branch through the Project Repository Provider.")]
+    public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "tag_create"), Description("Creates a tag through the Project Repository Provider.")]
+    public Task<RepositoryProviderResult> TagCreate(string project, string tag, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "tag_delete", Destructive = true), Description("Deletes an allowed tag through the Project Repository Provider.")]
+    public Task<RepositoryProviderResult> TagDelete(string project, string tag, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.TagDelete, tag: tag, cancellationToken: cancellationToken);
+
+    [McpServerTool(Name = "tag_push"), Description("Pushes an existing local tag through the Project Repository Provider.")]
+    public Task<RepositoryProviderResult> TagPush(string project, string tag, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.TagPush, tag: tag, cancellationToken: cancellationToken);
 
     [McpServerTool(Name = "build", Destructive = true), Description("Builds a Moyai-managed project through its configured build Provider.")]
     public Task<LifecycleResult> Build(string project, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.Build, actorType, actorName, cancellationToken: cancellationToken);
