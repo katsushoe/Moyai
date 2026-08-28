@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.5 - 2026-08-29
+
+- Repackaged version 1.0.4 without product behavior or database format changes.
+
 ## 1.0.4 - 2026-08-29
 
 - Added SQLite schema v4 with relational constraints, revision contracts, and FTS5 synchronization.

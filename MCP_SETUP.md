@@ -67,7 +67,7 @@ Use one server process and database per isolation boundary. Assign a distinct lo
 
 1. Confirm the endpoint is listening.
 2. Confirm the client discovers tools.
-3. Confirm `get_version` returns `Moyai` and `1.0.4.0`.
+3. Confirm `get_version` returns `Moyai` and `1.0.5.0`.
 4. Confirm `project_list` returns JSON-compatible structured data.
 5. Stop at the first failed stage and inspect server standard error.
 
