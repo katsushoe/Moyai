@@ -22,8 +22,7 @@ public sealed class SqliteLifecycleEventWriter : ILifecycleEventWriter
     public async Task WriteAsync(Guid projectId, LifecycleAction action, LifecycleResult result, string actorType, string actorName, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(result);
-        await using var connection = new SqliteConnection(_options.ConnectionString);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using SqliteConnection connection = await SqliteConnectionFactory.OpenAsync(_options, cancellationToken).ConfigureAwait(false);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText = "INSERT INTO events(id,project_id,entity_type,entity_id,event_type,actor_type,actor_name,before_json,after_json,message,created_at) VALUES($id,$project,'lifecycle',$project,$event,$actor_type,$actor_name,NULL,$after,$message,$created);";
         command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("D", CultureInfo.InvariantCulture));

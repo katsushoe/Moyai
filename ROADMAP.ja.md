@@ -12,15 +12,17 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン1: データ・監査基盤
 
-- Relation、Comment、Task Link、Commit Link、Release、Release Item、Release Artifact、Build、Build Artifact、Deployment Target、Deploymentのmigrationとrepositoryを追加します。
+- 状態: 2026-08-28完了。
+- Relation、Comment、Task Link、Commit Link、Release、Release Item、Release Artifact、Build、Build Artifact、Deployment Target、Deploymentのmigrationと永続化contractを追加します。Entity固有repositoryは、永続化とApplication動作を一緒に検証するため、対象機能のマイルストーンで実装します。
 - 安定したID、revision、日時、制約、外部キーを定義します。
 - Append-only Event HistoryとMigration前Backupを維持します。
 - Migration upgrade、失敗時rollback、制約、WAL、同時更新をテストします。
 
-完了条件: v1.0.3の既存DBをデータ損失なく更新でき、すべての新しい可変EntityがOptimistic LockとAudit Eventに対応していること。
+完了条件: v1.0.3の既存DBをデータ損失なく更新でき、すべての新しい可変tableがrevision contractを持ち、外部キー、immutable record、append-only record、1対1 cardinalityをSQLiteが強制し、すべての実行時接続で外部キー検証が有効なこと。状態変更のAudit Eventは、対象機能のEntity固有repositoryと同時に追加します。
 
 ## マイルストーン2: WorkItem連携
 
+- 状態: 2026-08-28完了。
 - 方向とcycle検証を含むRelationの追加・削除・一覧を実装します。
 - Commentの追加・一覧を実装します。
 - Hataori Task LinkとCommit Linkの追加・削除・一覧を実装します。
@@ -31,6 +33,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン3: 検索・Project集約表示
 
+- 状態: 2026-08-28完了。
 - FTS5 WorkItem indexを追加し、更新に追従させます。
 - 条件指定可能なWorkItem Searchを実装します。
 - Project OverviewとChanges Sinceを実装します。

@@ -23,8 +23,7 @@ public sealed class SqliteMigrationRunner
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqliteConnection(_options.ConnectionString);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using SqliteConnection connection = await SqliteConnectionFactory.OpenAsync(_options, cancellationToken).ConfigureAwait(false);
         int currentVersion = await GetVersionAsync(connection, cancellationToken).ConfigureAwait(false);
         int requiredVersion = _migrations.Length == 0 ? 0 : _migrations[^1].Version;
         if (currentVersion > requiredVersion) throw new InvalidOperationException($"Database version {currentVersion} is newer than supported version {requiredVersion}.");

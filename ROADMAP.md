@@ -12,15 +12,17 @@ Lifecycle operations currently delegate to Providers and record events; they do 
 
 ## Milestone 1: Data and Audit Foundation
 
-- Add migrations and repositories for relations, comments, task links, commit links, releases, release items, release artifacts, builds, build artifacts, deployment targets, and deployments.
+- Status: complete on 2026-08-28.
+- Add migrations and persistence contracts for relations, comments, task links, commit links, releases, release items, release artifacts, builds, build artifacts, deployment targets, and deployments. Entity-specific repositories are delivered with their owning functional milestones so that persistence and application behavior are tested together.
 - Define stable IDs, revision fields, timestamps, constraints, and foreign keys.
 - Preserve append-only event history and migration-before-backup behavior.
 - Add migration upgrade, rollback-on-failure, constraint, WAL, and concurrency tests.
 
-Exit criteria: an existing v1.0.3 database upgrades without data loss, and every new mutable entity uses optimistic locking and audit events.
+Exit criteria: an existing v1.0.3 database upgrades without data loss; every new mutable table has a revision contract; foreign keys, immutable records, append-only records, and one-to-one cardinality are enforced by SQLite; every runtime connection enables foreign-key enforcement. Audit events for state-changing operations are added with the entity-specific repositories in the owning functional milestones.
 
 ## Milestone 2: WorkItem Collaboration
 
+- Status: complete on 2026-08-28.
 - Implement relation add/remove/list with direction and cycle validation.
 - Implement comment add/list.
 - Implement Hataori task link and commit link add/remove/list.
@@ -31,6 +33,7 @@ Exit criteria: Acceptance Criteria 7, 8, 9, and the WorkItem history requirement
 
 ## Milestone 3: Search and Project Views
 
+- Status: complete on 2026-08-28.
 - Add and maintain the FTS5 WorkItem index.
 - Implement filtered WorkItem search.
 - Implement Project Overview and Changes Since.

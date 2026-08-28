@@ -8,8 +8,9 @@
 
 | Group | Commands | 用途 |
 | :--- | :--- | :--- |
-| Project | `project-list`、`project-get`、`project-create`、`project-update`、`project-set-archived` | Project状態 |
-| Work item | `work-item-list`、`work-item-get`、`work-item-create`、`work-item-update`、`work-item-set-deleted`、`work-item-transition` | 作業管理 |
+| Project | `project-list`、`project-get`、`project-create`、`project-update`、`project-set-archived`、`project-overview`、`project-changes-since` | Project状態・集約表示 |
+| Work item | `work-item-list`、`work-item-get`、`work-item-create`、`work-item-update`、`work-item-set-deleted`、`work-item-transition`、`work-item-history`、`item-search` | 作業管理・履歴・FTS5検索 |
+| Collaboration | `relation-add/remove/list`、`comment-add/list`、`task-link-add/remove/list`、`commit-link-add/remove/list` | WorkItem連携記録 |
 | Repository | `repository-status`、`repository-diff`、`repository-commit`、`repository-push`、`repository-pull` | Provider経由Git操作 |
 | Token | `token-issue`、`token-rotate`、`token-revoke`、`token-cleanup` | Service認証 |
 | Lifecycle | `build`、`release-create`、`release-publish`、`release-withdraw`、`deploy` | Lifecycle操作 |
@@ -29,12 +30,23 @@ Optionは`--kebab-case`です。変更操作には`--actor-type`と`--actor-name
 - `project-create`: `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`が必須で、Projectと1つのRepository紐付けを同時に作成します。
 - `project-update`: `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`が必須です。任意の`--repository-url`と`--repository-provider`で紐付けを変更でき、URLだけを指定した場合はProviderを再判定します。
 - `project-set-archived`: `--name --expected-revision --archived --actor-type --actor-name`が必須です。
+- `project-overview --project`はOpen WorkItem件数、blocker、最新stable Release、予定Release、直近Eventを返します。`--recent-limit`は既定`10`、範囲`1..100`です。
+- `project-changes-since`は`--project --since`が必須で、指定したISO 8601日時より後のEventを時系列順に返します。`--offset --limit`の既定値は`0`と`50`です。
 
 ### Work item commands
 
 - `work-item-list`、`work-item-get`は保存状態を返し、`--include-deleted`で削除済みを含めます。
 - `work-item-create`は`--project --type --title --actor-type --actor-name`が必須です。
 - `work-item-update`、`work-item-set-deleted`、`work-item-transition`はProject、key、revision、actorが必須です。
+- `work-item-history --project --key`はWorkItemと関連記録の追記専用Audit Eventを返します。
+- `item-search`は`--project --query`が必須で、任意の`--type --status --priority --owner --created-after --updated-after --offset --limit`を指定できます。Title、Description、Comment本文をFTS5検索し、削除済みWorkItemを除外します。limitの既定値は`50`、上限は`100`です。
+
+### Collaboration commands
+
+- `relation-add`は`--project --source-key --target-key --relation --actor-type --actor-name`が必須です。`depends_on`または`blocks`のcycleは保存したうえで`relation_cycle_detected`を返し、`relates_to`の逆順重複は拒否します。削除は`--relation-id`、一覧は`--key`を指定します。
+- `comment-add`は`--project --key --body --actor-type --actor-name`で編集・削除不可のCommentを追記します。一覧は`comment-list --project --key`です。
+- `task-link-add`は`--project --key --task-system --task-id --relation --actor-type --actor-name`で外部Taskを関連付けます。標準task systemは`hataori`です。削除は`--link-id`、一覧は`--key`を指定します。
+- `commit-link-add`は`--project --key --commit-hash --relation --actor-type --actor-name`でCommitを関連付けます。relationは`implements`、`fixes`、`relates_to`です。削除は`--link-id`、一覧は`--key`を指定します。
 
 ### Repository commands
 
