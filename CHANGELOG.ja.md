@@ -2,6 +2,14 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.4 - 2026-08-29
+
+- 関係制約、revision contract、FTS5同期を備えたSQLite schema v4を追加しました。
+- WorkItem relation、comment、Hataori task link、commit link、検索、Project Overview、Changes Since操作を追加しました。
+- Repository Provider contractへ能力照会、branch、tag操作を追加し、Providerエラーを正規化しました。
+- 対応するCLI・MCP操作、テスト、利用者向け文書を追加しました。
+- 既存のv1.0.3 DBは、migration前にbackupを作成して自動更新します。
+
 ## 1.0.3 - 2026-08-28
 
 - Project更新コマンドとMCPツールからRepository URLおよびProviderを変更できるようにしました。
