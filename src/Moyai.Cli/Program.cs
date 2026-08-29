@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Moyai.Application.Builds;
+using Moyai.Application.Deployments;
 using Moyai.Application.Diagnostics;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
@@ -46,6 +47,7 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
         var lifecycle = new LifecycleService(repository, tokenRepository, CreateLifecycleProviders(providerServices.GetRequiredService<IHttpClientFactory>()), new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System);
         var releaseOrchestration = new ReleaseOrchestrationService(releases, releaseContent, lifecycle);
         var builds = new BuildService(repository, new SqliteBuildRepository(options), routing, lifecycle, TimeProvider.System);
+        var deployments = new DeploymentService(repository, new SqliteBuildRepository(options), new SqliteReleaseRepository(options), new SqliteDeploymentRepository(options), lifecycle, TimeProvider.System);
         var tokens = new Moyai.Application.Authentication.ServiceTokenLifecycleService(tokenRepository, TimeProvider.System);
         IReadOnlyDictionary<string, string?> values = ParseOptions(arguments[1..]);
 
@@ -118,7 +120,15 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
             "release-withdraw" => await releaseOrchestration.WithdrawAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
             "release-latest" => await releaseOrchestration.LatestAsync(Required(values, "project")),
             "release-overview" => await releaseOrchestration.OverviewAsync(Required(values, "project"), Required(values, "version")),
-            "deploy" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Deploy, Required(values, "actor-type"), Required(values, "actor-name"), Optional(values, "version"), Required(values, "artifact-path")),
+            "deployment-target-get" => await deployments.GetTargetAsync(Required(values, "project")),
+            "deployment-target-update" => await deployments.UpdateTargetAsync(Required(values, "project"), Required(values, "name"), Required(values, "mode"), Required(values, "destination-path"), Optional(values, "kelpie-target"), Optional(values, "config-json"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy" => await deployments.StartAsync(Required(values, "project"), RequiredGuid(values, "build-id"), RequiredGuid(values, "artifact-id"), Optional(values, "version"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy-start" => await deployments.StartAsync(Required(values, "project"), RequiredGuid(values, "build-id"), RequiredGuid(values, "artifact-id"), Optional(values, "version"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy-get" => await deployments.GetAsync(Required(values, "project"), RequiredGuid(values, "deployment-id")),
+            "deploy-list" => await deployments.ListAsync(Required(values, "project")),
+            "deploy-status" => await deployments.GetAsync(Required(values, "project"), RequiredGuid(values, "deployment-id")),
+            "deploy-retry" => await deployments.RetryAsync(Required(values, "project"), RequiredGuid(values, "deployment-id"), RequiredGuid(values, "artifact-id"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy-rollback" => await deployments.RollbackAsync(Required(values, "project"), RequiredGuid(values, "deployment-id"), Required(values, "actor-type"), Required(values, "actor-name")),
             _ => throw new ArgumentException($"Unknown command '{arguments[0]}'."),
         };
         WriteJson(result);

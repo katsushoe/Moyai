@@ -50,11 +50,11 @@ public sealed class LifecycleService
         string? scope = action switch
         {
             LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw => "release.write",
-            LifecycleAction.Deploy => "deploy.write",
+            LifecycleAction.Deploy or LifecycleAction.DeployRollback => "deploy.write",
             _ => null,
         };
         if (scope is null) return null;
-        string audience = action == LifecycleAction.Deploy ? project.DeployMode : RepositoryProviderName(project.RepositoryProvider);
+        string audience = action is LifecycleAction.Deploy or LifecycleAction.DeployRollback ? project.DeployMode : RepositoryProviderName(project.RepositoryProvider);
         ServiceToken token = await _tokens.FindByAudienceAsync(audience, cancellationToken).ConfigureAwait(false)
             ?? throw new ProviderRoutingException("invalid_service_token", $"An active service token for '{audience}' is required.");
         if (token.ExpiresAt is not null && token.ExpiresAt <= _timeProvider.GetUtcNow()) throw new ProviderRoutingException("service_token_expired", $"The service token for '{audience}' has expired.");
@@ -66,7 +66,7 @@ public sealed class LifecycleService
     {
         LifecycleAction.Build or LifecycleAction.BuildClean => project.BuildProvider,
         LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw => RepositoryProviderName(project.RepositoryProvider),
-        LifecycleAction.Deploy => project.DeployMode,
+        LifecycleAction.Deploy or LifecycleAction.DeployRollback => project.DeployMode,
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
@@ -75,6 +75,6 @@ public sealed class LifecycleService
     private static void ValidateInput(LifecycleAction action, string? version, string? artifactPath)
     {
         if (action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw) ArgumentException.ThrowIfNullOrWhiteSpace(version);
-        if (action == LifecycleAction.Deploy) ArgumentException.ThrowIfNullOrWhiteSpace(artifactPath);
+        if (action is LifecycleAction.Deploy or LifecycleAction.DeployRollback) ArgumentException.ThrowIfNullOrWhiteSpace(artifactPath);
     }
 }

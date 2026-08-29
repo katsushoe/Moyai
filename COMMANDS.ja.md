@@ -15,7 +15,7 @@
 | Token | `token-issue`、`token-rotate`、`token-revoke`、`token-cleanup` | Service認証 |
 | Release | `release-create/get/list/update/transition`、`release-add/remove/list-items`、`release-add/remove/list-artifacts`、`release-prepare/mark-ready/publish/retry/withdraw`、`release-latest/overview` | Release状態、内容、公開 |
 | Build | `build`、`build-start`、`build-get`、`build-list`、`build-artifacts`、`build-clean` | 追跡可能なBuild実行とArtifact |
-| Lifecycle | `deploy` | Provider経由Deploy操作 |
+| Deployment | `deployment-target-get/update`、`deploy/start/get/list/status/retry/rollback` | Local／KelpieSSH Deployの追跡管理 |
 
 ## Common Options
 
@@ -76,7 +76,9 @@ Project名の検索、重複登録判定、変更対象の解決にはOrdinalな
 
 `build`と`build-start`は`--project --actor-type --actor-name`が必須で、`--configuration`の既定値は`Release`です。Repository ProviderからSource CommitとDirty状態を取得し、Dirtyな標準BuildはBuild Provider実行前に拒否します。`build-get`、`build-list`、`build-artifacts`は永続状態を返し、`build-clean --project --actor-type --actor-name`はBuild／Artifact履歴を保持してProviderのclean操作を実行します。
 
-`release-publish`、`release-withdraw`、`deploy`はProject、actorと操作固有のversion、artifact pathをProviderへ渡します。
+`deployment-target-update`は`--project --name --mode --destination-path --expected-revision --actor-type --actor-name`が必須で、初回作成時のrevisionは`0`です。Server modeでは`--kelpie-target`も必須で、`--config-json`に資格情報を保存しません。
+
+`deploy`と`deploy-start`は`--project --build-id --artifact-id --actor-type --actor-name`が必須で、任意の`--version`でReleaseを関連付けます。成功済みBuildの検証済みArtifactだけを受け付けます。get／status／list／retry／rollbackはDeployment状態と失敗履歴を保持し、Rollback失敗を`rollback_failed`として記録します。
 
 ## Safety Notes
 

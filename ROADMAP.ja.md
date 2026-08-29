@@ -75,6 +75,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン7: Deploy管理
 
+- 状態: 2026-08-30完了。
 - 1 Project = 1 DeploymentTargetを実装します。
 - `install_path`へのLocal Deployとverifyを実装します。
 - SSH secretを保存せず、KelpieSSH Streamable HTTP経由のServer Deployを実装します。

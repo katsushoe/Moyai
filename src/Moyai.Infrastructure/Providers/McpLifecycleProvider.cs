@@ -60,6 +60,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         LifecycleAction.ReleasePublish => "release_publish",
         LifecycleAction.ReleaseWithdraw => "release_withdraw",
         LifecycleAction.Deploy => "deploy",
+        LifecycleAction.DeployRollback => "deploy_rollback",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 }

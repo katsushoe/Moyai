@@ -9,4 +9,5 @@ public enum LifecycleAction
     ReleasePublish,
     ReleaseWithdraw,
     Deploy,
+    DeployRollback,
 }

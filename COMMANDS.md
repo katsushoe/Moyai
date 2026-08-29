@@ -15,7 +15,7 @@ This document is the public command contract for `Moyai.Cli.exe`. MCP tools use 
 | Token | `token-issue`, `token-rotate`, `token-revoke`, `token-cleanup` | Internal service authentication |
 | Release | `release-create/get/list/update/transition`, `release-add/remove/list-items`, `release-add/remove/list-artifacts`, `release-prepare/mark-ready/publish/retry/withdraw`, `release-latest/overview` | Release state, contents, and publishing |
 | Build | `build`, `build-start`, `build-get`, `build-list`, `build-artifacts`, `build-clean` | Tracked build execution and artifacts |
-| Lifecycle | `deploy` | Provider-routed deployment |
+| Deployment | `deployment-target-get/update`, `deploy/start/get/list/status/retry/rollback` | Tracked Local and KelpieSSH deployment |
 
 ## Common Options
 
@@ -87,7 +87,9 @@ Each command below has the syntax, processing rule, and result contract. Returne
 - `release-latest --project` returns the latest released stable version by `released_at`. `release-overview --project --version` returns the Release, WorkItem relations, and artifact metadata.
 - `release-publish`: requires `--project --version --actor-type --actor-name`; publishes an existing release.
 - `release-withdraw`: requires the same options; withdraws an existing release.
-- `deploy`: requires `--project --artifact-path --actor-type --actor-name`; optional `--version`; deploys the verified artifact through the deploy Provider.
+- `deployment-target-get`: requires `--project`. `deployment-target-update` requires `--project --name --mode --destination-path --expected-revision --actor-type --actor-name`; use revision `0` for first creation. Server mode also requires `--kelpie-target`, and optional `--config-json` never contains credentials.
+- `deploy` / `deploy-start`: require `--project --build-id --artifact-id --actor-type --actor-name`; optional `--version` links a Release. Only a succeeded managed Build and its verified immutable Artifact are accepted.
+- `deploy-get`, `deploy-status`: require `--project --deployment-id`; `deploy-list` requires `--project`. `deploy-retry` additionally requires `--artifact-id --actor-type --actor-name`. `deploy-rollback` requires actor options and records `rollback_failed` rather than hiding failure.
 
 ## Safety Notes
 
