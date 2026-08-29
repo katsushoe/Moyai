@@ -1,4 +1,4 @@
-namespace Moyai.Domain.Releases;
+﻿namespace Moyai.Domain.Releases;
 
 /// <summary>ProjectのRelease履歴と公開状態を表します。</summary>
 public sealed class Release

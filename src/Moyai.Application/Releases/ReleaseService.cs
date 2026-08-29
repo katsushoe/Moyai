@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Moyai.Application.Projects;
 using Moyai.Domain.Events;
 using Moyai.Domain.Releases;
