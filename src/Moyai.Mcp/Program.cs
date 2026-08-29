@@ -37,6 +37,7 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<SqliteProjectQueryRepository>();
         builder.Services.AddSingleton<SqliteServiceTokenRepository>();
         builder.Services.AddSingleton<SqliteReleaseRepository>();
+        builder.Services.AddSingleton<SqliteReleaseContentRepository>();
         builder.Services.AddSingleton<SqliteLifecycleEventWriter>();
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddSingleton<ProjectService>(serviceProvider => new ProjectService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
@@ -44,6 +45,7 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<WorkItemCollaborationService>(serviceProvider => new WorkItemCollaborationService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteWorkItemRepository>(), serviceProvider.GetRequiredService<SqliteWorkItemCollaborationRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<ProjectQueryService>(serviceProvider => new ProjectQueryService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteProjectQueryRepository>()));
         builder.Services.AddSingleton<ReleaseService>(serviceProvider => new ReleaseService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<ReleaseContentService>(serviceProvider => new ReleaseContentService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteWorkItemRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<SqliteReleaseContentRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<AuthIntrospectionService>(serviceProvider => new AuthIntrospectionService(serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<ServiceTokenLifecycleService>(serviceProvider => new ServiceTokenLifecycleService(serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddHttpClient();
