@@ -13,13 +13,16 @@ This document is the public command contract for `Moyai.Cli.exe`. MCP tools use 
 | Collaboration | `relation-add/remove/list`, `comment-add/list`, `task-link-add/remove/list`, `commit-link-add/remove/list` | Persistent WorkItem collaboration records |
 | Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
 | Token | `token-issue`, `token-rotate`, `token-revoke`, `token-cleanup` | Internal service authentication |
-| Lifecycle | `build`, `release-create`, `release-publish`, `release-withdraw`, `deploy` | Provider-routed lifecycle operations |
+| Release | `release-create`, `release-get`, `release-list`, `release-update`, `release-transition`, `release-publish`, `release-withdraw` | Release state and publishing |
+| Lifecycle | `build`, `deploy` | Provider-routed lifecycle operations |
 
 ## Common Options
 
 Options use `--kebab-case`. Mutations require `--actor-type` and `--actor-name`; concurrency-protected mutations also require `--expected-revision`. Success is JSON on standard output with exit code `0`. Failure is JSON on standard error with exit code `1`, containing `command`, `summary`, `ok`, `fatal`, and `error`.
 
 ## Commands
+
+Project name lookup, duplicate registration checks, and update targeting use ordinal case-insensitive comparison. The originally registered name casing remains canonical unless `project-update` explicitly supplies a new name.
 
 Each command below has the syntax, processing rule, and result contract. Returned Project or WorkItem fields reflect persisted SQLite state; list filters change inclusion, and mutation results contain the new `revision`.
 
@@ -70,7 +73,10 @@ Each command below has the syntax, processing rule, and result contract. Returne
 ### Lifecycle commands
 
 - `build`: requires `--project --actor-type --actor-name`; invokes the configured build Provider.
-- `release-create`: also requires `--version`; optional `--notes`; creates but does not publish a release.
+- `release-create`: requires `--version --channel`; optional `--notes`; creates a draft release in Moyai.
+- `release-get` / `release-list`: read Release state; `--include-deleted` includes soft-deleted rows.
+- `release-update`: requires `--version --channel --expected-revision`; accepts `--tag-name --commit-hash --notes --planned-at`.
+- `release-transition`: requires `--version --next-status --expected-revision` and follows the v1 Release workflow.
 - `release-publish`: requires `--project --version --actor-type --actor-name`; publishes an existing release.
 - `release-withdraw`: requires the same options; withdraws an existing release.
 - `deploy`: requires `--project --artifact-path --actor-type --actor-name`; optional `--version`; deploys the verified artifact through the deploy Provider.

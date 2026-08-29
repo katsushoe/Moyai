@@ -6,7 +6,9 @@ using Moyai.Application.Diagnostics;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
 using Moyai.Application.Providers;
+using Moyai.Application.Releases;
 using Moyai.Application.WorkItems;
+using Moyai.Domain.Releases;
 using Moyai.Domain.WorkItems;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
@@ -36,6 +38,7 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
         var itemRepository = new SqliteWorkItemRepository(options);
         var items = new WorkItemService(repository, itemRepository, TimeProvider.System);
         var collaboration = new WorkItemCollaborationService(repository, itemRepository, new SqliteWorkItemCollaborationRepository(options), TimeProvider.System);
+        var releases = new ReleaseService(repository, new SqliteReleaseRepository(options), TimeProvider.System);
         using ServiceProvider providerServices = new ServiceCollection().AddHttpClient().BuildServiceProvider();
         var routing = new ProviderRoutingService(repository, tokenRepository, CreateProviders(providerServices.GetRequiredService<IHttpClientFactory>()), TimeProvider.System);
         var lifecycle = new LifecycleService(repository, tokenRepository, CreateLifecycleProviders(providerServices.GetRequiredService<IHttpClientFactory>()), new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System);
@@ -88,7 +91,11 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
             "token-revoke" => await tokens.RevokeAsync(Required(values, "audience"), Required(values, "actor-type"), Required(values, "actor-name")),
             "token-cleanup" => await tokens.DeleteExpiredAsync(Required(values, "actor-type"), Required(values, "actor-name")),
             "build" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Build, Required(values, "actor-type"), Required(values, "actor-name")),
-            "release-create" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleaseCreate, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version"), notes: Optional(values, "notes")),
+            "release-create" => await releases.CreateAsync(new CreateReleaseCommand(Required(values, "project"), Required(values, "version"), Enum.Parse<ReleaseChannel>(Required(values, "channel"), true), Optional(values, "notes"), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "release-get" => await releases.GetAsync(Required(values, "project"), Required(values, "version"), HasFlag(values, "include-deleted")),
+            "release-list" => await releases.ListAsync(Required(values, "project"), HasFlag(values, "include-deleted")),
+            "release-update" => await releases.UpdateAsync(new UpdateReleaseCommand(Required(values, "project"), Required(values, "version"), Enum.Parse<ReleaseChannel>(Required(values, "channel"), true), Optional(values, "tag-name"), Optional(values, "commit-hash"), Optional(values, "notes"), OptionalDate(values, "planned-at"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "release-transition" => await releases.TransitionAsync(new TransitionReleaseCommand(Required(values, "project"), Required(values, "version"), Enum.Parse<ReleaseStatus>(Required(values, "next-status"), true), Revision(values), Required(values, "actor-type"), Required(values, "actor-name"))),
             "release-publish" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleasePublish, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
             "release-withdraw" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleaseWithdraw, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
             "deploy" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Deploy, Required(values, "actor-type"), Required(values, "actor-name"), Optional(values, "version"), Required(values, "artifact-path")),

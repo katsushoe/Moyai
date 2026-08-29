@@ -25,6 +25,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
         await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            await EnsureNameAvailableAsync(connection, transaction, project.Name, null, cancellationToken).ConfigureAwait(false);
             await InsertProjectAsync(connection, transaction, project, cancellationToken).ConfigureAwait(false);
             await InsertEventAsync(connection, transaction, projectEvent, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -46,7 +47,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         await using SqliteConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = $"{SelectSql} WHERE name = $name COLLATE NOCASE;";
+        command.CommandText = $"{SelectSql} WHERE name = $name COLLATE MOYAI_NOCASE;";
         command.Parameters.AddWithValue("$name", name);
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? Read(reader) : null;
@@ -56,7 +57,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
     {
         await using SqliteConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = includeArchived ? $"{SelectSql} ORDER BY name COLLATE NOCASE;" : $"{SelectSql} WHERE archived_at IS NULL ORDER BY name COLLATE NOCASE;";
+        command.CommandText = includeArchived ? $"{SelectSql} ORDER BY name COLLATE MOYAI_NOCASE;" : $"{SelectSql} WHERE archived_at IS NULL ORDER BY name COLLATE MOYAI_NOCASE;";
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var projects = new List<Project>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) projects.Add(Read(reader));
@@ -69,6 +70,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
         await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            await EnsureNameAvailableAsync(connection, transaction, project.Name, project.Id, cancellationToken).ConfigureAwait(false);
             await using SqliteCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
@@ -102,6 +104,19 @@ public sealed class SqliteProjectRepository : IProjectRepository
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
     {
         return await SqliteConnectionFactory.OpenAsync(_options, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task EnsureNameAvailableAsync(SqliteConnection connection, SqliteTransaction transaction, string name, Guid? excludedId, CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = excludedId is null
+            ? "SELECT EXISTS(SELECT 1 FROM projects WHERE name=$name COLLATE MOYAI_NOCASE);"
+            : "SELECT EXISTS(SELECT 1 FROM projects WHERE name=$name COLLATE MOYAI_NOCASE AND id<>$id);";
+        command.Parameters.AddWithValue("$name", name);
+        if (excludedId is not null) command.Parameters.AddWithValue("$id", Format(excludedId.Value));
+        long exists = (long)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0L);
+        if (exists != 0) throw new ProjectNameConflictException(name);
     }
 
     private static async Task InsertProjectAsync(SqliteConnection connection, SqliteTransaction transaction, Project project, CancellationToken cancellationToken)

@@ -13,13 +13,16 @@
 | Collaboration | `relation-add/remove/list`、`comment-add/list`、`task-link-add/remove/list`、`commit-link-add/remove/list` | WorkItem連携記録 |
 | Repository | `repository-status`、`repository-diff`、`repository-commit`、`repository-push`、`repository-pull` | Provider経由Git操作 |
 | Token | `token-issue`、`token-rotate`、`token-revoke`、`token-cleanup` | Service認証 |
-| Lifecycle | `build`、`release-create`、`release-publish`、`release-withdraw`、`deploy` | Lifecycle操作 |
+| Release | `release-create`、`release-get`、`release-list`、`release-update`、`release-transition`、`release-publish`、`release-withdraw` | Release状態と公開 |
+| Lifecycle | `build`、`deploy` | Provider経由Lifecycle操作 |
 
 ## Common Options
 
 Optionは`--kebab-case`です。変更操作には`--actor-type`と`--actor-name`、同時実行制御対象には`--expected-revision`も必要です。成功時は標準出力へJSONと終了コード`0`、失敗時は標準エラーへ`command`、`summary`、`ok`、`fatal`、`error`を含むJSONと終了コード`1`を返します。
 
 ## Commands
+
+Project名の検索、重複登録判定、変更対象の解決にはOrdinalな大文字小文字非区別比較を使用します。`project-update`で新しい名前を明示しない限り、登録時の表記を正本として保持します。
 
 各コマンドの構文・処理・戻り値は[英語正本](COMMANDS.md)の同一順序の個別項目を正とします。Command、Option、制約、安全Note、Sample、Linkは英語正本と一致します。
 
@@ -58,7 +61,9 @@ Optionは`--kebab-case`です。変更操作には`--actor-type`と`--actor-name
 
 ### Lifecycle commands
 
-`build`、`release-create`、`release-publish`、`release-withdraw`、`deploy`はProject、actorと操作固有のversion、notes、artifact pathをProviderへ渡します。
+`release-create`は`--version --channel`、`release-update`は`--version --channel --expected-revision`、`release-transition`は`--version --next-status --expected-revision`を必須とします。`release-get`と`release-list`はRelease状態を取得します。
+
+`build`、`release-publish`、`release-withdraw`、`deploy`はProject、actorと操作固有のversion、artifact pathをProviderへ渡します。
 
 ## Safety Notes
 

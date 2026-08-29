@@ -43,6 +43,7 @@ Exit criteria: Acceptance Criteria 23, 24, and 25 pass through both CLI and MCP.
 
 ## Milestone 4: Repository Contract Completion
 
+- Status: complete on 2026-08-29.
 - Add branch list/create/delete.
 - Add tag create/delete/push.
 - Complete Provider information and capability negotiation.

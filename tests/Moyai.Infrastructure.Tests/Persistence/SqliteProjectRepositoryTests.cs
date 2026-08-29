@@ -46,6 +46,35 @@ public sealed class SqliteProjectRepositoryTests
     }
 
     [Fact]
+    public async Task ProjectOperationsUseOrdinalCaseInsensitiveCanonicalName()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        Project created = await service.CreateAsync(new CreateProjectCommand("MoyaiÅ", "source", "install", "https://github.com/example/moyai", null, "csharp", "local", "agent", "codex"));
+
+        Project loaded = await service.GetAsync("moyaiå");
+        Project updated = await service.UpdateAsync(new UpdateProjectCommand("MOYAIÅ", "MoyaiÅ", null, null, "updated", null, null, null, "origin", null, created.Revision, "agent", "codex"));
+
+        Assert.Equal(created.Id, loaded.Id);
+        Assert.Equal("MoyaiÅ", loaded.Name);
+        Assert.Equal("updated", updated.Description);
+        Assert.Equal(created.Id, updated.Id);
+    }
+
+    [Fact]
+    public async Task CreateAsyncRejectsOrdinalCaseInsensitiveUnicodeDuplicate()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        var first = new CreateProjectCommand("MoyaiÅ", "source", "install", "https://github.com/example/moyai", null, "csharp", "local", "agent", "codex");
+        await service.CreateAsync(first);
+
+        await Assert.ThrowsAsync<ProjectNameConflictException>(() => service.CreateAsync(first with { Name = "moyaiå" }));
+
+        Assert.Single(await service.ListAsync(true));
+    }
+
+    [Fact]
     public async Task UpdateAsyncRejectsStaleRevisionWithoutEventOrDataChange()
     {
         using var fixture = new ProjectFixture();
