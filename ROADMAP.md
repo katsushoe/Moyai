@@ -54,6 +54,7 @@ Exit criteria: all repository operations in the v1 MCP API and Acceptance Criter
 
 ## Milestone 5: Release Management
 
+- Status: complete on 2026-08-29.
 - Implement Release create/get/list/update and status transitions.
 - Implement Release–WorkItem and Release Artifact metadata management.
 - Implement prepare, mark-ready, publish, retry, withdraw, latest release, and release overview.

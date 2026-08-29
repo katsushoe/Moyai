@@ -13,7 +13,7 @@ This document is the public command contract for `Moyai.Cli.exe`. MCP tools use 
 | Collaboration | `relation-add/remove/list`, `comment-add/list`, `task-link-add/remove/list`, `commit-link-add/remove/list` | Persistent WorkItem collaboration records |
 | Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
 | Token | `token-issue`, `token-rotate`, `token-revoke`, `token-cleanup` | Internal service authentication |
-| Release | `release-create/get/list/update/transition`, `release-add/remove/list-items`, `release-add/remove/list-artifacts`, `release-publish/withdraw` | Release state, contents, and publishing |
+| Release | `release-create/get/list/update/transition`, `release-add/remove/list-items`, `release-add/remove/list-artifacts`, `release-prepare/mark-ready/publish/retry/withdraw`, `release-latest/overview` | Release state, contents, and publishing |
 | Lifecycle | `build`, `deploy` | Provider-routed lifecycle operations |
 
 ## Common Options
@@ -79,6 +79,10 @@ Each command below has the syntax, processing rule, and result contract. Returne
 - `release-transition`: requires `--version --next-status --expected-revision` and follows the v1 Release workflow.
 - `release-add-item`: requires `--project --version --work-item-key --relation --actor-type --actor-name`; relation is `includes`, `fixes`, `implements`, or `resolves`. Remove requires `--relation-id`; list requires `--project --version`.
 - `release-add-artifact`: requires `--project --version --name --artifact-type --platform --architecture --file-name --actor-type --actor-name`; optional metadata is `--build-artifact-id --file-path --download-url --file-size --sha256 --signature-path --signature-url`. Remove requires `--artifact-id`; list requires `--project --version`. File content is not stored.
+- `release-prepare` / `release-mark-ready`: require `--project --version --expected-revision --actor-type --actor-name` and move `planned -> preparing -> ready`.
+- `release-publish`: requires the same options and explicit approval; persists `publishing` before calling the Provider, then records `released` or `failed`. Repeating an already released version is idempotent and does not call the Provider.
+- `release-retry`: requires the same options and explicit approval; moves `failed -> ready` and retries publish. `release-withdraw` withdraws a released version through the Provider and is idempotent after completion.
+- `release-latest --project` returns the latest released stable version by `released_at`. `release-overview --project --version` returns the Release, WorkItem relations, and artifact metadata.
 - `release-publish`: requires `--project --version --actor-type --actor-name`; publishes an existing release.
 - `release-withdraw`: requires the same options; withdraws an existing release.
 - `deploy`: requires `--project --artifact-path --actor-type --actor-name`; optional `--version`; deploys the verified artifact through the deploy Provider.
