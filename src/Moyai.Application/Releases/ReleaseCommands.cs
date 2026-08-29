@@ -1,4 +1,4 @@
-using Moyai.Domain.Releases;
+﻿using Moyai.Domain.Releases;
 
 namespace Moyai.Application.Releases;
 

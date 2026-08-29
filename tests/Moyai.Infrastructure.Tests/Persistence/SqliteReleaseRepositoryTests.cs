@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using Moyai.Application.Projects;
 using Moyai.Domain.Events;
 using Moyai.Domain.Projects;

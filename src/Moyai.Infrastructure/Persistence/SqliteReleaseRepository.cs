@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Moyai.Application.Projects;
 using Moyai.Application.Releases;

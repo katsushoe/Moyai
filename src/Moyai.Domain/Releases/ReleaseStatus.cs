@@ -1,4 +1,4 @@
-namespace Moyai.Domain.Releases;
+﻿namespace Moyai.Domain.Releases;
 
 /// <summary>Releaseの状態です。</summary>
 public enum ReleaseStatus

@@ -1,4 +1,4 @@
-namespace Moyai.Domain.Releases;
+﻿namespace Moyai.Domain.Releases;
 
 /// <summary>許可されていないRelease状態遷移を表します。</summary>
 public sealed class InvalidReleaseTransitionException : InvalidOperationException
