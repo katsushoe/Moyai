@@ -1,11 +1,13 @@
 ﻿using System.ComponentModel;
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
+using Moyai.Application.Builds;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
 using Moyai.Application.Providers;
 using Moyai.Application.Releases;
 using Moyai.Application.WorkItems;
+using Moyai.Domain.Builds;
 using Moyai.Domain.Projects;
 using Moyai.Domain.Releases;
 using Moyai.Domain.WorkItems;
@@ -14,7 +16,7 @@ namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, ReleaseOrchestrationService releaseOrchestration, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
+public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, ReleaseOrchestrationService releaseOrchestration, BuildService builds, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
 {
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
@@ -150,8 +152,23 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "tag_push"), Description("Pushes an existing local tag through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> TagPush(string project, string tag, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.TagPush, tag: tag, cancellationToken: cancellationToken);
 
-    [McpServerTool(Name = "build", Destructive = true), Description("Builds a Moyai-managed project through its configured build Provider.")]
-    public Task<LifecycleResult> Build(string project, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.Build, actorType, actorName, cancellationToken: cancellationToken);
+    [McpServerTool(Name = "build", Destructive = true), Description("Builds a tracked clean repository commit through the configured Provider.")]
+    public Task<Build> Build(string project, string actorType, string actorName, string configuration = "Release", CancellationToken cancellationToken = default) => builds.StartAsync(project, configuration, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "build_start", Destructive = true), Description("Starts a tracked build from a clean repository commit.")]
+    public Task<Build> BuildStart(string project, string actorType, string actorName, string configuration = "Release", CancellationToken cancellationToken = default) => builds.StartAsync(project, configuration, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "build_get", ReadOnly = true), Description("Gets a tracked build.")]
+    public Task<Build> BuildGet(string project, Guid buildId, CancellationToken cancellationToken = default) => builds.GetAsync(project, buildId, cancellationToken);
+
+    [McpServerTool(Name = "build_list", ReadOnly = true), Description("Lists tracked builds newest first.")]
+    public Task<IReadOnlyList<Build>> BuildList(string project, CancellationToken cancellationToken = default) => builds.ListAsync(project, cancellationToken);
+
+    [McpServerTool(Name = "build_artifacts", ReadOnly = true), Description("Lists immutable artifacts for a build.")]
+    public Task<IReadOnlyList<BuildArtifact>> BuildArtifacts(string project, Guid buildId, CancellationToken cancellationToken = default) => builds.ListArtifactsAsync(project, buildId, cancellationToken);
+
+    [McpServerTool(Name = "build_clean", Destructive = true), Description("Removes artifact metadata for completed builds without deleting build history.")]
+    public Task<LifecycleResult> BuildClean(string project, string actorType, string actorName, CancellationToken cancellationToken = default) => builds.CleanAsync(project, actorType, actorName, cancellationToken);
 
     [McpServerTool(Name = "release_create"), Description("Creates a draft release in Moyai and records an audit event.")]
     public Task<Release> ReleaseCreate(string project, string version, ReleaseChannel channel, string actorType, string actorName, string? notes = null, CancellationToken cancellationToken = default) => releases.CreateAsync(new CreateReleaseCommand(project, version, channel, notes, actorType, actorName), cancellationToken);

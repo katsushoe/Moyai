@@ -4,6 +4,7 @@
 public enum LifecycleAction
 {
     Build,
+    BuildClean,
     ReleaseCreate,
     ReleasePublish,
     ReleaseWithdraw,

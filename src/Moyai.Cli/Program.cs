@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Moyai.Application.Builds;
 using Moyai.Application.Diagnostics;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
@@ -44,6 +45,7 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
         var routing = new ProviderRoutingService(repository, tokenRepository, CreateProviders(providerServices.GetRequiredService<IHttpClientFactory>()), TimeProvider.System);
         var lifecycle = new LifecycleService(repository, tokenRepository, CreateLifecycleProviders(providerServices.GetRequiredService<IHttpClientFactory>()), new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System);
         var releaseOrchestration = new ReleaseOrchestrationService(releases, releaseContent, lifecycle);
+        var builds = new BuildService(repository, new SqliteBuildRepository(options), routing, lifecycle, TimeProvider.System);
         var tokens = new Moyai.Application.Authentication.ServiceTokenLifecycleService(tokenRepository, TimeProvider.System);
         IReadOnlyDictionary<string, string?> values = ParseOptions(arguments[1..]);
 
@@ -92,7 +94,12 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
             "token-rotate" => await tokens.RotateAsync(Required(values, "audience"), Required(values, "scopes").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), OptionalDate(values, "expires-at"), Required(values, "actor-type"), Required(values, "actor-name")),
             "token-revoke" => await tokens.RevokeAsync(Required(values, "audience"), Required(values, "actor-type"), Required(values, "actor-name")),
             "token-cleanup" => await tokens.DeleteExpiredAsync(Required(values, "actor-type"), Required(values, "actor-name")),
-            "build" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Build, Required(values, "actor-type"), Required(values, "actor-name")),
+            "build" => await builds.StartAsync(Required(values, "project"), Optional(values, "configuration") ?? "Release", Required(values, "actor-type"), Required(values, "actor-name")),
+            "build-start" => await builds.StartAsync(Required(values, "project"), Optional(values, "configuration") ?? "Release", Required(values, "actor-type"), Required(values, "actor-name")),
+            "build-get" => await builds.GetAsync(Required(values, "project"), RequiredGuid(values, "build-id")),
+            "build-list" => await builds.ListAsync(Required(values, "project")),
+            "build-artifacts" => await builds.ListArtifactsAsync(Required(values, "project"), RequiredGuid(values, "build-id")),
+            "build-clean" => await builds.CleanAsync(Required(values, "project"), Required(values, "actor-type"), Required(values, "actor-name")),
             "release-create" => await releases.CreateAsync(new CreateReleaseCommand(Required(values, "project"), Required(values, "version"), Enum.Parse<ReleaseChannel>(Required(values, "channel"), true), Optional(values, "notes"), Required(values, "actor-type"), Required(values, "actor-name"))),
             "release-get" => await releases.GetAsync(Required(values, "project"), Required(values, "version"), HasFlag(values, "include-deleted")),
             "release-list" => await releases.ListAsync(Required(values, "project"), HasFlag(values, "include-deleted")),
@@ -199,6 +206,8 @@ static IReadOnlyList<IRepositoryProvider> CreateProviders(IHttpClientFactory htt
 static IReadOnlyList<ILifecycleProvider> CreateLifecycleProviders(IHttpClientFactory httpClientFactory)
 {
     var providers = new List<ILifecycleProvider>();
+    string? externalBuildProvider = Environment.GetEnvironmentVariable("MOYAI_BUILD_PROVIDER_NAME");
+    foreach (string name in new[] { "csharp", "node", "php" }) if (!string.Equals(name, externalBuildProvider, StringComparison.Ordinal)) providers.Add(new StandardBuildProvider(name));
     AddLifecycleProvider(providers, httpClientFactory, "githubbie", "GITHUBIE_MCP_URL", "github");
     AddLifecycleProvider(providers, httpClientFactory, "buckettie", "BUCKETTIE_MCP_URL", "bitbucket");
     AddOptionalLifecycleProvider(providers, httpClientFactory, "MOYAI_BUILD_PROVIDER_NAME", "MOYAI_BUILD_PROVIDER_URL", "MOYAI_BUILD_PROVIDER_PREFIX");

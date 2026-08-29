@@ -14,7 +14,8 @@ This document is the public command contract for `Moyai.Cli.exe`. MCP tools use 
 | Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
 | Token | `token-issue`, `token-rotate`, `token-revoke`, `token-cleanup` | Internal service authentication |
 | Release | `release-create/get/list/update/transition`, `release-add/remove/list-items`, `release-add/remove/list-artifacts`, `release-prepare/mark-ready/publish/retry/withdraw`, `release-latest/overview` | Release state, contents, and publishing |
-| Lifecycle | `build`, `deploy` | Provider-routed lifecycle operations |
+| Build | `build`, `build-start`, `build-get`, `build-list`, `build-artifacts`, `build-clean` | Tracked build execution and artifacts |
+| Lifecycle | `deploy` | Provider-routed deployment |
 
 ## Common Options
 
@@ -72,7 +73,8 @@ Each command below has the syntax, processing rule, and result contract. Returne
 
 ### Lifecycle commands
 
-- `build`: requires `--project --actor-type --actor-name`; invokes the configured build Provider.
+- `build` / `build-start`: require `--project --actor-type --actor-name`; optional `--configuration` defaults to `Release`. Repository Provider status supplies the source commit and dirty state; dirty standard builds are rejected before the configured Build Provider runs.
+- `build-get`: requires `--project --build-id`. `build-list --project` returns newest first. `build-artifacts --project --build-id` returns immutable artifact metadata. `build-clean --project --actor-type --actor-name` invokes Provider cleanup while preserving Build and Artifact history.
 - `release-create`: requires `--version --channel`; optional `--notes`; creates a draft release in Moyai.
 - `release-get` / `release-list`: read Release state; `--include-deleted` includes soft-deleted rows.
 - `release-update`: requires `--version --channel --expected-revision`; accepts `--tag-name --commit-hash --notes --planned-at`.
