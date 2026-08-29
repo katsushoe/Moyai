@@ -64,7 +64,7 @@ public sealed class LifecycleService
 
     private static string ResolveProvider(Project project, LifecycleAction action) => action switch
     {
-        LifecycleAction.Build => project.BuildProvider,
+        LifecycleAction.Build or LifecycleAction.BuildClean => project.BuildProvider,
         LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw => RepositoryProviderName(project.RepositoryProvider),
         LifecycleAction.Deploy => project.DeployMode,
         _ => throw new ArgumentOutOfRangeException(nameof(action)),

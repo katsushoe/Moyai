@@ -64,6 +64,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン6: Build管理
 
+- 状態: 2026-08-30完了。
 - BuildとimmutableなBuild Artifact Entityを実装します。
 - build start/get/list/artifacts/cleanとproject buildを実装します。
 - C#、Node、PHPの標準Build Providerを追加します。

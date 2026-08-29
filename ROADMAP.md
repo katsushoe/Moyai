@@ -64,6 +64,7 @@ Exit criteria: Acceptance Criteria 10, 11, 12, 19, 30, and the release workflow 
 
 ## Milestone 6: Build Management
 
+- Status: complete on 2026-08-30.
 - Implement Build and immutable Build Artifact entities.
 - Implement build start/get/list/artifacts/clean and project build.
 - Add standard C#, Node, and PHP Build Providers.

@@ -55,6 +55,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     private static string OperationName(LifecycleAction action) => action switch
     {
         LifecycleAction.Build => "build",
+        LifecycleAction.BuildClean => "build_clean",
         LifecycleAction.ReleaseCreate => "release_create",
         LifecycleAction.ReleasePublish => "release_publish",
         LifecycleAction.ReleaseWithdraw => "release_withdraw",
