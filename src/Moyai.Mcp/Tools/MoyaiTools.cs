@@ -14,7 +14,7 @@ namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
+public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
 {
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
@@ -167,6 +167,24 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
 
     [McpServerTool(Name = "release_transition"), Description("Transitions a release according to the v1 release workflow.")]
     public Task<Release> ReleaseTransition(string project, string version, ReleaseStatus nextStatus, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => releases.TransitionAsync(new TransitionReleaseCommand(project, version, nextStatus, expectedRevision, actorType, actorName), cancellationToken);
+
+    [McpServerTool(Name = "release_add_item"), Description("Adds a WorkItem to a Release with a typed relation.")]
+    public Task<ReleaseWorkItem> ReleaseAddItem(string project, string version, string workItemKey, string relation, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseContent.AddItemAsync(new AddReleaseItemCommand(project, version, workItemKey, relation, actorType, actorName), cancellationToken);
+
+    [McpServerTool(Name = "release_remove_item"), Description("Removes a WorkItem relation from a Release.")]
+    public Task<bool> ReleaseRemoveItem(string project, string version, Guid relationId, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseContent.RemoveItemAsync(project, version, relationId, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "release_list_items", ReadOnly = true), Description("Lists WorkItem relations for a Release.")]
+    public Task<IReadOnlyList<ReleaseWorkItem>> ReleaseListItems(string project, string version, CancellationToken cancellationToken = default) => releaseContent.ListItemsAsync(project, version, cancellationToken);
+
+    [McpServerTool(Name = "release_add_artifact"), Description("Adds distribution artifact metadata to a Release without storing file content.")]
+    public Task<ReleaseArtifact> ReleaseAddArtifact(string project, string version, string name, string artifactType, string platform, string architecture, string fileName, string actorType, string actorName, Guid? buildArtifactId = null, string? filePath = null, string? downloadUrl = null, long? fileSize = null, string? sha256 = null, string? signaturePath = null, string? signatureUrl = null, CancellationToken cancellationToken = default) => releaseContent.AddArtifactAsync(new AddReleaseArtifactCommand(project, version, buildArtifactId, name, artifactType, platform, architecture, fileName, filePath, downloadUrl, fileSize, sha256, signaturePath, signatureUrl, actorType, actorName), cancellationToken);
+
+    [McpServerTool(Name = "release_remove_artifact"), Description("Removes artifact metadata from a Release.")]
+    public Task<bool> ReleaseRemoveArtifact(string project, string version, Guid artifactId, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseContent.RemoveArtifactAsync(project, version, artifactId, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "release_list_artifacts", ReadOnly = true), Description("Lists artifact metadata for a Release.")]
+    public Task<IReadOnlyList<ReleaseArtifact>> ReleaseListArtifacts(string project, string version, CancellationToken cancellationToken = default) => releaseContent.ListArtifactsAsync(project, version, cancellationToken);
 
     [McpServerTool(Name = "release_publish", Destructive = true), Description("Publishes an existing release. Call only after explicit user approval for the exact project, version, and destination.")]
     public Task<LifecycleResult> ReleasePublish(string project, string version, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.ReleasePublish, actorType, actorName, version, cancellationToken: cancellationToken);
