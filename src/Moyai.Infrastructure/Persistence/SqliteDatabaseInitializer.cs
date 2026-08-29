@@ -21,6 +21,7 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new SqliteConnection(_options.ConnectionString);
+        SqliteConnectionFactory.RegisterProjectNameCollation(connection);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await ExecuteAsync(connection, "PRAGMA foreign_keys = ON;", cancellationToken).ConfigureAwait(false);
         await ExecuteAsync(connection, "PRAGMA journal_mode = WAL;", cancellationToken).ConfigureAwait(false);
@@ -89,6 +90,7 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
             last_used_at TEXT NULL
         );
         """;
+
 
     private const string ServiceTokenAuditMigrationSql = """
         CREATE TABLE events_v2 (

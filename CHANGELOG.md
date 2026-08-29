@@ -2,6 +2,12 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.6 - 2026-08-29
+
+- Added the Release domain model, SQLite persistence, application service, and matching CLI/MCP operations.
+- Completed Repository Provider error normalization for retryable and policy failures.
+- Aligned Project lookup, duplicate registration, and update targeting with ordinal case-insensitive comparison.
+
 ## 1.0.5 - 2026-08-29
 
 - Repackaged version 1.0.4 without product behavior or database format changes.

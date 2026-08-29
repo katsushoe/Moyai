@@ -4,15 +4,17 @@ using Moyai.Application.Authentication;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
 using Moyai.Application.Providers;
+using Moyai.Application.Releases;
 using Moyai.Application.WorkItems;
 using Moyai.Domain.Projects;
+using Moyai.Domain.Releases;
 using Moyai.Domain.WorkItems;
 
 namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
+public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
 {
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
@@ -151,8 +153,20 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "build", Destructive = true), Description("Builds a Moyai-managed project through its configured build Provider.")]
     public Task<LifecycleResult> Build(string project, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.Build, actorType, actorName, cancellationToken: cancellationToken);
 
-    [McpServerTool(Name = "release_create", Destructive = true), Description("Creates a release through the repository Provider. Publishing requires a separate release_publish call and explicit user approval.")]
-    public Task<LifecycleResult> ReleaseCreate(string project, string version, string actorType, string actorName, string? notes = null, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.ReleaseCreate, actorType, actorName, version, notes: notes, cancellationToken: cancellationToken);
+    [McpServerTool(Name = "release_create"), Description("Creates a draft release in Moyai and records an audit event.")]
+    public Task<Release> ReleaseCreate(string project, string version, ReleaseChannel channel, string actorType, string actorName, string? notes = null, CancellationToken cancellationToken = default) => releases.CreateAsync(new CreateReleaseCommand(project, version, channel, notes, actorType, actorName), cancellationToken);
+
+    [McpServerTool(Name = "release_get", ReadOnly = true), Description("Gets a Moyai release by project and version.")]
+    public Task<Release> ReleaseGet(string project, string version, bool includeDeleted = false, CancellationToken cancellationToken = default) => releases.GetAsync(project, version, includeDeleted, cancellationToken);
+
+    [McpServerTool(Name = "release_list", ReadOnly = true), Description("Lists releases managed by a Moyai project.")]
+    public Task<IReadOnlyList<Release>> ReleaseList(string project, bool includeDeleted = false, CancellationToken cancellationToken = default) => releases.ListAsync(project, includeDeleted, cancellationToken);
+
+    [McpServerTool(Name = "release_update"), Description("Updates editable release metadata using optimistic concurrency.")]
+    public Task<Release> ReleaseUpdate(string project, string version, ReleaseChannel channel, long expectedRevision, string actorType, string actorName, string? tagName = null, string? commitHash = null, string? notes = null, DateTimeOffset? plannedAt = null, CancellationToken cancellationToken = default) => releases.UpdateAsync(new UpdateReleaseCommand(project, version, channel, tagName, commitHash, notes, plannedAt, expectedRevision, actorType, actorName), cancellationToken);
+
+    [McpServerTool(Name = "release_transition"), Description("Transitions a release according to the v1 release workflow.")]
+    public Task<Release> ReleaseTransition(string project, string version, ReleaseStatus nextStatus, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => releases.TransitionAsync(new TransitionReleaseCommand(project, version, nextStatus, expectedRevision, actorType, actorName), cancellationToken);
 
     [McpServerTool(Name = "release_publish", Destructive = true), Description("Publishes an existing release. Call only after explicit user approval for the exact project, version, and destination.")]
     public Task<LifecycleResult> ReleasePublish(string project, string version, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.ReleasePublish, actorType, actorName, version, cancellationToken: cancellationToken);
