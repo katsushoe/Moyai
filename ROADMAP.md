@@ -75,6 +75,7 @@ Exit criteria: Acceptance Criteria 31 through 34 and 44 pass with reproducible a
 
 ## Milestone 7: Deployment Management
 
+- Status: complete on 2026-08-30.
 - Implement the one-Project-to-one-DeploymentTarget model.
 - Implement local deployment to `install_path` with verification.
 - Implement server deployment through KelpieSSH Streamable HTTP without storing SSH secrets.

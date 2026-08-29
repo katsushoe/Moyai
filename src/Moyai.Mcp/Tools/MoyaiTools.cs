@@ -2,12 +2,14 @@
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
 using Moyai.Application.Builds;
+using Moyai.Application.Deployments;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
 using Moyai.Application.Providers;
 using Moyai.Application.Releases;
 using Moyai.Application.WorkItems;
 using Moyai.Domain.Builds;
+using Moyai.Domain.Deployments;
 using Moyai.Domain.Projects;
 using Moyai.Domain.Releases;
 using Moyai.Domain.WorkItems;
@@ -16,7 +18,7 @@ namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, ReleaseOrchestrationService releaseOrchestration, BuildService builds, AuthIntrospectionService authentication, ProviderRoutingService routing, LifecycleService lifecycle)
+public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, ReleaseOrchestrationService releaseOrchestration, BuildService builds, DeploymentService deployments, AuthIntrospectionService authentication, ProviderRoutingService routing)
 {
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
@@ -224,6 +226,30 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "release_overview", ReadOnly = true), Description("Gets a release with its WorkItem relations and artifact metadata.")]
     public Task<ReleaseOverview> ReleaseOverview(string project, string version, CancellationToken cancellationToken = default) => releaseOrchestration.OverviewAsync(project, version, cancellationToken);
 
-    [McpServerTool(Name = "deploy", Destructive = true), Description("Deploys a verified artifact through the configured deploy Provider. Call only after explicit user approval for the exact target.")]
-    public Task<LifecycleResult> Deploy(string project, string artifactPath, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(project, LifecycleAction.Deploy, actorType, actorName, version, artifactPath, cancellationToken: cancellationToken);
+    [McpServerTool(Name = "deployment_target_get", ReadOnly = true), Description("Gets the single Deployment Target for a Project.")]
+    public Task<DeploymentTarget> DeploymentTargetGet(string project, CancellationToken cancellationToken = default) => deployments.GetTargetAsync(project, cancellationToken);
+
+    [McpServerTool(Name = "deployment_target_update"), Description("Creates or updates the single Deployment Target for a Project.")]
+    public Task<DeploymentTarget> DeploymentTargetUpdate(string project, string name, string mode, string destinationPath, long expectedRevision, string actorType, string actorName, string? kelpieTarget = null, string? configJson = null, CancellationToken cancellationToken = default) => deployments.UpdateTargetAsync(project, name, mode, destinationPath, kelpieTarget, configJson, expectedRevision, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "deploy", Destructive = true), Description("Deploys a managed Build Artifact. Requires explicit approval for the exact target.")]
+    public Task<Deployment> Deploy(string project, Guid buildId, Guid artifactId, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => deployments.StartAsync(project, buildId, artifactId, version, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "deploy_start", Destructive = true), Description("Starts a tracked Deployment from a managed Build Artifact.")]
+    public Task<Deployment> DeployStart(string project, Guid buildId, Guid artifactId, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => deployments.StartAsync(project, buildId, artifactId, version, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "deploy_get", ReadOnly = true), Description("Gets a Deployment.")]
+    public Task<Deployment> DeployGet(string project, Guid deploymentId, CancellationToken cancellationToken = default) => deployments.GetAsync(project, deploymentId, cancellationToken);
+
+    [McpServerTool(Name = "deploy_list", ReadOnly = true), Description("Lists Deployments newest first.")]
+    public Task<IReadOnlyList<Deployment>> DeployList(string project, CancellationToken cancellationToken = default) => deployments.ListAsync(project, cancellationToken);
+
+    [McpServerTool(Name = "deploy_status", ReadOnly = true), Description("Gets persisted Deployment status.")]
+    public Task<Deployment> DeployStatus(string project, Guid deploymentId, CancellationToken cancellationToken = default) => deployments.GetAsync(project, deploymentId, cancellationToken);
+
+    [McpServerTool(Name = "deploy_retry", Destructive = true), Description("Retries a failed Deployment using the specified managed artifact.")]
+    public Task<Deployment> DeployRetry(string project, Guid deploymentId, Guid artifactId, string actorType, string actorName, CancellationToken cancellationToken = default) => deployments.RetryAsync(project, deploymentId, artifactId, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "deploy_rollback", Destructive = true), Description("Rolls back a succeeded Deployment and records rollback failure.")]
+    public Task<Deployment> DeployRollback(string project, Guid deploymentId, string actorType, string actorName, CancellationToken cancellationToken = default) => deployments.RollbackAsync(project, deploymentId, actorType, actorName, cancellationToken);
 }

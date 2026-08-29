@@ -23,6 +23,8 @@ Users set process environment variables. Moyai, the build, and the MSI do not ge
 - `MOYAI_BUILD_PROVIDER_NAME`, `MOYAI_BUILD_PROVIDER_URL`, `MOYAI_BUILD_PROVIDER_PREFIX`: optional build Provider identity, loopback MCP endpoint, and Tool prefix.
 - `MOYAI_DEPLOY_PROVIDER_NAME`, `MOYAI_DEPLOY_PROVIDER_URL`, `MOYAI_DEPLOY_PROVIDER_PREFIX`: optional deploy Provider identity, loopback MCP endpoint, and Tool prefix.
 
+For Server Deploy through KelpieSSH, set the deploy Provider name to `server`; Moyai stores only the Kelpie target name/ID in the Deployment Target and never stores SSH credentials. Local targets use the Project `install_path` by default.
+
 The built-in Build Providers are `csharp`, `node`, and `php`. `build_config_json` may contain `configuration` and an `artifacts` array. Each artifact requires `name`, `artifact_type`, and a project-relative `file_path`. Moyai hashes files with SHA-256 and directories with a deterministic relative-path/file-hash manifest. An external Provider with the same configured name overrides the built-in Provider.
 
 All values are strings with no default. `MOYAI_DB_PATH` is required for CLI data operations and MCP; `MOYAI_MCP_URL` is required for MCP and must be an absolute loopback URL. Provider triplets are optional but register only when all three values are non-empty. URL values must identify the applicable Streamable HTTP endpoint.

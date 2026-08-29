@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
 using Moyai.Application.Builds;
+using Moyai.Application.Deployments;
 using Moyai.Application.Diagnostics;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
@@ -40,6 +41,7 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<SqliteReleaseRepository>();
         builder.Services.AddSingleton<SqliteReleaseContentRepository>();
         builder.Services.AddSingleton<SqliteBuildRepository>();
+        builder.Services.AddSingleton<SqliteDeploymentRepository>();
         builder.Services.AddSingleton<SqliteLifecycleEventWriter>();
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddSingleton<ProjectService>(serviceProvider => new ProjectService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
@@ -60,6 +62,7 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<ProviderRoutingService>(serviceProvider => new ProviderRoutingService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<IRepositoryProvider>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<LifecycleService>(serviceProvider => new LifecycleService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<ILifecycleProvider>(), serviceProvider.GetRequiredService<SqliteLifecycleEventWriter>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<BuildService>(serviceProvider => new BuildService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<ProviderRoutingService>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<DeploymentService>(serviceProvider => new DeploymentService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<SqliteDeploymentRepository>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<ReleaseOrchestrationService>();
         builder.Services.AddMcpServer()
             .WithHttpTransport(transport => transport.Stateless = true)
