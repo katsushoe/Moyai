@@ -43,10 +43,11 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
         using ServiceProvider providerServices = new ServiceCollection().AddHttpClient().BuildServiceProvider();
         var routing = new ProviderRoutingService(repository, tokenRepository, CreateProviders(providerServices.GetRequiredService<IHttpClientFactory>()), TimeProvider.System);
         var lifecycle = new LifecycleService(repository, tokenRepository, CreateLifecycleProviders(providerServices.GetRequiredService<IHttpClientFactory>()), new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System);
+        var releaseOrchestration = new ReleaseOrchestrationService(releases, releaseContent, lifecycle);
         var tokens = new Moyai.Application.Authentication.ServiceTokenLifecycleService(tokenRepository, TimeProvider.System);
         IReadOnlyDictionary<string, string?> values = ParseOptions(arguments[1..]);
 
-        object result = arguments[0] switch
+        object? result = arguments[0] switch
         {
             "project-list" => await projects.ListAsync(HasFlag(values, "include-archived")),
             "project-get" => await projects.GetAsync(Required(values, "name")),
@@ -103,8 +104,13 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
             "release-add-artifact" => await releaseContent.AddArtifactAsync(new AddReleaseArtifactCommand(Required(values, "project"), Required(values, "version"), OptionalGuid(values, "build-artifact-id"), Required(values, "name"), Required(values, "artifact-type"), Required(values, "platform"), Required(values, "architecture"), Required(values, "file-name"), Optional(values, "file-path"), Optional(values, "download-url"), OptionalLong(values, "file-size"), Optional(values, "sha256"), Optional(values, "signature-path"), Optional(values, "signature-url"), Required(values, "actor-type"), Required(values, "actor-name"))),
             "release-remove-artifact" => await releaseContent.RemoveArtifactAsync(Required(values, "project"), Required(values, "version"), RequiredGuid(values, "artifact-id"), Required(values, "actor-type"), Required(values, "actor-name")),
             "release-list-artifacts" => await releaseContent.ListArtifactsAsync(Required(values, "project"), Required(values, "version")),
-            "release-publish" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleasePublish, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
-            "release-withdraw" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleaseWithdraw, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
+            "release-prepare" => await releaseOrchestration.PrepareAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-mark-ready" => await releaseOrchestration.MarkReadyAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-publish" => await releaseOrchestration.PublishAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-retry" => await releaseOrchestration.RetryAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-withdraw" => await releaseOrchestration.WithdrawAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-latest" => await releaseOrchestration.LatestAsync(Required(values, "project")),
+            "release-overview" => await releaseOrchestration.OverviewAsync(Required(values, "project"), Required(values, "version")),
             "deploy" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Deploy, Required(values, "actor-type"), Required(values, "actor-name"), Optional(values, "version"), Required(values, "artifact-path")),
             _ => throw new ArgumentException($"Unknown command '{arguments[0]}'."),
         };
@@ -179,7 +185,7 @@ static string QuoteArgument(string argument) =>
         ? $"\"{argument.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
         : argument;
 
-static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
+static void WriteJson(object? value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
 static JsonSerializerOptions SerializerOptions() => new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
 static IReadOnlyList<IRepositoryProvider> CreateProviders(IHttpClientFactory httpClientFactory)

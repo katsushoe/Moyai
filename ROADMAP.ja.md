@@ -54,6 +54,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン5: Release管理
 
+- 状態: 2026-08-29完了。
 - Releaseの作成・取得・一覧・更新とstatus遷移を実装します。
 - ReleaseとWorkItemの関連、Release Artifact metadataを管理します。
 - prepare、mark-ready、publish、retry、withdraw、latest release、release overviewを実装します。
