@@ -48,7 +48,12 @@ public static class RepositoryProviderContract
         {
             using JsonDocument document = JsonDocument.Parse(detail);
             if (document.RootElement.TryGetProperty("error", out JsonElement error)
-                && error.TryGetProperty("code", out JsonElement codeElement)) return NormalizeKnownCode(codeElement.GetString());
+                && error.ValueKind == JsonValueKind.Object)
+            {
+                if (error.TryGetProperty("retryable", out JsonElement retryableElement)
+                    && retryableElement.ValueKind == JsonValueKind.True) return "provider_retryable_failure";
+                if (error.TryGetProperty("code", out JsonElement codeElement)) return NormalizeKnownCode(codeElement.GetString());
+            }
         }
         catch (JsonException)
         {
@@ -65,7 +70,8 @@ public static class RepositoryProviderContract
     {
         "provider_unavailable" => "provider_unavailable",
         "unauthorized" or "invalid_service_token" or "service_token_expired" or "service_token_scope_missing" => "provider_authentication_failed",
-        "policy_rejected" or "protected_branch" or "forbidden" => "provider_policy_rejected",
+        "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" => "provider_policy_rejected",
+        "retryable" or "rate_limited" or "temporarily_unavailable" => "provider_retryable_failure",
         "conflict" or "already_exists" => "provider_conflict",
         "not_found" or "branch_not_found" or "tag_not_found" => "provider_not_found",
         _ => "provider_operation_failed",

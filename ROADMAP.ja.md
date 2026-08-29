@@ -43,6 +43,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン4: Repository Contract完成
 
+- 状態: 2026-08-29完了。
 - Branchの一覧・作成・削除を追加します。
 - Tagの作成・削除・pushを追加します。
 - Provider情報とcapability negotiationを完成させます。
