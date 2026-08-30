@@ -2,11 +2,12 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
-## 1.0.6 - 2026-08-29
+## 1.0.6 - 2026-08-30
 
 - Release Domain Model、SQLite永続化、Application Service、対応するCLI／MCP操作を追加しました。
 - 再試行可能エラーとPolicy拒否を含むRepository Providerエラー正規化を完成させました。
 - Project検索、重複登録判定、変更対象の解決をOrdinalな大文字小文字非区別比較へ統一しました。
+- MCPのProject探索指示、`list_projects` Tool別名、未登録エラーの登録済みProject候補を追加しました。
 
 ## 1.0.5 - 2026-08-29
 

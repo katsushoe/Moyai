@@ -41,7 +41,7 @@ MCPクライアントには`http://127.0.0.1:43120/mcp`をStreamable HTTPサー�
 dotnet restore .\Moyai.slnx
 dotnet build .\Moyai.slnx --configuration Release --no-restore
 dotnet test .\Moyai.slnx --configuration Release --no-build
-.\scripts\Build-Installer.ps1 -Version 1.0.5
+.\scripts\Build-Installer.ps1 -Version 1.0.6
 ```
 
 ## Configuration
