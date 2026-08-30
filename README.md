@@ -27,7 +27,7 @@ Register `http://127.0.0.1:43120/mcp` as a Streamable HTTP server in the MCP cli
 
 ### Installer
 
-Download `Moyai-1.0.5-x64.msi` and its `.sha256` file from [Moyai v1.0.5](https://github.com/katsushoe/Moyai/releases/tag/v1.0.5). Verify both SHA-256 values match, then run the MSI as an administrator. Moyai is installed in `C:\Moyai`.
+Download `Moyai-1.0.7-x64.msi` and its `.sha256` file from [Moyai v1.0.7](https://github.com/katsushoe/Moyai/releases/tag/v1.0.7). Verify both SHA-256 values match, then run the MSI as an administrator. Moyai is installed in `C:\Moyai`.
 
 ### Binary Archive
 
@@ -41,7 +41,7 @@ Prerequisites are the .NET 10 SDK, including support for targeting .NET 8, and t
 dotnet restore .\Moyai.slnx
 dotnet build .\Moyai.slnx --configuration Release --no-restore
 dotnet test .\Moyai.slnx --configuration Release --no-build
-.\scripts\Build-Installer.ps1 -Version 1.0.6
+.\scripts\Build-Installer.ps1 -Version 1.0.7
 ```
 
 ## Configuration
