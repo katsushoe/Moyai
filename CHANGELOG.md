@@ -2,12 +2,16 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.0.7 - 2026-08-31
+
+- Added MCP project discovery guidance, the `list_projects` tool alias, and registered-project candidates in not-found errors.
+- Completed v1 acceptance traceability and expanded architecture, build, deployment, and release-content verification.
+
 ## 1.0.6 - 2026-08-30
 
 - Added the Release domain model, SQLite persistence, application service, and matching CLI/MCP operations.
 - Completed Repository Provider error normalization for retryable and policy failures.
 - Aligned Project lookup, duplicate registration, and update targeting with ordinal case-insensitive comparison.
-- Added MCP project discovery guidance, the `list_projects` tool alias, and registered-project candidates in not-found errors.
 
 ## 1.0.5 - 2026-08-29
 
