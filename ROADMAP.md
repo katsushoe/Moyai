@@ -86,9 +86,9 @@ Exit criteria: Acceptance Criteria 35 through 43 and 45 pass, including failed v
 
 ## Milestone 8: v1 Conformance and Distribution
 
-- Build a traceability matrix for all 45 Acceptance Criteria.
+- Completed on 2026-08-30: built the [traceability matrix](V1_TRACEABILITY.md) for all 45 Acceptance Criteria; 42 are verified and 3 require external provider verification.
 - Add CLI/MCP parity, standard response/error, authorization, idempotency, and recovery tests.
-- Run migration tests from the released v1.0.3 database.
+- Completed on 2026-08-30: migrated a database created by the released v1.0.3.0 CLI, retained its Project data, and verified the readable pre-migration backup.
 - Perform Release build, full automated tests, MSI upgrade/install/uninstall, and installed-machine smoke tests.
 - Update all public documentation and publish only after explicit release approval.
 

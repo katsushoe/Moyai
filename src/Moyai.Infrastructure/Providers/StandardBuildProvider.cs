@@ -41,10 +41,10 @@ public sealed class StandardBuildProvider(string name) : ILifecycleProvider
         {
             "csharp" when action == LifecycleAction.Build => ("dotnet", ["publish", "--configuration", configuration]),
             "csharp" => ("dotnet", ["clean", "--configuration", configuration]),
-            "node" when action == LifecycleAction.Build => ("npm", ["run", "build", "--if-present"]),
-            "node" => ("npm", ["run", "clean", "--if-present"]),
-            "php" when action == LifecycleAction.Build => ("composer", ["run-script", "build"]),
-            "php" => ("composer", ["run-script", "clean"]),
+            "node" when action == LifecycleAction.Build => ("cmd.exe", ["/d", "/s", "/c", "npm.cmd", "run", "build", "--if-present"]),
+            "node" => ("cmd.exe", ["/d", "/s", "/c", "npm.cmd", "run", "clean", "--if-present"]),
+            "php" when action == LifecycleAction.Build => ("cmd.exe", ["/d", "/s", "/c", "composer.bat", "run-script", "build"]),
+            "php" => ("cmd.exe", ["/d", "/s", "/c", "composer.bat", "run-script", "clean"]),
             _ => throw new ArgumentOutOfRangeException(nameof(name)),
         };
     }
