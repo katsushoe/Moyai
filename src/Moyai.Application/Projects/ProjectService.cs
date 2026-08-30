@@ -28,7 +28,7 @@ public sealed class ProjectService
     }
 
     public async Task<Project> GetAsync(string name, CancellationToken cancellationToken = default) =>
-        await _repository.GetByNameAsync(name, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(name);
+        await _repository.GetRequiredAsync(name, cancellationToken).ConfigureAwait(false);
 
     public Task<IReadOnlyList<Project>> ListAsync(bool includeArchived, CancellationToken cancellationToken = default) =>
         _repository.ListAsync(includeArchived, cancellationToken);

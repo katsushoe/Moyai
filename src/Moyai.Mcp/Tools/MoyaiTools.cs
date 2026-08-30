@@ -27,6 +27,10 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<IReadOnlyList<Project>> ProjectList(bool includeArchived = false, CancellationToken cancellationToken = default) =>
         projects.ListAsync(includeArchived, cancellationToken);
 
+    [McpServerTool(Name = "list_projects", ReadOnly = true), Description("Lists registered project name candidates. Call this before any tool that accepts a project name.")]
+    public Task<IReadOnlyList<Project>> ListProjects(bool includeArchived = false, CancellationToken cancellationToken = default) =>
+        projects.ListAsync(includeArchived, cancellationToken);
+
     [McpServerTool(Name = "project_get", ReadOnly = true), Description("Gets a registered Moyai project by name.")]
     public Task<Project> ProjectGet(string name, CancellationToken cancellationToken = default) => projects.GetAsync(name, cancellationToken);
 

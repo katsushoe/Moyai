@@ -55,7 +55,7 @@ public sealed class ReleaseContentService(IProjectRepository projects, IWorkItem
 
     private async Task<(Moyai.Domain.Projects.Project Project, Release Release)> ResolveAsync(string projectName, string version, CancellationToken cancellationToken)
     {
-        Moyai.Domain.Projects.Project project = await projects.GetByNameAsync(projectName, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(projectName);
+        Moyai.Domain.Projects.Project project = await projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
         Release release = await releases.GetAsync(project.Id, version, false, cancellationToken).ConfigureAwait(false) ?? throw new ReleaseNotFoundException(version);
         return (project, release);
     }

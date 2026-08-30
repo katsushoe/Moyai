@@ -75,6 +75,21 @@ public sealed class SqliteProjectRepositoryTests
     }
 
     [Fact]
+    public async Task GetAsyncReturnsRegisteredCandidatesWhenProjectIsNotRegistered()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        await service.CreateAsync(new CreateProjectCommand("Moyai", "source", "install", "https://github.com/example/moyai", null, "csharp", "local", "agent", "codex"));
+        await service.CreateAsync(new CreateProjectCommand("Kelpie", "source", "install", "https://github.com/example/kelpie", null, "csharp", "local", "agent", "codex"));
+
+        ProjectNotFoundException exception = await Assert.ThrowsAsync<ProjectNotFoundException>(() => service.GetAsync("Unknown"));
+
+        Assert.Equal("Unknown", exception.ProjectName);
+        Assert.Equal(["Kelpie", "Moyai"], exception.Candidates);
+        Assert.Contains("Registered project candidates: Kelpie, Moyai", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UpdateAsyncRejectsStaleRevisionWithoutEventOrDataChange()
     {
         using var fixture = new ProjectFixture();

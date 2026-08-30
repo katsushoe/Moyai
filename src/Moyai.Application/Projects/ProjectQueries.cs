@@ -54,7 +54,7 @@ public sealed class ProjectQueryService
     }
 
     private async Task<Project> GetProjectAsync(string name, CancellationToken cancellationToken) =>
-        await _projects.GetByNameAsync(name, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(name);
+        await _projects.GetRequiredAsync(name, cancellationToken).ConfigureAwait(false);
 
     private static void ValidatePage(int offset, int limit)
     {
