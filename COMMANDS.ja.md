@@ -2,7 +2,7 @@
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
-`Moyai.Cli.exe`の公開コマンド契約です。MCP Toolは同じ操作名をunderscore形式で提供します。
+`Moyai.Cli.exe`の公開コマンド契約です。MCP Toolは同じ操作名をunderscore形式で提供します。MCPはAI向けの`project_list`別名として`list_projects`も公開し、対応するCLI操作は`project-list`です。
 
 ## Command Groups
 
@@ -13,8 +13,9 @@
 | Collaboration | `relation-add/remove/list`、`comment-add/list`、`task-link-add/remove/list`、`commit-link-add/remove/list` | WorkItem連携記録 |
 | Repository | `repository-status`、`repository-diff`、`repository-commit`、`repository-push`、`repository-pull` | Provider経由Git操作 |
 | Token | `token-issue`、`token-rotate`、`token-revoke`、`token-cleanup` | Service認証 |
-| Release | `release-create`、`release-get`、`release-list`、`release-update`、`release-transition`、`release-publish`、`release-withdraw` | Release状態と公開 |
-| Lifecycle | `build`、`deploy` | Provider経由Lifecycle操作 |
+| Release | `release-create/get/list/update/transition`、`release-add/remove/list-items`、`release-add/remove/list-artifacts`、`release-prepare/mark-ready/publish/retry/withdraw`、`release-latest/overview` | Release状態、内容、公開 |
+| Build | `build`、`build-start`、`build-get`、`build-list`、`build-artifacts`、`build-clean` | 追跡可能なBuild実行とArtifact |
+| Deployment | `deployment-target-get/update`、`deploy/start/get/list/status/retry/rollback` | Local／KelpieSSH Deployの追跡管理 |
 
 ## Common Options
 
@@ -63,7 +64,21 @@ Project名の検索、重複登録判定、変更対象の解決にはOrdinalな
 
 `release-create`は`--version --channel`、`release-update`は`--version --channel --expected-revision`、`release-transition`は`--version --next-status --expected-revision`を必須とします。`release-get`と`release-list`はRelease状態を取得します。
 
-`build`、`release-publish`、`release-withdraw`、`deploy`はProject、actorと操作固有のversion、artifact pathをProviderへ渡します。
+`release-add-item`は`--project --version --work-item-key --relation --actor-type --actor-name`が必須です。relationは`includes`、`fixes`、`implements`、`resolves`です。削除は`--relation-id`、一覧は`--project --version`を指定します。
+
+`release-add-artifact`は`--project --version --name --artifact-type --platform --architecture --file-name --actor-type --actor-name`が必須です。任意で`--build-artifact-id --file-path --download-url --file-size --sha256 --signature-path --signature-url`を指定します。削除は`--artifact-id`、一覧は`--project --version`を指定します。ファイル本体は保存しません。
+
+`release-prepare`と`release-mark-ready`は`--project --version --expected-revision --actor-type --actor-name`が必須で、`planned -> preparing -> ready`へ遷移します。
+
+`release-publish`は同じOptionと明示承認が必要です。Provider呼び出し前に`publishing`を保存し、結果を`released`または`failed`として記録します。公開済みVersionへの再実行ではProviderを呼びません。`release-retry`は`failed -> ready`後に再公開し、`release-withdraw`はProviderで公開停止後に状態を更新します。
+
+`release-latest --project`は`released_at`基準の最新Stable Release、`release-overview --project --version`はRelease、WorkItem関連、Artifact metadataを返します。
+
+`build`と`build-start`は`--project --actor-type --actor-name`が必須で、`--configuration`の既定値は`Release`です。Repository ProviderからSource CommitとDirty状態を取得し、Dirtyな標準BuildはBuild Provider実行前に拒否します。`build-get`、`build-list`、`build-artifacts`は永続状態を返し、`build-clean --project --actor-type --actor-name`はBuild／Artifact履歴を保持してProviderのclean操作を実行します。
+
+`deployment-target-update`は`--project --name --mode --destination-path --expected-revision --actor-type --actor-name`が必須で、初回作成時のrevisionは`0`です。Server modeでは`--kelpie-target`も必須で、`--config-json`に資格情報を保存しません。
+
+`deploy`と`deploy-start`は`--project --build-id --artifact-id --actor-type --actor-name`が必須で、任意の`--version`でReleaseを関連付けます。成功済みBuildの検証済みArtifactだけを受け付けます。get／status／list／retry／rollbackはDeployment状態と失敗履歴を保持し、Rollback失敗を`rollback_failed`として記録します。
 
 ## Safety Notes
 

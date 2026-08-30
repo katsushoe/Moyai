@@ -54,6 +54,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン5: Release管理
 
+- 状態: 2026-08-29完了。
 - Releaseの作成・取得・一覧・更新とstatus遷移を実装します。
 - ReleaseとWorkItemの関連、Release Artifact metadataを管理します。
 - prepare、mark-ready、publish、retry、withdraw、latest release、release overviewを実装します。
@@ -63,6 +64,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン6: Build管理
 
+- 状態: 2026-08-30完了。
 - BuildとimmutableなBuild Artifact Entityを実装します。
 - build start/get/list/artifacts/cleanとproject buildを実装します。
 - C#、Node、PHPの標準Build Providerを追加します。
@@ -73,6 +75,7 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン7: Deploy管理
 
+- 状態: 2026-08-30完了。
 - 1 Project = 1 DeploymentTargetを実装します。
 - `install_path`へのLocal Deployとverifyを実装します。
 - SSH secretを保存せず、KelpieSSH Streamable HTTP経由のServer Deployを実装します。
@@ -83,9 +86,9 @@ ProjectとWorkItemの基本操作、Type固有のWorkItem遷移、Optimistic Loc
 
 ## マイルストーン8: v1適合確認・配布
 
-- 45項目すべてのAcceptance Criteria traceability matrixを作成します。
+- 2026-08-30完了: 45項目すべての[Acceptance Criteria追跡表](V1_TRACEABILITY.ja.md)を作成しました。42項目は適合、3項目は外部Provider検証が必要です。
 - CLI/MCP parity、標準response/error、認可、idempotency、障害復旧testを追加します。
-- 公開済みv1.0.3 DBからのmigration testを実行します。
+- 2026-08-30完了: 公開済みv1.0.3.0 CLIが作成したDBをMigrationし、Projectデータ保持と読取可能なMigration前Backupを検証しました。
 - Release build、全自動test、MSI upgrade/install/uninstall、実機smoke testを実行します。
 - 公開文書を更新し、明示的なrelease承認後にだけ公開します。
 

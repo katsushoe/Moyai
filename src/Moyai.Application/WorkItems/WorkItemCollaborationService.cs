@@ -122,7 +122,7 @@ public sealed class WorkItemCollaborationService
     }
 
     private async Task<Guid> ResolveProjectIdAsync(string projectName, CancellationToken cancellationToken) =>
-        (await _projects.GetByNameAsync(projectName, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(projectName)).Id;
+        (await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false)).Id;
 
     private async Task<WorkItem> GetItemAsync(Guid projectId, string key, CancellationToken cancellationToken) =>
         await _items.GetAsync(projectId, key, false, cancellationToken).ConfigureAwait(false) ?? throw new WorkItemNotFoundException(key);

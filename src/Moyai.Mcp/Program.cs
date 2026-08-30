@@ -2,6 +2,8 @@
 using Microsoft.Data.Sqlite;
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
+using Moyai.Application.Builds;
+using Moyai.Application.Deployments;
 using Moyai.Application.Diagnostics;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
@@ -37,6 +39,9 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<SqliteProjectQueryRepository>();
         builder.Services.AddSingleton<SqliteServiceTokenRepository>();
         builder.Services.AddSingleton<SqliteReleaseRepository>();
+        builder.Services.AddSingleton<SqliteReleaseContentRepository>();
+        builder.Services.AddSingleton<SqliteBuildRepository>();
+        builder.Services.AddSingleton<SqliteDeploymentRepository>();
         builder.Services.AddSingleton<SqliteLifecycleEventWriter>();
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddSingleton<ProjectService>(serviceProvider => new ProjectService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
@@ -44,16 +49,22 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<WorkItemCollaborationService>(serviceProvider => new WorkItemCollaborationService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteWorkItemRepository>(), serviceProvider.GetRequiredService<SqliteWorkItemCollaborationRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<ProjectQueryService>(serviceProvider => new ProjectQueryService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteProjectQueryRepository>()));
         builder.Services.AddSingleton<ReleaseService>(serviceProvider => new ReleaseService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<ReleaseContentService>(serviceProvider => new ReleaseContentService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteWorkItemRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<SqliteReleaseContentRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<AuthIntrospectionService>(serviceProvider => new AuthIntrospectionService(serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<ServiceTokenLifecycleService>(serviceProvider => new ServiceTokenLifecycleService(serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddHttpClient();
+        string? externalBuildProvider = Environment.GetEnvironmentVariable("MOYAI_BUILD_PROVIDER_NAME");
+        foreach (string name in new[] { "csharp", "node", "php" }) if (!string.Equals(name, externalBuildProvider, StringComparison.Ordinal)) builder.Services.AddSingleton<ILifecycleProvider>(new StandardBuildProvider(name));
         RegisterProvider(builder.Services, "githubbie", "GITHUBIE_MCP_URL", "github");
         RegisterProvider(builder.Services, "buckettie", "BUCKETTIE_MCP_URL", "bitbucket");
         RegisterOptionalLifecycleProvider(builder.Services, "MOYAI_BUILD_PROVIDER_NAME", "MOYAI_BUILD_PROVIDER_URL", "MOYAI_BUILD_PROVIDER_PREFIX");
         RegisterOptionalLifecycleProvider(builder.Services, "MOYAI_DEPLOY_PROVIDER_NAME", "MOYAI_DEPLOY_PROVIDER_URL", "MOYAI_DEPLOY_PROVIDER_PREFIX");
         builder.Services.AddSingleton<ProviderRoutingService>(serviceProvider => new ProviderRoutingService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<IRepositoryProvider>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<LifecycleService>(serviceProvider => new LifecycleService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<ILifecycleProvider>(), serviceProvider.GetRequiredService<SqliteLifecycleEventWriter>(), serviceProvider.GetRequiredService<TimeProvider>()));
-        builder.Services.AddMcpServer()
+        builder.Services.AddSingleton<BuildService>(serviceProvider => new BuildService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<ProviderRoutingService>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<DeploymentService>(serviceProvider => new DeploymentService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<SqliteDeploymentRepository>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<ReleaseOrchestrationService>();
+        builder.Services.AddMcpServer(options => options.ServerInstructions = "Before every project operation, call list_projects and select the registered project name that matches the user's conversation context. Do not guess or synthesize project names.")
             .WithHttpTransport(transport => transport.Stateless = true)
             .WithTools<MoyaiTools>();
 

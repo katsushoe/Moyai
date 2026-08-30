@@ -65,7 +65,7 @@ public sealed class ReleaseService
     }
 
     private async Task<Moyai.Domain.Projects.Project> GetProjectAsync(string name, CancellationToken cancellationToken) =>
-        await _projects.GetByNameAsync(name, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(name);
+        await _projects.GetRequiredAsync(name, cancellationToken).ConfigureAwait(false);
 
     private ProjectEvent Event(Release release, string type, string actorType, string actorName, string? before) =>
         ProjectEvent.Create(release.ProjectId, "release", release.Id, type, actorType, actorName, before, JsonSerializer.Serialize(release), null, _timeProvider);

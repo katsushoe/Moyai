@@ -2,6 +2,8 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Moyai.Application.Builds;
+using Moyai.Application.Deployments;
 using Moyai.Application.Diagnostics;
 using Moyai.Application.Lifecycle;
 using Moyai.Application.Projects;
@@ -39,13 +41,17 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
         var items = new WorkItemService(repository, itemRepository, TimeProvider.System);
         var collaboration = new WorkItemCollaborationService(repository, itemRepository, new SqliteWorkItemCollaborationRepository(options), TimeProvider.System);
         var releases = new ReleaseService(repository, new SqliteReleaseRepository(options), TimeProvider.System);
+        var releaseContent = new ReleaseContentService(repository, itemRepository, new SqliteReleaseRepository(options), new SqliteReleaseContentRepository(options), TimeProvider.System);
         using ServiceProvider providerServices = new ServiceCollection().AddHttpClient().BuildServiceProvider();
         var routing = new ProviderRoutingService(repository, tokenRepository, CreateProviders(providerServices.GetRequiredService<IHttpClientFactory>()), TimeProvider.System);
         var lifecycle = new LifecycleService(repository, tokenRepository, CreateLifecycleProviders(providerServices.GetRequiredService<IHttpClientFactory>()), new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System);
+        var releaseOrchestration = new ReleaseOrchestrationService(releases, releaseContent, lifecycle);
+        var builds = new BuildService(repository, new SqliteBuildRepository(options), routing, lifecycle, TimeProvider.System);
+        var deployments = new DeploymentService(repository, new SqliteBuildRepository(options), new SqliteReleaseRepository(options), new SqliteDeploymentRepository(options), lifecycle, TimeProvider.System);
         var tokens = new Moyai.Application.Authentication.ServiceTokenLifecycleService(tokenRepository, TimeProvider.System);
         IReadOnlyDictionary<string, string?> values = ParseOptions(arguments[1..]);
 
-        object result = arguments[0] switch
+        object? result = arguments[0] switch
         {
             "project-list" => await projects.ListAsync(HasFlag(values, "include-archived")),
             "project-get" => await projects.GetAsync(Required(values, "name")),
@@ -90,15 +96,39 @@ static async Task<int> RunAsync(string[] arguments, string executedCommand)
             "token-rotate" => await tokens.RotateAsync(Required(values, "audience"), Required(values, "scopes").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), OptionalDate(values, "expires-at"), Required(values, "actor-type"), Required(values, "actor-name")),
             "token-revoke" => await tokens.RevokeAsync(Required(values, "audience"), Required(values, "actor-type"), Required(values, "actor-name")),
             "token-cleanup" => await tokens.DeleteExpiredAsync(Required(values, "actor-type"), Required(values, "actor-name")),
-            "build" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Build, Required(values, "actor-type"), Required(values, "actor-name")),
+            "build" => await builds.StartAsync(Required(values, "project"), Optional(values, "configuration") ?? "Release", Required(values, "actor-type"), Required(values, "actor-name")),
+            "build-start" => await builds.StartAsync(Required(values, "project"), Optional(values, "configuration") ?? "Release", Required(values, "actor-type"), Required(values, "actor-name")),
+            "build-get" => await builds.GetAsync(Required(values, "project"), RequiredGuid(values, "build-id")),
+            "build-list" => await builds.ListAsync(Required(values, "project")),
+            "build-artifacts" => await builds.ListArtifactsAsync(Required(values, "project"), RequiredGuid(values, "build-id")),
+            "build-clean" => await builds.CleanAsync(Required(values, "project"), Required(values, "actor-type"), Required(values, "actor-name")),
             "release-create" => await releases.CreateAsync(new CreateReleaseCommand(Required(values, "project"), Required(values, "version"), Enum.Parse<ReleaseChannel>(Required(values, "channel"), true), Optional(values, "notes"), Required(values, "actor-type"), Required(values, "actor-name"))),
             "release-get" => await releases.GetAsync(Required(values, "project"), Required(values, "version"), HasFlag(values, "include-deleted")),
             "release-list" => await releases.ListAsync(Required(values, "project"), HasFlag(values, "include-deleted")),
             "release-update" => await releases.UpdateAsync(new UpdateReleaseCommand(Required(values, "project"), Required(values, "version"), Enum.Parse<ReleaseChannel>(Required(values, "channel"), true), Optional(values, "tag-name"), Optional(values, "commit-hash"), Optional(values, "notes"), OptionalDate(values, "planned-at"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name"))),
             "release-transition" => await releases.TransitionAsync(new TransitionReleaseCommand(Required(values, "project"), Required(values, "version"), Enum.Parse<ReleaseStatus>(Required(values, "next-status"), true), Revision(values), Required(values, "actor-type"), Required(values, "actor-name"))),
-            "release-publish" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleasePublish, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
-            "release-withdraw" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.ReleaseWithdraw, Required(values, "actor-type"), Required(values, "actor-name"), Required(values, "version")),
-            "deploy" => await lifecycle.ExecuteAsync(Required(values, "project"), LifecycleAction.Deploy, Required(values, "actor-type"), Required(values, "actor-name"), Optional(values, "version"), Required(values, "artifact-path")),
+            "release-add-item" => await releaseContent.AddItemAsync(new AddReleaseItemCommand(Required(values, "project"), Required(values, "version"), Required(values, "work-item-key"), Required(values, "relation"), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "release-remove-item" => await releaseContent.RemoveItemAsync(Required(values, "project"), Required(values, "version"), RequiredGuid(values, "relation-id"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-list-items" => await releaseContent.ListItemsAsync(Required(values, "project"), Required(values, "version")),
+            "release-add-artifact" => await releaseContent.AddArtifactAsync(new AddReleaseArtifactCommand(Required(values, "project"), Required(values, "version"), OptionalGuid(values, "build-artifact-id"), Required(values, "name"), Required(values, "artifact-type"), Required(values, "platform"), Required(values, "architecture"), Required(values, "file-name"), Optional(values, "file-path"), Optional(values, "download-url"), OptionalLong(values, "file-size"), Optional(values, "sha256"), Optional(values, "signature-path"), Optional(values, "signature-url"), Required(values, "actor-type"), Required(values, "actor-name"))),
+            "release-remove-artifact" => await releaseContent.RemoveArtifactAsync(Required(values, "project"), Required(values, "version"), RequiredGuid(values, "artifact-id"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-list-artifacts" => await releaseContent.ListArtifactsAsync(Required(values, "project"), Required(values, "version")),
+            "release-prepare" => await releaseOrchestration.PrepareAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-mark-ready" => await releaseOrchestration.MarkReadyAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-publish" => await releaseOrchestration.PublishAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-retry" => await releaseOrchestration.RetryAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-withdraw" => await releaseOrchestration.WithdrawAsync(Required(values, "project"), Required(values, "version"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "release-latest" => await releaseOrchestration.LatestAsync(Required(values, "project")),
+            "release-overview" => await releaseOrchestration.OverviewAsync(Required(values, "project"), Required(values, "version")),
+            "deployment-target-get" => await deployments.GetTargetAsync(Required(values, "project")),
+            "deployment-target-update" => await deployments.UpdateTargetAsync(Required(values, "project"), Required(values, "name"), Required(values, "mode"), Required(values, "destination-path"), Optional(values, "kelpie-target"), Optional(values, "config-json"), Revision(values), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy" => await deployments.StartAsync(Required(values, "project"), RequiredGuid(values, "build-id"), RequiredGuid(values, "artifact-id"), Optional(values, "version"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy-start" => await deployments.StartAsync(Required(values, "project"), RequiredGuid(values, "build-id"), RequiredGuid(values, "artifact-id"), Optional(values, "version"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy-get" => await deployments.GetAsync(Required(values, "project"), RequiredGuid(values, "deployment-id")),
+            "deploy-list" => await deployments.ListAsync(Required(values, "project")),
+            "deploy-status" => await deployments.GetAsync(Required(values, "project"), RequiredGuid(values, "deployment-id")),
+            "deploy-retry" => await deployments.RetryAsync(Required(values, "project"), RequiredGuid(values, "deployment-id"), RequiredGuid(values, "artifact-id"), Required(values, "actor-type"), Required(values, "actor-name")),
+            "deploy-rollback" => await deployments.RollbackAsync(Required(values, "project"), RequiredGuid(values, "deployment-id"), Required(values, "actor-type"), Required(values, "actor-name")),
             _ => throw new ArgumentException($"Unknown command '{arguments[0]}'."),
         };
         WriteJson(result);
@@ -139,6 +169,8 @@ static string? Optional(IReadOnlyDictionary<string, string?> values, string name
 static T? OptionalEnum<T>(IReadOnlyDictionary<string, string?> values, string name) where T : struct => Optional(values, name) is string value ? Enum.Parse<T>(value, true) : null;
 static long Revision(IReadOnlyDictionary<string, string?> values) => long.Parse(Required(values, "expected-revision"), CultureInfo.InvariantCulture);
 static Guid RequiredGuid(IReadOnlyDictionary<string, string?> values, string name) => Guid.Parse(Required(values, name), CultureInfo.InvariantCulture);
+static Guid? OptionalGuid(IReadOnlyDictionary<string, string?> values, string name) => Optional(values, name) is string value ? Guid.Parse(value, CultureInfo.InvariantCulture) : null;
+static long? OptionalLong(IReadOnlyDictionary<string, string?> values, string name) => Optional(values, name) is string value ? long.Parse(value, CultureInfo.InvariantCulture) : null;
 static bool RequiredBoolean(IReadOnlyDictionary<string, string?> values, string name) => bool.Parse(Required(values, name));
 static DateTimeOffset? OptionalDate(IReadOnlyDictionary<string, string?> values, string name) => Optional(values, name) is string value ? DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : null;
 static DateTimeOffset RequiredDate(IReadOnlyDictionary<string, string?> values, string name) => DateTimeOffset.Parse(Required(values, name), CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
@@ -170,7 +202,7 @@ static string QuoteArgument(string argument) =>
         ? $"\"{argument.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
         : argument;
 
-static void WriteJson(object value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
+static void WriteJson(object? value) => Console.WriteLine(JsonSerializer.Serialize(value, SerializerOptions()));
 static JsonSerializerOptions SerializerOptions() => new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
 static IReadOnlyList<IRepositoryProvider> CreateProviders(IHttpClientFactory httpClientFactory)
@@ -184,6 +216,8 @@ static IReadOnlyList<IRepositoryProvider> CreateProviders(IHttpClientFactory htt
 static IReadOnlyList<ILifecycleProvider> CreateLifecycleProviders(IHttpClientFactory httpClientFactory)
 {
     var providers = new List<ILifecycleProvider>();
+    string? externalBuildProvider = Environment.GetEnvironmentVariable("MOYAI_BUILD_PROVIDER_NAME");
+    foreach (string name in new[] { "csharp", "node", "php" }) if (!string.Equals(name, externalBuildProvider, StringComparison.Ordinal)) providers.Add(new StandardBuildProvider(name));
     AddLifecycleProvider(providers, httpClientFactory, "githubbie", "GITHUBIE_MCP_URL", "github");
     AddLifecycleProvider(providers, httpClientFactory, "buckettie", "BUCKETTIE_MCP_URL", "bitbucket");
     AddOptionalLifecycleProvider(providers, httpClientFactory, "MOYAI_BUILD_PROVIDER_NAME", "MOYAI_BUILD_PROVIDER_URL", "MOYAI_BUILD_PROVIDER_PREFIX");

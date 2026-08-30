@@ -82,7 +82,7 @@ public sealed class WorkItemService
     }
 
     private async Task<Moyai.Domain.Projects.Project> GetProjectAsync(string name, CancellationToken cancellationToken) =>
-        await _projects.GetByNameAsync(name, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(name);
+        await _projects.GetRequiredAsync(name, cancellationToken).ConfigureAwait(false);
 
     private ProjectEvent CreateEvent(WorkItem item, string eventType, string actorType, string actorName, string? beforeJson, string? afterJson) =>
         ProjectEvent.Create(item.ProjectId, "work_item", item.Id, eventType, actorType, actorName, beforeJson, afterJson, null, _timeProvider);

@@ -54,6 +54,7 @@ Exit criteria: all repository operations in the v1 MCP API and Acceptance Criter
 
 ## Milestone 5: Release Management
 
+- Status: complete on 2026-08-29.
 - Implement Release create/get/list/update and status transitions.
 - Implement Release–WorkItem and Release Artifact metadata management.
 - Implement prepare, mark-ready, publish, retry, withdraw, latest release, and release overview.
@@ -63,6 +64,7 @@ Exit criteria: Acceptance Criteria 10, 11, 12, 19, 30, and the release workflow 
 
 ## Milestone 6: Build Management
 
+- Status: complete on 2026-08-30.
 - Implement Build and immutable Build Artifact entities.
 - Implement build start/get/list/artifacts/clean and project build.
 - Add standard C#, Node, and PHP Build Providers.
@@ -73,6 +75,7 @@ Exit criteria: Acceptance Criteria 31 through 34 and 44 pass with reproducible a
 
 ## Milestone 7: Deployment Management
 
+- Status: complete on 2026-08-30.
 - Implement the one-Project-to-one-DeploymentTarget model.
 - Implement local deployment to `install_path` with verification.
 - Implement server deployment through KelpieSSH Streamable HTTP without storing SSH secrets.
@@ -83,9 +86,9 @@ Exit criteria: Acceptance Criteria 35 through 43 and 45 pass, including failed v
 
 ## Milestone 8: v1 Conformance and Distribution
 
-- Build a traceability matrix for all 45 Acceptance Criteria.
+- Completed on 2026-08-30: built the [traceability matrix](V1_TRACEABILITY.md) for all 45 Acceptance Criteria; 42 are verified and 3 require external provider verification.
 - Add CLI/MCP parity, standard response/error, authorization, idempotency, and recovery tests.
-- Run migration tests from the released v1.0.3 database.
+- Completed on 2026-08-30: migrated a database created by the released v1.0.3.0 CLI, retained its Project data, and verified the readable pre-migration backup.
 - Perform Release build, full automated tests, MSI upgrade/install/uninstall, and installed-machine smoke tests.
 - Update all public documentation and publish only after explicit release approval.
 

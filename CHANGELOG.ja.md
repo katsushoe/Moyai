@@ -2,7 +2,12 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
-## 1.0.6 - 2026-08-29
+## 1.0.7 - 2026-08-31
+
+- MCPのProject探索指示、`list_projects` Tool別名、未登録エラーの登録済みProject候補を追加しました。
+- v1受入基準の追跡を完成させ、Architecture、Build、Deployment、Release Contentの検証を拡充しました。
+
+## 1.0.6 - 2026-08-30
 
 - Release Domain Model、SQLite永続化、Application Service、対応するCLI／MCP操作を追加しました。
 - 再試行可能エラーとPolicy拒否を含むRepository Providerエラー正規化を完成させました。

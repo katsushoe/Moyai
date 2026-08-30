@@ -27,7 +27,7 @@ MCPクライアントには`http://127.0.0.1:43120/mcp`をStreamable HTTPサー�
 
 ### Installer
 
-[Moyai v1.0.5](https://github.com/katsushoe/Moyai/releases/tag/v1.0.5)から`Moyai-1.0.5-x64.msi`と`.sha256`ファイルをダウンロードします。両方のSHA-256値が一致することを確認し、管理者権限でMSIを実行してください。Moyaiは`C:\Moyai`へインストールされます。
+[Moyai v1.0.7](https://github.com/katsushoe/Moyai/releases/tag/v1.0.7)から`Moyai-1.0.7-x64.msi`と`.sha256`ファイルをダウンロードします。両方のSHA-256値が一致することを確認し、管理者権限でMSIを実行してください。Moyaiは`C:\Moyai`へインストールされます。
 
 ### Binary Archive
 
@@ -41,7 +41,7 @@ MCPクライアントには`http://127.0.0.1:43120/mcp`をStreamable HTTPサー�
 dotnet restore .\Moyai.slnx
 dotnet build .\Moyai.slnx --configuration Release --no-restore
 dotnet test .\Moyai.slnx --configuration Release --no-build
-.\scripts\Build-Installer.ps1 -Version 1.0.5
+.\scripts\Build-Installer.ps1 -Version 1.0.7
 ```
 
 ## Configuration
@@ -61,6 +61,7 @@ CLIは成功時のJSONを標準出力、構造化エラーを標準エラーへ�
 - [セキュリティ（英語）](SECURITY.md)
 - [変更履歴](CHANGELOG.ja.md)
 - [v1完成ロードマップ](ROADMAP.ja.md)
+- [v1受入基準追跡表](V1_TRACEABILITY.ja.md)
 - [アーキテクチャ判断](docs/adr/0001-initial-architecture.md)
 
 ## Security
