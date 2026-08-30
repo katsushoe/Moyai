@@ -68,7 +68,7 @@ Server名は`moyai`、transportはStreamable HTTP、`get_version`は認証不要
 1. endpointの待受を確認します。
 2. clientのTool検出を確認します。
 3. `get_version`が`Moyai`と`1.0.5.0`を返すことを確認します。
-4. `project_list`がJSON互換の構造化データを返すことを確認します。
+4. `list_projects`がJSON互換の構造化データを返すことを確認します。サーバーは各プロジェクト操作前にこのToolを呼ぶようAIクライアントへ指示します。互換性維持のため`project_list`も利用できます。
 5. 最初の失敗で停止し、server標準エラーを確認します。
 
 ## Troubleshooting

@@ -2,7 +2,7 @@
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
-`Moyai.Cli.exe`の公開コマンド契約です。MCP Toolは同じ操作名をunderscore形式で提供します。
+`Moyai.Cli.exe`の公開コマンド契約です。MCP Toolは同じ操作名をunderscore形式で提供します。MCPはAI向けの`project_list`別名として`list_projects`も公開し、対応するCLI操作は`project-list`です。
 
 ## Command Groups
 

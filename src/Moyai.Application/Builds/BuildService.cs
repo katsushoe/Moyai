@@ -14,7 +14,7 @@ public sealed class BuildService(IProjectRepository projects, IBuildRepository b
     /// <summary>CleanなSource CommitからBuildを開始し、結果を永続化します。</summary>
     public async Task<Build> StartAsync(string projectName, string configuration, string actorType, string actorName, CancellationToken cancellationToken = default)
     {
-        Project project = await projects.GetByNameAsync(projectName, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(projectName);
+        Project project = await projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
         RepositoryProviderResult status = await repositoryProvider.ExecuteAsync(projectName, RepositoryOperation.Status, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!status.Ok) throw new InvalidOperationException(status.ErrorMessage ?? "Repository status failed.");
         (string commit, bool dirty) = ParseStatus(status.Output);
@@ -37,7 +37,7 @@ public sealed class BuildService(IProjectRepository projects, IBuildRepository b
     public async Task<IReadOnlyList<BuildArtifact>> ListArtifactsAsync(string projectName, Guid buildId, CancellationToken cancellationToken = default) => await builds.ListArtifactsAsync((await ProjectAsync(projectName, cancellationToken).ConfigureAwait(false)).Id, buildId, cancellationToken).ConfigureAwait(false);
     public Task<LifecycleResult> CleanAsync(string projectName, string actorType, string actorName, CancellationToken cancellationToken = default) => lifecycle.ExecuteAsync(projectName, LifecycleAction.BuildClean, actorType, actorName, cancellationToken: cancellationToken);
 
-    private async Task<Project> ProjectAsync(string name, CancellationToken token) => await projects.GetByNameAsync(name, token).ConfigureAwait(false) ?? throw new ProjectNotFoundException(name);
+    private async Task<Project> ProjectAsync(string name, CancellationToken token) => await projects.GetRequiredAsync(name, token).ConfigureAwait(false);
     private ProjectEvent Event(Build build, string type, object? value) => ProjectEvent.Create(build.ProjectId, "build", build.Id, type, build.ActorType, build.ActorName, null, JsonSerializer.Serialize(value ?? build), null, timeProvider);
     private async Task CollectArtifactsAsync(Build build, string sourcePath, string? output, CancellationToken token)
     {

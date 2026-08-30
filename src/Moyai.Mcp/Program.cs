@@ -64,7 +64,7 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<BuildService>(serviceProvider => new BuildService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<ProviderRoutingService>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<DeploymentService>(serviceProvider => new DeploymentService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<SqliteDeploymentRepository>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<ReleaseOrchestrationService>();
-        builder.Services.AddMcpServer()
+        builder.Services.AddMcpServer(options => options.ServerInstructions = "Before every project operation, call list_projects and select the registered project name that matches the user's conversation context. Do not guess or synthesize project names.")
             .WithHttpTransport(transport => transport.Stateless = true)
             .WithTools<MoyaiTools>();
 

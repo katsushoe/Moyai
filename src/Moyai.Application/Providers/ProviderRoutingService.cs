@@ -28,7 +28,7 @@ public sealed class ProviderRoutingService
     /// <summary>Projectに設定されたProviderへ標準Repository操作を委譲します。</summary>
     public async Task<RepositoryProviderResult> ExecuteAsync(string projectName, RepositoryOperation operation, string? message = null, string? branch = null, string? tag = null, CancellationToken cancellationToken = default)
     {
-        Project project = await _projects.GetByNameAsync(projectName, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(projectName);
+        Project project = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
         string providerName = ProviderName(project.RepositoryProvider);
         if (!_providers.TryGetValue(providerName, out IRepositoryProvider? provider))
         {

@@ -34,7 +34,7 @@ public sealed class LifecycleService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actorType);
         ArgumentException.ThrowIfNullOrWhiteSpace(actorName);
-        Project project = await _projects.GetByNameAsync(projectName, cancellationToken).ConfigureAwait(false) ?? throw new ProjectNotFoundException(projectName);
+        Project project = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
         ValidateInput(action, version, artifactPath);
         string providerName = ResolveProvider(project, action);
         if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)) throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");

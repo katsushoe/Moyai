@@ -2,7 +2,7 @@
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
-This document is the public command contract for `Moyai.Cli.exe`. MCP tools use the same operation names with underscores.
+This document is the public command contract for `Moyai.Cli.exe`. MCP tools use the same operation names with underscores. MCP also exposes `list_projects` as the AI-oriented alias of `project_list`; `project-list` is the corresponding CLI operation.
 
 ## Command Groups
 
