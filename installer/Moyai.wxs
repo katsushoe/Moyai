@@ -8,6 +8,9 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of Moyai is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <SetDirectory Id="INSTALLFOLDER" Value="C:\Moyai" Sequence="both" />
+    <Property Id="MOYAI_MCP_URL" Value="http://127.0.0.1:43120" Secure="yes">
+      <RegistrySearch Id="SavedMcpUrl" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="McpUrl" Type="raw" Bitness="always64" />
+    </Property>
 
     <Feature Id="Complete" Title="Moyai" Level="1">
       <ComponentGroupRef Id="ProductFiles" />
@@ -28,7 +31,20 @@
 
   <Fragment>
     <ComponentGroup Id="ProductFiles" Directory="BinFolder">
-      <Files Include="$(PublishDirectory)\**" />
+      <Files Include="$(PublishDirectory)\**">
+        <Exclude Files="$(PublishDirectory)\Moyai.Mcp.exe" />
+      </Files>
+      <Component Id="McpService" Guid="B53E9DA5-FD3B-4A18-97BA-7CB9AA75FB68">
+        <File Id="McpExecutable" Source="$(PublishDirectory)\Moyai.Mcp.exe" KeyPath="yes" />
+        <ServiceInstall Id="InstallMoyaiService" Name="Moyai" DisplayName="Moyai MCP"
+                        Description="Moyai loopback MCP server" Type="ownProcess" Start="auto"
+                        ErrorControl="normal" Account="NT AUTHORITY\LocalService" Vital="yes"
+                        Arguments="--MOYAI_DB_PATH &quot;[DataFolder]moyai.db&quot; --MOYAI_MCP_URL &quot;[MOYAI_MCP_URL]&quot;" />
+        <ServiceControl Id="ControlMoyaiService" Name="Moyai" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Component Id="McpServiceSettings" Guid="D07774D4-A351-4D3D-A688-77CE6893F9DC" Permanent="yes" NeverOverwrite="yes">
+        <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="McpUrl" Type="string" Value="[MOYAI_MCP_URL]" KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <ComponentGroup Id="DataDirectories">
@@ -39,12 +55,12 @@
       </Component>
       <Component Id="CreateLogsFolder" Directory="LogsFolder" Guid="99FC7854-B5A7-4C27-8557-EBA8EC0507C3">
         <CreateFolder>
-          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)" />
+          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)(A;OICI;0x1301BF;;;LS)" />
         </CreateFolder>
       </Component>
       <Component Id="CreateDataFolder" Directory="DataFolder" Guid="72CC2F57-1301-43DE-9298-E3C524126689">
         <CreateFolder>
-          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)" />
+          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)(A;OICI;0x1301BF;;;LS)" />
         </CreateFolder>
       </Component>
     </ComponentGroup>

@@ -2,6 +2,11 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 未リリース
+
+- インストーラによるLocalServiceでのWindowsサービス自動起動、停止・登録解除、既存DB保持の構成を追加しました。
+- MCP起動引数、サービスのイベントログ、サービスパッケージ検証テストを追加しました。実機のインストール・更新・削除・再起動検証は未実施です。
+
 ## 1.0.7 - 2026-08-31
 
 - MCPのProject探索指示、`list_projects` Tool別名、未登録エラーの登録済みProject候補を追加しました。

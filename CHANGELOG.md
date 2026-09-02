@@ -2,6 +2,11 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## Unreleased
+
+- Added installer-managed automatic Windows service startup under LocalService, with stop/remove lifecycle and existing database preservation.
+- Added MCP host configuration arguments, service event logging, and service package validation tests. Live install/upgrade/uninstall/reboot validation remains pending.
+
 ## 1.0.7 - 2026-08-31
 
 - Added MCP project discovery guidance, the `list_projects` tool alias, and registered-project candidates in not-found errors.

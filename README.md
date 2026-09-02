@@ -14,7 +14,7 @@ $env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
 & 'C:\Moyai\bin\Moyai.Cli.exe' project-list
 ```
 
-To start the MCP server:
+The development MSI now registers and starts a Windows service automatically; see [automatic Windows startup](CONFIG.md#automatic-windows-startup). The published v1.0.7 MSI predates this change. For manual execution only (stop the service first to avoid a port conflict):
 
 ```powershell
 $env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
@@ -46,7 +46,7 @@ dotnet test .\Moyai.slnx --configuration Release --no-build
 
 ## Configuration
 
-Moyai reads configuration from environment variables. `MOYAI_DB_PATH` is required for data commands and both `MOYAI_DB_PATH` and `MOYAI_MCP_URL` are required by the MCP server. See [Configuration](CONFIG.md) for types, defaults, constraints, and examples.
+Moyai reads configuration from environment variables; MCP host arguments override its DB path and listen URL. The MSI supplies these arguments for the service. `MOYAI_DB_PATH` is required for data commands and both `MOYAI_DB_PATH` and `MOYAI_MCP_URL` are required by the MCP server. See [Configuration](CONFIG.md) for types, defaults, constraints, and examples.
 
 ## Usage
 
@@ -63,6 +63,7 @@ The CLI writes successful JSON to standard output, structured errors to standard
 - [v1 Completion Roadmap](ROADMAP.md)
 - [v1 Acceptance Criteria Traceability](V1_TRACEABILITY.md)
 - [Architecture decision](docs/adr/0001-initial-architecture.md)
+- [Installer-managed Windows service decision](docs/adr/0002-installer-managed-windows-service.md)
 
 ## Security
 

@@ -1,12 +1,17 @@
 [CmdletBinding()]
 param(
     [string]$Version = "1.0.7",
-    [string]$WixCommand = ""
+    [string]$WixCommand = "",
+    [string]$ArtifactsDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$artifactsRoot = Join-Path $repositoryRoot "artifacts"
+$artifactsRoot = if ([string]::IsNullOrWhiteSpace($ArtifactsDirectory)) { Join-Path $repositoryRoot "artifacts" } else { [IO.Path]::GetFullPath($ArtifactsDirectory) }
+$allowedArtifactsRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot "artifacts"))
+if ($artifactsRoot -ne $allowedArtifactsRoot -and -not $artifactsRoot.StartsWith($allowedArtifactsRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "ArtifactsDirectory must be within this repository's artifacts directory."
+}
 $publishDirectory = Join-Path $artifactsRoot "publish\win-x64"
 $installerDirectory = Join-Path $artifactsRoot "installer"
 $wixSource = Join-Path $repositoryRoot "installer\Moyai.wxs"
@@ -17,6 +22,14 @@ $revisionVersion = [Math]::Max(0, $parsedVersion.Revision)
 $assemblyVersion = "$($parsedVersion.Major).$($parsedVersion.Minor).$buildVersion.$revisionVersion"
 
 if (Test-Path -LiteralPath $publishDirectory) {
+    $resolvedPublishDirectory = (Resolve-Path -LiteralPath $publishDirectory).Path
+    if ($resolvedPublishDirectory -ne [IO.Path]::GetFullPath($publishDirectory)) { throw "Unexpected publish directory resolution." }
+    $taskDirectory = Get-Item -LiteralPath $resolvedPublishDirectory
+    while ($taskDirectory.FullName -ne $repositoryRoot) {
+        if (($taskDirectory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Refusing to clear artifacts through a reparse point." }
+        $taskDirectory = $taskDirectory.Parent
+        if ($null -eq $taskDirectory) { throw "Publish directory is outside the repository." }
+    }
     Remove-Item -LiteralPath $publishDirectory -Recurse -Force
 }
 

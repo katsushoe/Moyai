@@ -1,5 +1,7 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
 using Moyai.Application.Builds;
@@ -12,6 +14,7 @@ using Moyai.Application.Releases;
 using Moyai.Application.WorkItems;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
+using Moyai.Mcp;
 using Moyai.Mcp.Tools;
 using Moyai.Presentation.Windows;
 
@@ -22,16 +25,20 @@ static async Task<int> RunAsync(string[] arguments)
 {
     try
     {
-        string databasePath = Environment.GetEnvironmentVariable("MOYAI_DB_PATH") ?? throw new InvalidOperationException("MOYAI_DB_PATH is required.");
-        string serverUrl = Environment.GetEnvironmentVariable("MOYAI_MCP_URL") ?? throw new InvalidOperationException("MOYAI_MCP_URL is required.");
-        var uri = new Uri(serverUrl, UriKind.Absolute);
-        if (!uri.IsLoopback) throw new InvalidOperationException("MOYAI_MCP_URL must use a loopback host.");
+        var configuration = new ConfigurationBuilder().AddEnvironmentVariables().AddCommandLine(arguments).Build();
+        McpHostSettings settings = McpHostSettings.Read(configuration);
 
-        var builder = WebApplication.CreateBuilder(arguments);
-        builder.WebHost.UseUrls(serverUrl);
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = arguments,
+            ContentRootPath = WindowsServiceHelpers.IsWindowsService() ? AppContext.BaseDirectory : null,
+        });
+        builder.WebHost.UseUrls(settings.ServerUrl);
         builder.Logging.ClearProviders();
         builder.Logging.AddSimpleConsole();
-        var options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString());
+        builder.Services.AddWindowsService(options => options.ServiceName = "Moyai");
+        builder.Services.Configure<Microsoft.Extensions.Logging.EventLog.EventLogSettings>(settings => settings.SourceName = "Application");
+        var options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = settings.DatabasePath }.ToString());
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton<SqliteProjectRepository>();
         builder.Services.AddSingleton<SqliteWorkItemRepository>();
@@ -89,12 +96,21 @@ static async Task<int> RunAsync(string[] arguments)
     }
 }
 
-static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant(), message = exception.Message } }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+static void WriteError(Exception exception, bool fatal)
+{
+    string message = JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant(), message = exception.Message } }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    Console.Error.WriteLine(message);
+    if (WindowsServiceHelpers.IsWindowsService())
+    {
+        try { EventLog.WriteEntry("Application", "Moyai MCP: " + message, EventLogEntryType.Error); }
+        catch (Exception loggingException) { Console.Error.WriteLine(loggingException); }
+    }
+}
 
 static void ReportFatalError(Exception exception)
 {
     WriteError(exception, true);
-    ErrorDialog.Show("Moyai MCP", exception);
+    if (!WindowsServiceHelpers.IsWindowsService()) ErrorDialog.Show("Moyai MCP", exception);
 }
 
 static void RegisterProvider(IServiceCollection services, string name, string environmentVariable, string toolPrefix)

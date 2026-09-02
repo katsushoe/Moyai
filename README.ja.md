@@ -14,7 +14,7 @@ $env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
 & 'C:\Moyai\bin\Moyai.Cli.exe' project-list
 ```
 
-MCPサーバーを起動する場合は次を実行します。
+開発版MSIはWindowsサービスを自動登録・起動します。[Windows起動時の自動起動](CONFIG.ja.md#Windows起動時の自動起動)を参照してください。公開済みv1.0.7 MSIにはこの変更は含まれません。手動起動する場合だけ、ポート競合を避けるためサービスを停止してから次を実行します。
 
 ```powershell
 $env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
@@ -46,7 +46,7 @@ dotnet test .\Moyai.slnx --configuration Release --no-build
 
 ## Configuration
 
-Moyaiは環境変数から設定を読み込みます。データ操作には`MOYAI_DB_PATH`、MCPサーバーには`MOYAI_DB_PATH`と`MOYAI_MCP_URL`が必要です。型、既定値、制約、例は[設定](CONFIG.ja.md)を参照してください。
+Moyaiは環境変数から設定を読み込み、MCPのDBパス・待受URLは起動引数が優先されます。MSIはサービス用の起動引数を設定します。データ操作には`MOYAI_DB_PATH`、MCPサーバーには`MOYAI_DB_PATH`と`MOYAI_MCP_URL`が必要です。型、既定値、制約、例は[設定](CONFIG.ja.md)を参照してください。
 
 ## Usage
 
@@ -63,6 +63,7 @@ CLIは成功時のJSONを標準出力、構造化エラーを標準エラーへ�
 - [v1完成ロードマップ](ROADMAP.ja.md)
 - [v1受入基準追跡表](V1_TRACEABILITY.ja.md)
 - [アーキテクチャ判断](docs/adr/0001-initial-architecture.md)
+- [インストーラ管理のWindowsサービス判断（英語）](docs/adr/0002-installer-managed-windows-service.md)
 
 ## Security
 
