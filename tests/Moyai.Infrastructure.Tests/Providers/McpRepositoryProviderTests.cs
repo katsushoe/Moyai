@@ -58,10 +58,13 @@ public sealed class McpRepositoryProviderTests
     {
         var branch = new RepositoryProviderRequest("Moyai", "source", "url", "origin", RepositoryOperation.BranchCreate, null, "token", Branch: "feature/test", BranchSource: "main");
         var tag = branch with { Operation = RepositoryOperation.TagPush, Branch = null, Tag = "v1.2.3" };
+        var createTag = tag with { Operation = RepositoryOperation.TagCreate };
 
-        Assert.Equal("feature/test", RepositoryProviderContract.Arguments(branch)["branch"]);
-        Assert.Equal("main", RepositoryProviderContract.Arguments(branch)["source"]);
-        Assert.Equal("v1.2.3", RepositoryProviderContract.Arguments(tag)["tag"]);
+        Assert.Equal("feature/test", RepositoryProviderContract.Arguments("github", branch)["branch"]);
+        Assert.Equal("main", RepositoryProviderContract.Arguments("github", branch)["source"]);
+        Assert.Equal("v1.2.3", RepositoryProviderContract.Arguments("github", tag)["tag"]);
+        Assert.Equal("main", RepositoryProviderContract.Arguments("github", createTag)["source"]);
+        Assert.DoesNotContain("source", RepositoryProviderContract.Arguments("bitbucket", createTag));
     }
 
     private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory

@@ -112,3 +112,4 @@ Moyai v1 models exactly one Repository as part of each Project. It has no indepe
 # Repository branches
 
 `branch_create` requires `project`, `branch`, and an explicit `source`. `source` must be a literal branch name or a full 40-character commit SHA. Moyai never substitutes `main`, `develop`, or the current `HEAD` when it is omitted.
+`tag_create` likewise requires `project`, `tag`, and an explicit literal branch or full commit SHA `source`; Moyai forwards it unchanged when the Provider supports explicit tag sources.

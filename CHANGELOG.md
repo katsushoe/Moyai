@@ -9,6 +9,7 @@
 - Changed `branch_create` to require an explicit literal branch or full commit SHA source, validate invalid revision expressions before Provider execution, and forward the source unchanged through the Repository Provider contract.
 - Fixed release publication to create the Provider draft first, then pass the registered artifact and notes using the exact Githubie or Buckettie Provider argument contract.
 - Fixed Lifecycle Provider business failures being reported as successful releases and added a reconciliation transition for previously misclassified releases.
+- Changed `tag_create` to require and forward an explicit literal branch or full commit SHA source for Githubie.
 
 ## 1.2.1 - 2026-09-04
 

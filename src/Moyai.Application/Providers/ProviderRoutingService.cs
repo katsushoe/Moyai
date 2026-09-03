@@ -65,6 +65,7 @@ public sealed class ProviderRoutingService
         if (operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) ArgumentException.ThrowIfNullOrWhiteSpace(branch);
         if (operation == RepositoryOperation.BranchCreate) ValidateBranchSource(source);
         if (operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) ArgumentException.ThrowIfNullOrWhiteSpace(tag);
+        if (operation == RepositoryOperation.TagCreate) ValidateBranchSource(source);
     }
 
     private static void ValidateBranchSource(string? source)

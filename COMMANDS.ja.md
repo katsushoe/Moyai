@@ -102,3 +102,4 @@ Moyai v1は各Projectの一部としてRepositoryを1つだけ管理するため
 # Repository branch
 
 `branch_create`には`project`、`branch`、明示的な`source`が必要です。`source`はliteral branch名または完全な40桁commit SHAを指定します。省略時にMoyaiが`main`、`develop`、現在の`HEAD`を補完することはありません。
+`tag_create`にも`project`、`tag`、明示的なliteral branch名または完全な40桁commit SHAの`source`が必要です。Providerが明示的なTag作成元に対応する場合、Moyaiは無変更で転送します。

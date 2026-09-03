@@ -181,7 +181,7 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_create"), Description("Creates a tag through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> TagCreate(string project, string tag, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, cancellationToken: cancellationToken));
+    public Task<RepositoryProviderResult> TagCreate(string project, string tag, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, source: source, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_delete", Destructive = true), Description("Deletes an allowed tag through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> TagDelete(string project, string tag, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagDelete, tag: tag, cancellationToken: cancellationToken));
