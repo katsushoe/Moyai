@@ -2,6 +2,8 @@
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
+ローカル接続管理は `configure codex|claude [--profile <path>] [--config <path>]`、`unconfigure codex|claude [--profile <path>]`、復元は `client-transaction codex|claude --phase rollback|commit [--profile <path>]` です。`--transaction`はMSI用の復元情報を残します。業務MCPではなくインストール管理コマンドです。[MCP設定手順](MCP_SETUP.ja.md)を参照してください。
+
 `moyaictl.exe`の公開コマンド契約です。MCP Toolは同じ操作名をunderscore形式で提供します。MCPはAI向けの`project_list`別名として`list_projects`も公開し、対応するCLI操作は`project-list`です。
 
 ## サービス接続と管理
@@ -62,6 +64,8 @@ Project名の検索、重複登録判定、変更対象の解決にはOrdinalな
 - `commit-link-add`は`--project --key --commit-hash --relation --actor-type --actor-name`でCommitを関連付けます。relationは`implements`、`fixes`、`relates_to`です。削除は`--link-id`、一覧は`--key`を指定します。
 
 ### Repository commands
+
+Provider本文の`ok:false`はMCPの`isError`がfalse／未指定でも失敗です。CLIは終了コード`1`と標準エラーの構造化JSONを返し、`error.message`に元の失敗本文を保持します。不正なRepository応答は`provider_invalid_response`、`repository_not_found`は`provider_not_found`へ変換します。構造化応答を優先しますが、構造化・テキストJSONのどちらかが明示的に失敗なら成功扱いしません。`ok`を持たない既存の一覧・レコード・バージョン応答は維持します。詳細は[応答契約](docs/adr/0006-provider-result-failures.md)を参照してください。
 
 `repository-status`、`repository-diff`、`repository-commit`、`repository-push`、`repository-pull`は`--project`で選択したProjectのProvider結果を返します。commitには`--message`も必要です。
 

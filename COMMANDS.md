@@ -2,6 +2,8 @@
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
+Local MCP registration management: `configure codex|claude [--profile <path>] [--config <path>]`, `unconfigure codex|claude [--profile <path>]`; recovery: `client-transaction codex|claude --phase rollback|commit [--profile <path>]`. `--transaction` retains rollback state for MSI. These are installation commands, not service business tools. See [MCP setup](MCP_SETUP.md#installer-client-registration).
+
 This document is the public command contract for `moyaictl.exe`. MCP tools use the same operation names with underscores. MCP also exposes `list_projects` as the AI-oriented alias of `project_list`; `project-list` is the corresponding CLI operation.
 
 ## Service connection and management
@@ -24,6 +26,8 @@ SCM commands are `service start`, `service stop`, `service pause`, `service resu
 | Deployment | `deployment-target-get/update`, `deploy/start/get/list/status/retry/rollback` | Tracked Local and KelpieSSH deployment |
 
 ## Common Options
+
+Repository business failures (`ok:false`) fail even when MCP `isError` is false/absent. The CLI returns exit `1` and a structured stderr error with the original failure payload in `error.message`. Invalid Repository responses return `provider_invalid_response`; `repository_not_found` becomes `provider_not_found`. Structured content is preferred, and an explicit failure in either structured or text JSON cannot become success. Existing non-envelope list/record/version results remain supported. See [response contract](docs/adr/0006-provider-result-failures.md).
 
 Options use `--kebab-case`. Mutations require `--actor-type` and `--actor-name`; concurrency-protected mutations also require `--expected-revision`. Success is JSON on standard output with exit code `0`. Failure is JSON on standard error with exit code `1`, containing `command`, `summary`, `ok`, `fatal`, and `error`.
 

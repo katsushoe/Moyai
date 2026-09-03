@@ -26,6 +26,7 @@ Packages restore from the configured public NuGet source. No private feed or cre
 | `Microsoft.Extensions.Hosting.WindowsServices` | `8.0.1` | Windows service lifetime and event logging |
 | `System.ServiceProcess.ServiceController` | `8.0.1` | CLI service lifecycle management |
 | `ModelContextProtocol` | `2.2.0` | MCP client transport |
+| `Tomlyn` | `2.10.1` | TOML client configuration parsing and comment-preserving model serialization (BSD-2-Clause) |
 | `ModelContextProtocol.AspNetCore` | `2.2.0` | MCP HTTP server |
 | `Microsoft.NET.Test.Sdk` | `17.8.0` | Test host |
 | `xunit` / `xunit.runner.visualstudio` | `2.5.3` | Unit tests |
