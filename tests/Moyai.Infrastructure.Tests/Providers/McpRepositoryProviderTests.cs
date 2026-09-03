@@ -64,6 +64,7 @@ public sealed class McpRepositoryProviderTests
         Assert.Equal("main", RepositoryProviderContract.Arguments("github", branch)["source"]);
         Assert.Equal("v1.2.3", RepositoryProviderContract.Arguments("github", tag)["tag"]);
         Assert.Equal("main", RepositoryProviderContract.Arguments("github", createTag)["source"]);
+        Assert.Null(RepositoryProviderContract.Arguments("github", createTag)["message"]);
         Assert.DoesNotContain("source", RepositoryProviderContract.Arguments("bitbucket", createTag));
     }
 

@@ -21,7 +21,11 @@ public static class RepositoryProviderContract
         if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) arguments["branch"] = request.Branch;
         if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
         if (request.Operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) arguments["tag"] = request.Tag;
-        if (request.Operation == RepositoryOperation.TagCreate && string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase)) arguments["source"] = request.BranchSource;
+        if (request.Operation == RepositoryOperation.TagCreate && string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase))
+        {
+            arguments["source"] = request.BranchSource;
+            arguments["message"] = null;
+        }
         return arguments;
     }
 
