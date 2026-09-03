@@ -35,10 +35,7 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             string toolName = RepositoryProviderContract.ToolName(_options.ToolPrefix, request.Operation);
             IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(request);
             CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-            string? output = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
-            return result.IsError is true
-                ? Failure(request.Operation, output)
-                : new RepositoryProviderResult(true, RepositoryProviderContract.OperationName(request.Operation), output, null, null);
+            return RepositoryProviderResponse.Parse(request.Operation, result);
         }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException)
         {

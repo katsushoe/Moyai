@@ -2,6 +2,14 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## Unreleased
+
+## 1.2.1 - 2026-09-04
+
+- Fixed Repository Provider business failures being reported as success and CLI business failures returning exit code zero. Added structured/text response validation and regression coverage.
+
+- Added user-scoped Codex/Claude Code configure and unconfigure commands, installer client/profile selection, owned-entry preservation and transactional rollback.
+
 ## 1.2.0 - 2026-09-03
 
 - Updated the local installer to 1.2.0 and verified the installed service, CLI, configuration preservation, and unchanged counts across all 23 database tables.

@@ -21,7 +21,7 @@ public sealed class InstallerContractTests
         Assert.EndsWith(@"\Moyai.Mcp.exe", (string?)file.Attribute("Source"));
         Assert.Contains(document.Descendants(Wix + "Exclude"), item => (string?)item.Attribute("Files") == (string?)file.Attribute("Source"));
         Assert.Equal("--config \"[ConfigFolder]moyai.json\"", (string?)service.Attribute("Arguments"));
-        XElement initializer = Assert.Single(document.Descendants(Wix + "CustomAction"));
+        XElement initializer = Assert.Single(document.Descendants(Wix + "CustomAction").Where(value => (string?)value.Attribute("Id") == "InitializeConfig"));
         Assert.Equal("CliExecutable", (string?)initializer.Attribute("FileRef"));
         Assert.Equal("deferred", (string?)initializer.Attribute("Execute"));
         XElement control = Assert.Single(document.Descendants(Wix + "ServiceControl"));
@@ -43,11 +43,33 @@ public sealed class InstallerContractTests
         }
         Assert.Empty(document.Descendants(Wix + "RemoveFile"));
         Assert.Empty(document.Descendants(Wix + "RemoveFolder"));
-        XElement registry = Assert.Single(document.Descendants(Wix + "RegistryValue"));
+        XElement registry = Assert.Single(document.Descendants(Wix + "RegistryValue").Where(value => (string?)value.Attribute("Name") == "McpUrl"));
         Assert.Equal("yes", (string?)registry.Parent!.Attribute("Permanent"));
         Assert.Equal("yes", (string?)registry.Parent.Attribute("NeverOverwrite"));
         Assert.Equal("McpUrl", (string?)registry.Attribute("Name"));
-        Assert.Single(document.Descendants(Wix + "RegistrySearch"));
+        Assert.Equal(4, document.Descendants(Wix + "RegistrySearch").Count());
+    }
+
+    [Theory]
+    [InlineData("Codex")]
+    [InlineData("Claude")]
+    public void ClientActionsUseExplicitProfileImpersonationAndRollback(string client)
+    {
+        XDocument document = LoadInstaller();
+        foreach (string operation in new[] { "Configure", "Unconfigure" })
+        {
+            string id = operation + client;
+            XElement action = document.Descendants(Wix + "CustomAction").Single(value => (string?)value.Attribute("Id") == id);
+            Assert.Equal("yes", (string?)action.Attribute("Impersonate"));
+            Assert.Equal("ClientSetup", (string?)action.Attribute("BinaryRef"));
+            Assert.Contains("--profile", (string?)action.Attribute("ExeCommand"));
+            Assert.Contains("--transaction", (string?)action.Attribute("ExeCommand"));
+            XElement rollback = document.Descendants(Wix + "CustomAction").Single(value => (string?)value.Attribute("Id") == "Rollback" + id);
+            Assert.Equal("rollback", (string?)rollback.Attribute("Execute"));
+            XElement sequence = document.Descendants(Wix + "Custom").Single(value => (string?)value.Attribute("Action") == id);
+            Assert.Equal("Rollback" + id, (string?)sequence.Attribute("After"));
+            if (operation == "Unconfigure") Assert.Contains("NOT UPGRADINGPRODUCTCODE", (string?)sequence.Attribute("Condition"));
+        }
     }
 
     private static XDocument LoadInstaller()

@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$Version = "1.2.0",
+    [string]$Version = "1.2.1",
     [string]$WixCommand = "",
     [string]$ArtifactsDirectory = ""
 )
@@ -14,6 +14,7 @@ if ($artifactsRoot -ne $allowedArtifactsRoot -and -not $artifactsRoot.StartsWith
 }
 $publishDirectory = Join-Path $artifactsRoot "publish\win-x64"
 $installerDirectory = Join-Path $artifactsRoot "installer"
+$clientSetupDirectory = Join-Path $artifactsRoot "client-setup"
 $wixSource = Join-Path $repositoryRoot "installer\Moyai.wxs"
 $msiPath = Join-Path $installerDirectory "Moyai-$Version-x64.msi"
 $parsedVersion = [Version]::Parse($Version)
@@ -54,6 +55,14 @@ if ($LASTEXITCODE -ne 0) { throw "Moyai.Cli publish failed." }
 & dotnet publish (Join-Path $repositoryRoot "src\Moyai.Mcp\Moyai.Mcp.csproj") @publishProperties
 if ($LASTEXITCODE -ne 0) { throw "Moyai.Mcp publish failed." }
 
+# Embedded self-contained helper remains executable during uninstall commit/rollback.
+& dotnet publish (Join-Path $repositoryRoot "src\Moyai.Cli\Moyai.Cli.csproj") `
+    --configuration Release --runtime win-x64 --self-contained true --output $clientSetupDirectory `
+    "-p:Version=$Version" "-p:AssemblyVersion=$assemblyVersion" "-p:FileVersion=$assemblyVersion" `
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --disable-build-servers
+if ($LASTEXITCODE -ne 0) { throw "Client registration helper publish failed." }
+$clientSetupExecutable = Join-Path $clientSetupDirectory "moyaictl.exe"
+
 if ([string]::IsNullOrWhiteSpace($WixCommand)) {
     & dotnet tool restore
     if ($LASTEXITCODE -ne 0) { throw "WiX Toolset restore failed." }
@@ -62,6 +71,7 @@ if ([string]::IsNullOrWhiteSpace($WixCommand)) {
         -arch x64 `
         -d "MoyaiVersion=$Version" `
         -d "PublishDirectory=$publishDirectory" `
+        -d "ClientSetupExecutable=$clientSetupExecutable" `
         -o $msiPath
 }
 else {
@@ -69,6 +79,7 @@ else {
         -arch x64 `
         -d "MoyaiVersion=$Version" `
         -d "PublishDirectory=$publishDirectory" `
+        -d "ClientSetupExecutable=$clientSetupExecutable" `
         -o $msiPath
 }
 if ($LASTEXITCODE -ne 0) { throw "MSI build failed." }

@@ -2,6 +2,8 @@
 
 [English](CONFIG.md) | [日本語](CONFIG.ja.md)
 
+MCP client registration uses an explicitly selected user profile and preserves unrelated client settings. MSI properties: `MOYAI_CODEX`, `MOYAI_CLAUDE` (select with `1`), `MOYAI_CLIENT_PROFILE` (existing absolute profile path). See [MCP setup](MCP_SETUP.md#installer-client-registration) for ownership, uninstall and recovery behavior.
+
 ## Configuration file
 
 The service and CLI read `config/moyai.json`, relative to the installation root (the parent of `bin`). `--config <path>` selects another file. Configuration never comes from environment variables. The CLI uses the endpoint only and never opens the database. Changes take effect after restarting the service.
