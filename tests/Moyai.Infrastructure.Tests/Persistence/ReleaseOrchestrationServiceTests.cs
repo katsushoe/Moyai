@@ -22,7 +22,7 @@ public sealed class ReleaseOrchestrationServiceTests
         Assert.Equal(ReleaseStatus.Released, first.Release.Status);
         Assert.NotNull(first.Release.ReleasedAt);
         Assert.True(second.AlreadyCompleted);
-        Assert.Equal(1, fixture.Provider.CallCount);
+        Assert.Equal(2, fixture.Provider.CallCount);
     }
 
     [Fact]
@@ -35,6 +35,7 @@ public sealed class ReleaseOrchestrationServiceTests
 
         Assert.Equal("artifact.msi", fixture.Provider.LastRequest?.ArtifactPath);
         Assert.Equal("release notes", fixture.Provider.LastRequest?.Notes);
+        Assert.Equal(LifecycleAction.ReleasePublish, fixture.Provider.LastRequest?.Action);
     }
 
     [Fact]
@@ -50,7 +51,7 @@ public sealed class ReleaseOrchestrationServiceTests
         Assert.Equal(ReleaseStatus.Failed, failed.Release.Status);
         Assert.Equal("provider_failure", failed.ProviderResult?.ErrorCode);
         Assert.Equal(ReleaseStatus.Released, retried.Release.Status);
-        Assert.Equal(2, fixture.Provider.CallCount);
+        Assert.Equal(4, fixture.Provider.CallCount);
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -99,6 +100,7 @@ public sealed class ReleaseOrchestrationServiceTests
         {
             CallCount++;
             LastRequest = request;
+            if (request.Action == LifecycleAction.ReleaseCreate) return Task.FromResult(new LifecycleResult(true, "release_create", "draft", null, null));
             return Task.FromResult(Succeeds
                 ? new LifecycleResult(true, "release_publish", "published", null, null)
                 : new LifecycleResult(false, "release_publish", null, "provider_failure", "failed"));
