@@ -19,6 +19,7 @@ public static class RepositoryProviderContract
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
         if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message;
         if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) arguments["branch"] = request.Branch;
+        if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
         if (request.Operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) arguments["tag"] = request.Tag;
         return arguments;
     }

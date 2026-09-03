@@ -26,7 +26,7 @@ public sealed class ProviderRoutingService
     }
 
     /// <summary>Projectに設定されたProviderへ標準Repository操作を委譲します。</summary>
-    public async Task<RepositoryProviderResult> ExecuteAsync(string projectName, RepositoryOperation operation, string? message = null, string? branch = null, string? tag = null, CancellationToken cancellationToken = default)
+    public async Task<RepositoryProviderResult> ExecuteAsync(string projectName, RepositoryOperation operation, string? message = null, string? branch = null, string? tag = null, string? source = null, CancellationToken cancellationToken = default)
     {
         Project project = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
         project.RequireConfiguration("sourcePath", "repositoryUrl", "repositoryProvider");
@@ -52,18 +52,35 @@ public sealed class ProviderRoutingService
             tokenValue = token.Token;
         }
 
-        ValidateArguments(operation, message, branch, tag);
-        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail);
+        ValidateArguments(operation, message, branch, tag, source);
+        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source);
         return await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
     private static bool IsMutation(RepositoryOperation operation) => operation is RepositoryOperation.Commit or RepositoryOperation.Push or RepositoryOperation.Pull or RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush;
 
-    private static void ValidateArguments(RepositoryOperation operation, string? message, string? branch, string? tag)
+    private static void ValidateArguments(RepositoryOperation operation, string? message, string? branch, string? tag, string? source)
     {
         if (operation == RepositoryOperation.Commit) ArgumentException.ThrowIfNullOrWhiteSpace(message);
         if (operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) ArgumentException.ThrowIfNullOrWhiteSpace(branch);
+        if (operation == RepositoryOperation.BranchCreate) ValidateBranchSource(source);
         if (operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) ArgumentException.ThrowIfNullOrWhiteSpace(tag);
+    }
+
+    private static void ValidateBranchSource(string? source)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        if (source.Length == 40 && source.All(Uri.IsHexDigit)) return;
+
+        bool invalid = source.StartsWith('-')
+            || source.StartsWith('/')
+            || source.EndsWith('/')
+            || source.EndsWith('.')
+            || source.Contains("..", StringComparison.Ordinal)
+            || source.Contains("@{", StringComparison.Ordinal)
+            || source.EndsWith(".lock", StringComparison.OrdinalIgnoreCase)
+            || source.Any(static character => char.IsWhiteSpace(character) || "~^:?*[\\".Contains(character, StringComparison.Ordinal));
+        if (invalid) throw new ArgumentException("Branch source must be a literal branch name or a full 40-character commit SHA.", nameof(source));
     }
 
     private static string ProviderName(string repositoryProvider) => repositoryProvider switch

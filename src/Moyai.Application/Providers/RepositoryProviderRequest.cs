@@ -13,4 +13,5 @@ public sealed record RepositoryProviderRequest(
     string? Tag = null,
     string? DefaultBranch = null,
     string? GitUserName = null,
-    string? GitUserEmail = null);
+    string? GitUserEmail = null,
+    string? BranchSource = null);

@@ -4,6 +4,10 @@
 
 ## 未公開
 
+## 1.2.2 - 2026-09-04
+
+- `branch_create`でliteral branch名または完全なcommit SHAの作成元を明示必須とし、不正なrevision式をProvider実行前に拒否して、Repository Provider契約へ無変更で転送するようにしました。
+
 ## 1.2.1 - 2026-09-04
 
 - Repository Providerの業務失敗を成功扱いする問題と、CLIが業務失敗でも終了コード0を返す問題を修正しました。構造化・テキスト応答の検証と回帰テストを追加しました。

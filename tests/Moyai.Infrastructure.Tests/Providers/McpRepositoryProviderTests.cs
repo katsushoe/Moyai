@@ -56,10 +56,11 @@ public sealed class McpRepositoryProviderTests
     [Fact]
     public void CommonContractMapsBranchAndTagArguments()
     {
-        var branch = new RepositoryProviderRequest("Moyai", "source", "url", "origin", RepositoryOperation.BranchCreate, null, "token", Branch: "feature/test");
+        var branch = new RepositoryProviderRequest("Moyai", "source", "url", "origin", RepositoryOperation.BranchCreate, null, "token", Branch: "feature/test", BranchSource: "main");
         var tag = branch with { Operation = RepositoryOperation.TagPush, Branch = null, Tag = "v1.2.3" };
 
         Assert.Equal("feature/test", RepositoryProviderContract.Arguments(branch)["branch"]);
+        Assert.Equal("main", RepositoryProviderContract.Arguments(branch)["source"]);
         Assert.Equal("v1.2.3", RepositoryProviderContract.Arguments(tag)["tag"]);
     }
 
