@@ -22,7 +22,9 @@ public sealed class ReleaseOrchestrationService(ReleaseService releases, Release
         Release publishing = await releases.TransitionAsync(new TransitionReleaseCommand(project, version, ReleaseStatus.Publishing, expectedRevision, actorType, actorName), cancellationToken).ConfigureAwait(false);
         try
         {
-            LifecycleResult providerResult = await lifecycle.ExecuteAsync(project, LifecycleAction.ReleasePublish, actorType, actorName, version, cancellationToken: cancellationToken).ConfigureAwait(false);
+            IReadOnlyList<ReleaseArtifact> artifacts = await content.ListArtifactsAsync(project, version, cancellationToken).ConfigureAwait(false);
+            string? artifactPath = artifacts.Select(static artifact => artifact.FilePath).FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path));
+            LifecycleResult providerResult = await lifecycle.ExecuteAsync(project, LifecycleAction.ReleasePublish, actorType, actorName, version, artifactPath, current.ReleaseNotes, cancellationToken).ConfigureAwait(false);
             ReleaseStatus finalStatus = providerResult.Ok ? ReleaseStatus.Released : ReleaseStatus.Failed;
             Release final = await releases.TransitionAsync(new TransitionReleaseCommand(project, version, finalStatus, publishing.Revision, actorType, actorName), cancellationToken).ConfigureAwait(false);
             return new ReleasePublishResult(final, providerResult, false);

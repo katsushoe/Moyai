@@ -26,6 +26,18 @@ public sealed class ReleaseOrchestrationServiceTests
     }
 
     [Fact]
+    public async Task PublishPassesReleaseNotesAndArtifactPathToProvider()
+    {
+        await using var fixture = new Fixture(true);
+        (ReleaseOrchestrationService service, Release ready) = await fixture.CreateReadyAsync(withArtifact: true);
+
+        await service.PublishAsync("Moyai", ready.Version, ready.Revision, "agent", "test");
+
+        Assert.Equal("artifact.msi", fixture.Provider.LastRequest?.ArtifactPath);
+        Assert.Equal("release notes", fixture.Provider.LastRequest?.Notes);
+    }
+
+    [Fact]
     public async Task PublishFailurePersistsFailedAndAllowsRetry()
     {
         await using var fixture = new Fixture(false);
@@ -49,7 +61,7 @@ public sealed class ReleaseOrchestrationServiceTests
         public Fixture(bool succeeds) => Provider = new RecordingProvider(succeeds);
         public RecordingProvider Provider { get; }
 
-        public async Task<(ReleaseOrchestrationService Service, Release Ready)> CreateReadyAsync()
+        public async Task<(ReleaseOrchestrationService Service, Release Ready)> CreateReadyAsync(bool withArtifact = false)
         {
             _options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString());
             await new SqliteDatabaseInitializer(_options).InitializeAsync();
@@ -59,12 +71,13 @@ public sealed class ReleaseOrchestrationServiceTests
             await tokens.AddAsync(ServiceToken.Issue("githubbie", ["release.write"], DateTimeOffset.UtcNow.AddHours(1), TimeProvider.System));
             var repository = new SqliteReleaseRepository(_options);
             var releaseService = new ReleaseService(projects, repository, TimeProvider.System);
-            Release release = await releaseService.CreateAsync(new CreateReleaseCommand("Moyai", "1.0.0", ReleaseChannel.Stable, null, "agent", "test"));
+            Release release = await releaseService.CreateAsync(new CreateReleaseCommand("Moyai", "1.0.0", ReleaseChannel.Stable, "release notes", "agent", "test"));
             release = await releaseService.TransitionAsync(new TransitionReleaseCommand("Moyai", release.Version, ReleaseStatus.Planned, release.Revision, "agent", "test"));
             release = await releaseService.TransitionAsync(new TransitionReleaseCommand("Moyai", release.Version, ReleaseStatus.Preparing, release.Revision, "agent", "test"));
             release = await releaseService.TransitionAsync(new TransitionReleaseCommand("Moyai", release.Version, ReleaseStatus.Ready, release.Revision, "agent", "test"));
             var lifecycle = new LifecycleService(projects, tokens, [Provider], new SqliteLifecycleEventWriter(_options, TimeProvider.System), TimeProvider.System);
             var content = new ReleaseContentService(projects, new SqliteWorkItemRepository(_options), repository, new SqliteReleaseContentRepository(_options), TimeProvider.System);
+            if (withArtifact) await content.AddArtifactAsync(new AddReleaseArtifactCommand("Moyai", release.Version, null, "installer", "installer", "windows", "x64", "artifact.msi", "artifact.msi", null, 1, new string('a', 64), null, null, "agent", "test"));
             return (new ReleaseOrchestrationService(releaseService, content, lifecycle), release);
         }
 
@@ -80,10 +93,12 @@ public sealed class ReleaseOrchestrationServiceTests
         public string Name => "githubbie";
         public bool Succeeds { get; set; } = succeeds;
         public int CallCount { get; private set; }
+        public LifecycleRequest? LastRequest { get; private set; }
 
         public Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default)
         {
             CallCount++;
+            LastRequest = request;
             return Task.FromResult(Succeeds
                 ? new LifecycleResult(true, "release_publish", "published", null, null)
                 : new LifecycleResult(false, "release_publish", null, "provider_failure", "failed"));
