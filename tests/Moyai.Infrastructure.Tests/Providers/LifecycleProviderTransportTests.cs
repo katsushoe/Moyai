@@ -29,12 +29,26 @@ public sealed class LifecycleProviderTransportTests
         Assert.False(arguments.TryGetProperty(artifactProperty == "artifact_path" ? "artifactPath" : "artifact_path", out _));
     }
 
+    [Fact]
+    public async Task ReleasePublishPropagatesProviderBusinessFailure()
+    {
+        using var handler = new ProviderHandler(ok: false);
+        using var client = new HttpClient(handler);
+        var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions("githubbie", new Uri("http://localhost/mcp"), "github"), new ClientFactory(client));
+
+        LifecycleResult result = await provider.ExecuteAsync(new LifecycleRequest("Moyai", "source", null, LifecycleAction.ReleasePublish, "1.2.2", null, null, null));
+
+        Assert.False(result.Ok);
+        Assert.Equal("provider_operation_failed", result.ErrorCode);
+        Assert.Contains("release_not_found", result.ErrorMessage);
+    }
+
     private sealed class ClientFactory(HttpClient client) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => client;
     }
 
-    private sealed class ProviderHandler : HttpMessageHandler
+    private sealed class ProviderHandler(bool ok = true) : HttpMessageHandler
     {
         public string? CalledTool { get; private set; }
         public JsonElement? Arguments { get; private set; }
@@ -52,7 +66,8 @@ public sealed class LifecycleProviderTransportTests
             {
                 CalledTool = root.GetProperty("params").GetProperty("name").GetString();
                 Arguments = root.GetProperty("params").GetProperty("arguments").Clone();
-                result = new { isError = false, content = new[] { new { type = "text", text = "published" } } };
+                string payload = JsonSerializer.Serialize(new { ok, data = ok ? "published" : null, error = ok ? null : new { code = "release_not_found", message = "Release was not found." } });
+                result = new { isError = false, content = new[] { new { type = "text", text = payload } } };
             }
             string json = JsonSerializer.Serialize(new { jsonrpc = "2.0", id, result });
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };

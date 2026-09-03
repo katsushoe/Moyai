@@ -39,8 +39,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             Add(arguments, IsGithubie ? "artifact_path" : "artifactPath", request.ArtifactPath);
             Add(arguments, "notes", request.Notes);
             CallToolResult result = await client.CallToolAsync($"{_options.ToolPrefix}_{operation}", arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-            string? output = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
-            return result.IsError is true ? new LifecycleResult(false, operation, null, "provider_operation_failed", output) : new LifecycleResult(true, operation, output, null, null);
+            return LifecycleProviderResponse.Parse(operation, result);
         }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
         {

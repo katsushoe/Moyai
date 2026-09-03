@@ -60,6 +60,22 @@ public sealed class ReleaseTests
         Assert.Throws<InvalidReleaseTransitionException>(() => release.TransitionTo(ReleaseStatus.Released, time));
     }
 
+    [Fact]
+    public void TransitionToFailedAllowsFalsePositiveReconciliation()
+    {
+        var time = new FixedTimeProvider(DateTimeOffset.UtcNow);
+        Release release = Release.Create(Guid.NewGuid(), "1.0.0", ReleaseChannel.Stable, null, time);
+        release.TransitionTo(ReleaseStatus.Planned, time);
+        release.TransitionTo(ReleaseStatus.Preparing, time);
+        release.TransitionTo(ReleaseStatus.Ready, time);
+        release.TransitionTo(ReleaseStatus.Publishing, time);
+        release.TransitionTo(ReleaseStatus.Released, time);
+
+        release.TransitionTo(ReleaseStatus.Failed, time);
+
+        Assert.Equal(ReleaseStatus.Failed, release.Status);
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => value;
