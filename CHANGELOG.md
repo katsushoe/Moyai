@@ -4,9 +4,11 @@
 
 ## Unreleased
 
-- Fixed Repository Provider business failures being reported as success and CLI business failures returning exit code zero. Added structured/text response validation and regression coverage; installed services are unchanged.
+## 1.2.1 - 2026-09-04
 
-- Added user-scoped Codex/Claude Code configure and unconfigure commands, installer client/profile selection, owned-entry preservation and transactional rollback. MSI lifecycle and visual validation remain release gates.
+- Fixed Repository Provider business failures being reported as success and CLI business failures returning exit code zero. Added structured/text response validation and regression coverage.
+
+- Added user-scoped Codex/Claude Code configure and unconfigure commands, installer client/profile selection, owned-entry preservation and transactional rollback.
 
 ## 1.2.0 - 2026-09-03
 
