@@ -28,9 +28,9 @@
 | 11 | Release Artifact metadataを管理できる。 | 適合 | `SqliteReleaseContentRepositoryTests`。 | — |
 | 12 | ReleaseとWorkItemを関連付けられる。 | 適合 | `SqliteReleaseContentRepositoryTests`。 | — |
 | 13 | Repository Provider Contract経由でGithubie/Buckettieを呼び分けられる。 | 適合 | `ProviderRoutingServiceTests`で設定Providerへのroutingを検証。 | — |
-| 14 | Githubie/Buckettieが同じ共通Tool Contractを実装できる。 | 部分適合 | 両ProviderがRepository diff/commitのsource実装完了を報告しました。Githubieは292 test、Buckettieは281 test合格ですが、いずれも未commit・未release・未installで、稼働Serverに対するMoyai検証は未実施です。 | 両Provider更新版のinstall後にconformance testを再実行。 |
+| 14 | Githubie/Buckettieが同じ共通Tool Contractを実装できる。 | 部分適合 | 2026-09-04時点の稼働版Githubie 1.8.6.3とBuckettie 1.3.19.0が、いずれも`repository_diff`・`repository_commit`を含むRepository操作への対応を能力照会で返すことを確認しました。 | Moyaiから両稼働Providerを呼び出すconformance testを実行。 |
 | 15 | Moyai自身はGit CLIを実行しない。 | 適合 | `MoyaiSourceDoesNotInvokeGitCli`。 | — |
-| 16 | Commit/Push/Tag/ReleaseをProvider経由で実行できる。 | 部分適合 | Moyaiは変更をProviderへ委譲し、Githubie/Buckettieは作業treeでRepository commit実装済みと報告しました。稼働Serverは当該Tool未搭載版です。 | Provider更新版をinstall後、明示承認を得て変更操作testを実行。 |
+| 16 | Commit/Push/Tag/ReleaseをProvider経由で実行できる。 | 部分適合 | Moyaiは変更をProviderへ委譲します。2026-09-04のMoyai 1.2.1公開では、稼働版Githubieによるcommit・push・tag・releaseが成功しましたが、Moyai自身がMoyai Projectに未登録だったためGithubieを直接利用しており、Moyai経由の実績ではありません。 | Moyaiへ登録したGitHub・Bitbucket検証Projectで、明示承認済みの変更操作testを実行。 |
 | 17 | Provider停止時に`provider_unavailable`を返せる。 | 適合 | `ExecuteAsyncReturnsUnavailableWhenProviderCannotBeReached`。 | — |
 | 18 | ProviderをMoyaiが自動起動しない。 | 適合 | `RepositoryAndLifecycleAdaptersDoNotStartProviderProcesses`。 | — |
 | 19 | Release Publishの途中失敗を記録できる。 | 適合 | `PublishFailurePersistsFailedAndAllowsRetry`。 | — |
@@ -51,7 +51,7 @@
 | 34 | BuildArtifactがimmutableで、File HashまたはDirectory Manifest Hashを保持できる。 | 適合 | Schema不変性、file SHA-256、決定的なDirectory Manifest SHA-256を検証。 | — |
 | 35 | Projectごとに`local`/`server`のDeploy Modeを設定できる。 | 適合 | Project domain validationとDeployment Service routing。 | — |
 | 36 | Local Deployが`install_path`へBuildArtifactを配置できる。 | 適合 | `LocalDeployVerifiesArtifactAndRollbackRestoresPreviousContent`。 | — |
-| 37 | Server DeployがStreamable HTTP経由でKelpieSSHを利用できる。 | 部分適合 | Streamable HTTP transportは実装済みですが、現行adapterは単一Tool呼出しです。Kelpie ProjectでKelpieSSH製品の正式contract・結合環境CRをtask `kelpiessh-moyai-deploy-contract-20260830`として対応中です。 | 確定したKelpieSSH contractに合わせて実装し、integration testを実行。 |
+| 37 | Server DeployがStreamable HTTP経由でKelpieSSHを利用できる。 | 部分適合 | Streamable HTTP transportは実装済みですが、現行adapterは単一Tool呼出しです。KelpieSSH側task `kelpiessh-moyai-deploy-contract-20260830`は、Moyaiへのintegration test依頼送信まで進んだ95%時点で、DB保守により`Expired`となっています。 | KelpieSSHの正式contractと結合環境を再確認し、段階orchestrationの実装およびintegration testを完了。 |
 | 38 | MoyaiがSSH Password/Private Keyを保存しない。 | 適合 | DeploymentTargetはProvider target参照のみを持ち資格情報fieldなし。ADRにも分離を明記。 | — |
 | 39 | DeploymentTargetを独立Entityとして保持できる。 | 適合 | Domain、SQLite table、repository、CLI、MCPを実装。 | — |
 | 40 | v1で1 Project = 1 DeploymentTargetを保証する。 | 適合 | SQLiteの`project_id`一意制約とinitializer constraint test。 | — |
@@ -63,4 +63,4 @@
 
 ## 次の検証単位
 
-残る完了作業は、Githubie/BuckettieのRepository diff/commit CR完了後の承認済み変更操作testと、仕様19.5のKelpieSSH段階orchestration実装および実Provider結合検証です。
+残る完了作業は、稼働中のGithubie/BuckettieをMoyaiから呼び出すconformance test、Moyai登録済みGitHub・Bitbucket検証Projectでの承認済み変更操作test、および仕様19.5のKelpieSSH段階orchestration実装と実Provider結合検証です。
