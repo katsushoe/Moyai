@@ -74,7 +74,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
             await using SqliteCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
-                UPDATE projects SET name=$name, repository_url=$repository_url, repository_provider=$repository_provider,
+                UPDATE projects SET name=$name, source_path=$source, install_path=$install, build_provider=$build_provider, deploy_mode=$deploy_mode, repository_url=$repository_url, repository_provider=$repository_provider,
                     description=$description, build_config_json=$build_config,
                     git_user_name=$git_name, git_user_email=$git_email, git_remote_name=$remote,
                     git_default_branch=$default_branch, updated_at=$updated, archived_at=$archived,
@@ -82,6 +82,10 @@ public sealed class SqliteProjectRepository : IProjectRepository
                 WHERE id=$id AND revision=$expected_revision;
                 """;
             AddMutableParameters(command, project);
+            command.Parameters.AddWithValue("$source", project.SourcePath);
+            command.Parameters.AddWithValue("$install", Value(project.InstallPath));
+            command.Parameters.AddWithValue("$build_provider", project.BuildProvider);
+            command.Parameters.AddWithValue("$deploy_mode", project.DeployMode);
             command.Parameters.AddWithValue("$id", Format(project.Id));
             command.Parameters.AddWithValue("$expected_revision", expectedRevision);
             int affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

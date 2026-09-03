@@ -14,7 +14,7 @@ SCM commands are `service start`, `service stop`, `service pause`, `service resu
 
 | Group | Commands | Purpose |
 | :--- | :--- | :--- |
-| Project | `project-list`, `project-get`, `project-create`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
+| Project | `project-list`, `project-get`, `project-create`, `project-ensure`, `project-configure`, `project-rename`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
 | Work item | `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, `work-item-transition`, `work-item-history`, `item-search` | Work tracking, history, and FTS5 search |
 | Collaboration | `relation-add/remove/list`, `comment-add/list`, `task-link-add/remove/list`, `commit-link-add/remove/list` | Persistent WorkItem collaboration records |
 | Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
@@ -29,7 +29,7 @@ Options use `--kebab-case`. Mutations require `--actor-type` and `--actor-name`;
 
 ## Commands
 
-Project name lookup, duplicate registration checks, and update targeting use ordinal case-insensitive comparison. The originally registered name casing remains canonical unless `project-update` explicitly supplies a new name.
+Project name lookup, duplicate registration checks, and update targeting use ordinal case-insensitive comparison. The originally registered name casing remains canonical unless `project-rename` or `project-update` explicitly supplies a new name.
 
 Each command below has the syntax, processing rule, and result contract. Returned Project or WorkItem fields reflect persisted SQLite state; list filters change inclusion, and mutation results contain the new `revision`.
 
@@ -37,7 +37,10 @@ Each command below has the syntax, processing rule, and result contract. Returne
 
 - `project-list`: `project-list [--include-archived]`; returns all non-archived projects unless the flag is present. Example: `moyaictl.exe project-list`.
 - `project-get`: `project-get --name <name>`; returns the persisted project or an error when absent. Example: `moyaictl.exe project-get --name Sample`.
-- `project-create`: requires `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`; optional `--install-path --repository-provider`; creates both the Project and its one Repository association. Names must be unique.
+- `project-create`: requires only `--name`; creates a Project without requiring a path or Repository. Execution settings are optional. Names must be unique.
+- `project-ensure`: requires only `--name`; creates a missing Project or returns the existing one without changing settings, revision or archive state. Concurrent calls create one record and one creation event.
+- `project-configure`: requires `--name --expected-revision`; optional `--source-path --install-path --repository-url --repository-provider --build-provider --deploy-mode` associate execution settings later. Omitted values are retained. Stale revisions are rejected. Create/ensure/configure accept optional `--actor-type --actor-name`, defaulting to `client`/`unspecified` (unavailable attribution, not authentication).
+- `project-rename`: requires `--current-name --name --expected-revision`. Preserves ID, all settings, archive state, and related data; updates the name, timestamp, and revision and records `project_renamed`. Blank names, duplicate names, stale revisions, and missing projects fail without persistence. Same-name and case-only renames also advance the revision. Optional actors default to `client`/`unspecified`. MCP: `project_rename`. Example: `moyaictl.exe project-rename --current-name Sample --name NewName --expected-revision 1`.
 - `project-update`: requires `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`; optional `--repository-url --repository-provider --description --build-config-json --git-user-name --git-user-email --git-default-branch`; updates and returns the project, rejecting stale revisions. A supplied URL with no Provider re-runs Provider inference; a supplied Provider changes routing explicitly.
 - `project-set-archived`: requires `--name --expected-revision --archived --actor-type --actor-name`; archives or restores and returns the project.
 - `project-overview`: requires `--project`; optional `--recent-limit` defaults to `10` and must be `1..100`; returns open WorkItem counts, blockers, latest stable release, planned release, and recent events.

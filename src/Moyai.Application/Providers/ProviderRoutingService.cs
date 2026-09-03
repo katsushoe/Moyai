@@ -29,6 +29,7 @@ public sealed class ProviderRoutingService
     public async Task<RepositoryProviderResult> ExecuteAsync(string projectName, RepositoryOperation operation, string? message = null, string? branch = null, string? tag = null, CancellationToken cancellationToken = default)
     {
         Project project = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
+        project.RequireConfiguration("sourcePath", "repositoryUrl", "repositoryProvider");
         string providerName = ProviderName(project.RepositoryProvider);
         if (!_providers.TryGetValue(providerName, out IRepositoryProvider? provider))
         {

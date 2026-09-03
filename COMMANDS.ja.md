@@ -14,7 +14,7 @@
 
 | Group | Commands | 用途 |
 | :--- | :--- | :--- |
-| Project | `project-list`、`project-get`、`project-create`、`project-update`、`project-set-archived`、`project-overview`、`project-changes-since` | Project状態・集約表示 |
+| Project | `project-list`、`project-get`、`project-create`、`project-ensure`、`project-configure`、`project-rename`、`project-update`、`project-set-archived`、`project-overview`、`project-changes-since` | Project状態・集約表示 |
 | Work item | `work-item-list`、`work-item-get`、`work-item-create`、`work-item-update`、`work-item-set-deleted`、`work-item-transition`、`work-item-history`、`item-search` | 作業管理・履歴・FTS5検索 |
 | Collaboration | `relation-add/remove/list`、`comment-add/list`、`task-link-add/remove/list`、`commit-link-add/remove/list` | WorkItem連携記録 |
 | Repository | `repository-status`、`repository-diff`、`repository-commit`、`repository-push`、`repository-pull` | Provider経由Git操作 |
@@ -29,7 +29,7 @@ Optionは`--kebab-case`です。変更操作には`--actor-type`と`--actor-name
 
 ## Commands
 
-Project名の検索、重複登録判定、変更対象の解決にはOrdinalな大文字小文字非区別比較を使用します。`project-update`で新しい名前を明示しない限り、登録時の表記を正本として保持します。
+Project名の検索、重複登録判定、変更対象の解決にはOrdinalな大文字小文字非区別比較を使用します。`project-rename`または`project-update`で新しい名前を明示しない限り、登録時の表記を正本として保持します。
 
 各コマンドの構文・処理・戻り値は[英語正本](COMMANDS.md)の同一順序の個別項目を正とします。Command、Option、制約、安全Note、Sample、Linkは英語正本と一致します。
 
@@ -37,7 +37,10 @@ Project名の検索、重複登録判定、変更対象の解決にはOrdinalな
 
 - `project-list`: `project-list [--include-archived]`。既定ではarchive済みを除外します。
 - `project-get`: `project-get --name <name>`。保存済みProjectを返します。
-- `project-create`: `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`が必須で、Projectと1つのRepository紐付けを同時に作成します。
+- `project-create`: 必須は`--name`だけです。パスやRepositoryなしでProjectを作成でき、実行設定は任意です。同名登録は拒否します。
+- `project-ensure`: 必須は`--name`だけです。未登録なら作成し、登録済みなら設定・revision・アーカイブ状態を変更せず返します。同時呼び出しでもProjectと作成Eventは1件です。
+- `project-configure`: `--name --expected-revision`が必須です。任意の`--source-path --install-path --repository-url --repository-provider --build-provider --deploy-mode`で後から設定できます。省略値は保持し、古いrevisionは拒否します。create/ensure/configureの`--actor-type --actor-name`は任意で、未指定時は`client`/`unspecified`（認証済み利用者を表すものではありません）です。
+- `project-rename`: `--current-name --name --expected-revision`が必須です。名前だけを変更し、ID・全設定・アーカイブ状態・関連データを保持します。更新日時とrevisionを更新し、`project_renamed`監査イベントを記録します。空白名・重複名・古いrevision・対象なしはエラーとなり保存しません。同一名や大文字小文字だけの変更もrevisionを更新します。任意の`--actor-type --actor-name`は既定で`client`/`unspecified`です。MCPは`project_rename`です。例: `moyaictl.exe project-rename --current-name Sample --name NewName --expected-revision 1`。
 - `project-update`: `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`が必須です。任意の`--repository-url`と`--repository-provider`で紐付けを変更でき、URLだけを指定した場合はProviderを再判定します。
 - `project-set-archived`: `--name --expected-revision --archived --actor-type --actor-name`が必須です。
 - `project-overview --project`はOpen WorkItem件数、blocker、最新stable Release、予定Release、直近Eventを返します。`--recent-limit`は既定`10`、範囲`1..100`です。

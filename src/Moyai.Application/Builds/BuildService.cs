@@ -15,6 +15,7 @@ public sealed class BuildService(IProjectRepository projects, IBuildRepository b
     public async Task<Build> StartAsync(string projectName, string configuration, string actorType, string actorName, CancellationToken cancellationToken = default)
     {
         Project project = await projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
+        project.RequireConfiguration("sourcePath", "repositoryUrl", "repositoryProvider", "buildProvider");
         RepositoryProviderResult status = await repositoryProvider.ExecuteAsync(projectName, RepositoryOperation.Status, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!status.Ok) throw new InvalidOperationException(status.ErrorMessage ?? "Repository status failed.");
         (string commit, bool dirty) = ParseStatus(status.Output);

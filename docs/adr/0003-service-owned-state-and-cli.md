@@ -1,7 +1,7 @@
 # ADR 0003: Service-owned state and CLI
 
 ## Status
-Accepted for implementation. Supersedes the environment and direct-DB CLI design in ADR 0002. Live upgrade and isolated Windows SCM lifecycle validation remain release gates.
+Accepted for implementation. Supersedes the environment and direct-DB CLI design in ADR 0002. Live upgrade and isolated Windows SCM lifecycle validation are release gates. For 1.2.0, live upgrade passed 14 checks and VirtualBox guest validation passed 17 checks on 2026-09-03, including register/unregister, uninstall DB/configuration hash preservation, and reinstall data recovery. Evidence: artifacts/project-upgrade-120/verification.json and artifacts/project-upgrade-120/vm-test/guest-result.json.
 
 ## Context
 The common service standard requires persistent configuration, service-connected business commands, and CLI lifecycle management. Separate CLI database access bypasses service state and configuration.

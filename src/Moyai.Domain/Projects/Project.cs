@@ -7,17 +7,12 @@ public sealed class Project
     public static Project Create(string name, string sourcePath, string? installPath, string repositoryUrl, string? repositoryProvider, string buildProvider, string deployMode, TimeProvider timeProvider)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryUrl);
-        ArgumentException.ThrowIfNullOrWhiteSpace(buildProvider);
-        ArgumentException.ThrowIfNullOrWhiteSpace(deployMode);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         string normalizedDeployMode = deployMode.ToLowerInvariant();
-        if (normalizedDeployMode is not ("local" or "server")) throw new ArgumentException("Deploy mode must be 'local' or 'server'.", nameof(deployMode));
-        if (normalizedDeployMode == "local" && string.IsNullOrWhiteSpace(installPath)) throw new ArgumentException("Install path is required for local deployment.", nameof(installPath));
+        if (normalizedDeployMode is not ("" or "local" or "server")) throw new ArgumentException("Deploy mode must be empty, 'local' or 'server'.", nameof(deployMode));
 
-        string provider = ResolveRepositoryProvider(repositoryUrl, repositoryProvider);
+        string provider = string.IsNullOrWhiteSpace(repositoryUrl) && string.IsNullOrWhiteSpace(repositoryProvider) ? "" : ResolveRepositoryProvider(repositoryUrl, repositoryProvider);
         DateTimeOffset now = timeProvider.GetUtcNow();
         return new Project(Guid.NewGuid(), name, sourcePath, installPath, repositoryUrl, provider, buildProvider, normalizedDeployMode, now);
     }
@@ -59,13 +54,13 @@ public sealed class Project
     public Guid Id { get; }
     public string Name { get; private set; }
     public string? Description { get; private set; }
-    public string SourcePath { get; }
-    public string? InstallPath { get; }
+    public string SourcePath { get; private set; }
+    public string? InstallPath { get; private set; }
     public string RepositoryUrl { get; private set; }
     public string RepositoryProvider { get; private set; }
-    public string BuildProvider { get; }
+    public string BuildProvider { get; private set; }
     public string? BuildConfigJson { get; private set; }
-    public string DeployMode { get; }
+    public string DeployMode { get; private set; }
     public string? GitUserName { get; private set; }
     public string? GitUserEmail { get; private set; }
     public string GitRemoteName { get; private set; }
@@ -74,6 +69,47 @@ public sealed class Project
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ArchivedAt { get; private set; }
     public long Revision { get; private set; }
+
+    /// <summary>Associates optional execution settings without replacing omitted values.</summary>
+    public void Configure(string? sourcePath, string? installPath, string? repositoryUrl, string? repositoryProvider, string? buildProvider, string? deployMode, TimeProvider timeProvider)
+    {
+        Project candidate = Create(Name, sourcePath ?? SourcePath, installPath ?? InstallPath, repositoryUrl ?? RepositoryUrl,
+            repositoryProvider ?? (repositoryUrl is null ? RepositoryProvider : null), buildProvider ?? BuildProvider, deployMode ?? DeployMode, timeProvider);
+        SourcePath = candidate.SourcePath;
+        InstallPath = candidate.InstallPath;
+        RepositoryUrl = candidate.RepositoryUrl;
+        RepositoryProvider = candidate.RepositoryProvider;
+        BuildProvider = candidate.BuildProvider;
+        DeployMode = candidate.DeployMode;
+        UpdatedAt = timeProvider.GetUtcNow();
+        Revision++;
+    }
+
+    /// <summary>Checks execution settings only when an operation requires them.</summary>
+    public void RequireConfiguration(params string[] fields)
+    {
+        var missing = fields.Where(field => string.IsNullOrWhiteSpace(field switch
+        {
+            "sourcePath" => SourcePath,
+            "repositoryUrl" => RepositoryUrl,
+            "repositoryProvider" => RepositoryProvider,
+            "buildProvider" => BuildProvider,
+            "deployMode" => DeployMode,
+            "installPath" => InstallPath,
+            _ => throw new ArgumentException($"Unknown configuration field: {field}"),
+        })).ToArray();
+        if (missing.Length > 0) throw new ProjectConfigurationException($"Project '{Name}' requires configuration: {string.Join(", ", missing)}. Use project-configure.");
+    }
+
+    /// <summary>名前だけを変更し、設定と関連付けを保持します。</summary>
+    public void Rename(string name, TimeProvider timeProvider)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        Name = name;
+        UpdatedAt = timeProvider.GetUtcNow();
+        Revision++;
+    }
 
     /// <summary>Projectの編集可能な基本情報を更新します。</summary>
     public void Update(string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, TimeProvider timeProvider)

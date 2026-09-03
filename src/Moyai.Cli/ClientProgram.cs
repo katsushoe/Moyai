@@ -27,6 +27,9 @@ try
         Console.WriteLine("moyaictl <command> [--config <moyai.json>] [--kebab-case-option <value>]\n" +
             "moyaictl service <start|stop|pause|resume|register|unregister|status> [--config <moyai.json>]\n" +
             "config-init: create configuration only when absent.\n" +
+            "project-create --name <name>: create using only a name. project-ensure --name <name>: create only when missing.\n" +
+            "project-configure --name <name> --expected-revision <revision> [settings]: associate execution settings later.\n" +
+            "project-rename --current-name <old> --name <new> --expected-revision <revision>: rename while preserving settings.\n" +
             "commands: list service business commands and schemas. version: query service version.\n" +
             "Business commands always connect to the service. Management commands target the Moyai Windows service.");
         return 0;

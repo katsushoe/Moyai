@@ -1,5 +1,7 @@
 # Moyai
 
+`moyaictl.exe project-create --name Sample`で名前だけのProjectを作成できます。未登録時だけ自動作成する場合は`moyaictl.exe project-ensure --name Sample`を使います。登録済みの設定は保持します。Repository・ビルド・デプロイ設定は`project-configure --name Sample --expected-revision 1`で後から関連付けます。Project作成や作業項目の管理にパスは不要です。[コマンド仕様](COMMANDS.ja.md)と[ADR 0004](docs/adr/0004-name-only-projects.md)を参照してください。
+
 [English](README.md) | [日本語](README.ja.md)
 
 Moyaiは、プロジェクトと作業項目をSQLiteで管理し、リポジトリ、ビルド、リリース、デプロイ操作を設定済みProviderへ委譲するWindows向けツールです。JSON CLIとstateless Streamable HTTP MCPサーバーを提供します。

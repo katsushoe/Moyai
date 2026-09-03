@@ -44,6 +44,10 @@ try {
  }
  $version=Invoke-Cli @('version');Assert ($version.name -eq 'Moyai') 'Version response'
  $commands=Invoke-Cli @('commands');Assert (@($commands).Count -gt 50) 'Tool discovery'
+ foreach($name in @('project-create','project-ensure')) {
+  $contract=$commands|Where-Object command -eq $name
+  Assert ((@($contract.schema.required) -join ',') -eq 'name') 'Name-only MCP input contract changed'
+ }
  $empty=Invoke-Cli @('project-list');Assert (@($empty).Count -eq 0) 'Isolated DB not empty'
  $project=Invoke-Cli (@('project-create','--name','CliValidation','--source-path',$run,'--install-path',(Join-Path $run 'install'),'--repository-url','https://example.invalid/test.git','--repository-provider','Githubie','--build-provider','csharp','--deploy-mode','Local')+$actor)
  $read=Invoke-Cli @('project-get','--name','clivalidation');Assert ($read.name -eq 'CliValidation') 'Case-insensitive read'
@@ -85,6 +89,44 @@ try {
  $config=$savedConfig
  Assert (-not (Test-Path (Join-Path $run 'must-not-exist.db'))) 'CLI accessed database'
  Assert (-not (Test-Path (Join-Path $run 'wrong.db'))) 'Host read environment configuration'
+ $minimal=Invoke-Cli @('project-create','--name','NameOnly')
+ Assert ($minimal.name -eq 'NameOnly' -and $minimal.sourcePath -eq '' -and $minimal.repositoryProvider -eq '') 'Name-only creation failed'
+ $ensured=Invoke-Cli @('project-ensure','--name','NAMEONLY')
+ Assert ($ensured.id -eq $minimal.id -and $ensured.revision -eq 1) 'Ensure modified existing Project'
+ $created=Invoke-Cli @('project-ensure','--name','AutoCreated')
+ Assert ($created.name -eq 'AutoCreated') 'Ensure did not create missing Project'
+ $work=Invoke-Cli (@('work-item-create','--project','NameOnly','--type','Issue','--title','No checkout required')+$actor)
+ Assert ($work.title -eq 'No checkout required') 'Work tracking requires execution settings'
+ $missing=Invoke-Cli @('repository-status','--project','NameOnly') 1
+ Assert ($missing.summary -match 'sourcePath' -and $missing.summary -match 'project-configure') 'Missing settings were not explained'
+ $null=Invoke-Cli (@('build-start','--project','NameOnly')+$actor) 1
+ $null=Invoke-Cli (@('deploy-start','--project','NameOnly','--build-id',[Guid]::Empty.ToString(),'--artifact-id',[Guid]::Empty.ToString())+$actor) 1
+ $configured=Invoke-Cli @('project-configure','--name','NameOnly','--expected-revision','1','--source-path','source','--repository-url','https://github.com/example/nameonly','--build-provider','csharp')
+ Assert ($configured.repositoryProvider -eq 'github' -and $configured.revision -eq 2) 'Late configuration failed'
+ $null=Invoke-Cli @('project-configure','--name','NameOnly','--expected-revision','1','--source-path','wrong') 1
+ $loaded=Invoke-Cli @('project-get','--name','NameOnly')
+ Assert ($loaded.sourcePath -eq 'source') 'Conflict changed persisted configuration'
+ $response=Invoke-WebRequest "http://127.0.0.1:$port/mcp" -Method Post -ContentType 'application/json' -Headers @{Accept='application/json, text/event-stream'} -Body '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"project_ensure","arguments":{"name":"McpOnly"}}}'
+ $data=($response.Content -split "`n" | Where-Object {$_ -like 'data:*'} | Select-Object -First 1).Substring(5)|ConvertFrom-Json
+ Assert (-not $data.result.isError) 'Direct MCP ensure failed'
+ $mcpProject=$data.result.content[0].text|ConvertFrom-Json
+ $cliProject=Invoke-Cli @('project-get','--name','McpOnly')
+ Assert ($mcpProject.id -eq $cliProject.id -and $cliProject.sourcePath -eq '') 'MCP and CLI state differ'
+ $renameContract=$commands|Where-Object command -eq 'project-rename'
+ Assert ((@($renameContract.schema.required) -join ',') -eq 'currentName,name,expectedRevision') 'Rename input contract changed'
+ $renamed=Invoke-Cli @('project-rename','--current-name','NameOnly','--name','Renamed','--expected-revision','2')
+ Assert ($renamed.id -eq $minimal.id -and $renamed.sourcePath -eq 'source' -and $renamed.repositoryUrl -eq $configured.repositoryUrl -and $renamed.revision -eq 3) 'Rename lost configuration'
+ $related=Invoke-Cli @('work-item-get','--project','Renamed','--key',$work.key)
+ Assert ($related.id -eq $work.id) 'Rename lost related work item'
+ $null=Invoke-Cli @('project-rename','--current-name','Renamed','--name','AutoCreated','--expected-revision','3') 1
+ $null=Invoke-Cli @('project-rename','--current-name','Renamed','--name','Stale','--expected-revision','2') 1
+ $null=Invoke-Cli @('project-rename','--current-name','Renamed','--name',' ','--expected-revision','3') 1
+ $null=Invoke-Cli @('project-get','--name','NameOnly') 1
+ $response=Invoke-WebRequest "http://127.0.0.1:$port/mcp" -Method Post -ContentType 'application/json' -Headers @{Accept='application/json, text/event-stream'} -Body '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"project_rename","arguments":{"currentName":"Renamed","name":"McpRenamed","expectedRevision":3}}}'
+ $data=($response.Content -split "`n" | Where-Object {$_ -like 'data:*'} | Select-Object -First 1).Substring(5)|ConvertFrom-Json
+ Assert (-not $data.result.isError) 'Direct MCP rename failed'
+ $renamed=Invoke-Cli @('project-get','--name','McpRenamed')
+ Assert ($renamed.id -eq $minimal.id -and $renamed.revision -eq 4 -and $renamed.sourcePath -eq 'source') 'MCP rename state differs'
  $hostProcess.Kill();$hostProcess.WaitForExit()
  $status=Invoke-Cli @('service','status')
  Assert ($status.name -eq 'Moyai') 'Service status did not use SCM'

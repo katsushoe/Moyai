@@ -8,6 +8,92 @@ namespace Moyai.Infrastructure.Tests.Persistence;
 public sealed class SqliteProjectRepositoryTests
 {
     [Fact]
+    public async Task RenameAsyncPreservesAllOtherFieldsAndAuditHistory()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        await service.CreateAsync(new CreateProjectCommand("Original", "source", "install", "https://github.com/example/repo", null, "csharp", "local"));
+        await service.UpdateAsync(new UpdateProjectCommand("Original", "Original", null, null, "Description", "{\"setting\":true}", "User", "user@example.com", "upstream", "develop", 1, "test", "tester"));
+        Project before = await service.SetArchivedAsync("Original", 2, true, "test", "tester");
+
+        Project renamed = await service.RenameAsync("ORIGINAL", "Renamed", before.Revision, "test", "renamer");
+        Project loaded = await service.GetAsync("renamed");
+
+        var expected = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(before))!;
+        var actual = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(loaded))!;
+        expected["Name"] = "Renamed";
+        expected["Revision"] = before.Revision + 1;
+        expected["UpdatedAt"] = actual["UpdatedAt"]!.DeepClone();
+        Assert.True(System.Text.Json.Nodes.JsonNode.DeepEquals(expected, actual));
+        Assert.Equal(renamed.Id, loaded.Id);
+        Assert.True(loaded.UpdatedAt >= before.UpdatedAt);
+        await Assert.ThrowsAsync<ProjectNotFoundException>(() => service.GetAsync("Original"));
+        Assert.Equal(4L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+        Assert.Equal(1L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events WHERE event_type = 'project_renamed' AND actor_name = 'renamer';"));
+    }
+
+    [Fact]
+    public async Task RenameAsyncRejectsConflictsAndInvalidNamesWithoutChanges()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        await service.CreateAsync(new CreateProjectCommand("Original"));
+        await service.CreateAsync(new CreateProjectCommand("OtherÅ"));
+
+        await Assert.ThrowsAsync<ProjectNameConflictException>(() => service.RenameAsync("Original", "otherå", 1));
+        await Assert.ThrowsAsync<RevisionConflictException>(() => service.RenameAsync("Original", "New", 0));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.RenameAsync("Original", " ", 1));
+        await Assert.ThrowsAsync<ProjectNotFoundException>(() => service.RenameAsync("Missing", "New", 1));
+        Assert.Equal(1, (await service.GetAsync("Original")).Revision);
+        Assert.Equal(2L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+
+        Project renamed = await service.RenameAsync("Original", "ORIGINAL", 1);
+        Assert.Equal("ORIGINAL", (await service.GetAsync("original")).Name);
+        Assert.Equal(2, renamed.Revision);
+    }
+
+    [Fact]
+    public async Task NameOnlyProjectCanBeConfiguredLaterWithoutLosingSettings()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        Project created = await service.CreateAsync(new CreateProjectCommand("Tracking"));
+        Assert.Empty(created.SourcePath);
+        Assert.Empty(created.RepositoryProvider);
+        Project configured = await service.ConfigureAsync("Tracking", 1, "source", "install", "https://github.com/example/repo", null, "csharp", "local", "test", "tester");
+        Project loaded = await service.GetAsync("Tracking");
+        Assert.Equal("source", loaded.SourcePath);
+        Assert.Equal("install", loaded.InstallPath);
+        Assert.Equal("github", loaded.RepositoryProvider);
+        Assert.Equal("csharp", loaded.BuildProvider);
+        Assert.Equal("local", loaded.DeployMode);
+        await service.ConfigureAsync("Tracking", configured.Revision, null, null, null, null, null, "server", "test", "tester");
+        loaded = await service.GetAsync("Tracking");
+        Assert.Equal("source", loaded.SourcePath);
+        Assert.Equal("github", loaded.RepositoryProvider);
+        Assert.Equal("server", loaded.DeployMode);
+        await Assert.ThrowsAsync<RevisionConflictException>(() => service.ConfigureAsync("Tracking", 1, "wrong", null, null, null, null, null, "test", "tester"));
+        Assert.Equal("source", (await service.GetAsync("Tracking")).SourcePath);
+        Assert.Equal(3L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+    }
+
+    [Fact]
+    public async Task EnsureAsyncCreatesOnceAndPreservesArchivedProject()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        Project[] results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => service.EnsureAsync("Concurrent")));
+        Assert.Single(results.Select(value => value.Id).Distinct());
+        Assert.Equal(1L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+        Project archived = await service.SetArchivedAsync("Concurrent", 1, true, "test", "tester");
+        Project ensured = await service.EnsureAsync("CONCURRENT");
+        Assert.Equal(archived.Id, ensured.Id);
+        Assert.Equal(archived.Revision, ensured.Revision);
+        Assert.NotNull(ensured.ArchivedAt);
+        Assert.Equal(2L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+    }
+
+    [Fact]
     public async Task ProjectServiceSupportsCrudArchivingAndEventHistory()
     {
         using var fixture = new ProjectFixture();

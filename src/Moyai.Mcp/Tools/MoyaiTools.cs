@@ -20,6 +20,12 @@ namespace Moyai.Mcp.Tools;
 [McpServerToolType]
 public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, ReleaseOrchestrationService releaseOrchestration, BuildService builds, DeploymentService deployments, AuthIntrospectionService authentication, ProviderRoutingService routing, ServiceTokenLifecycleService tokens)
 {
+    private static async Task<T> WithConfigurationErrors<T>(Func<Task<T>> operation)
+    {
+        try { return await operation().ConfigureAwait(false); }
+        catch (ProjectConfigurationException exception) { throw new ModelContextProtocol.McpException(exception.Message); }
+    }
+
     [McpServerTool(Name = "token_issue"), Description("Issues a Provider service token. Returns the secret once; do not log it.")]
     public Task<Moyai.Domain.Authentication.ServiceToken> TokenIssue(string audience, string[] scopes, string actorType, string actorName, DateTimeOffset? expiresAt = null, CancellationToken cancellationToken = default) => tokens.IssueAsync(audience, scopes, expiresAt, actorType, actorName, cancellationToken);
 
@@ -47,8 +53,21 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<Project> ProjectGet(string name, CancellationToken cancellationToken = default) => projects.GetAsync(name, cancellationToken);
 
     [McpServerTool(Name = "project_create"), Description("Creates a project in Moyai and records an audit event.")]
-    public Task<Project> ProjectCreate(string name, string sourcePath, string? installPath, string repositoryUrl, string? repositoryProvider, string buildProvider, string deployMode, string actorType, string actorName, CancellationToken cancellationToken = default) =>
+    public Task<Project> ProjectCreate(string name, string sourcePath = "", string? installPath = null, string repositoryUrl = "", string? repositoryProvider = null, string buildProvider = "", string deployMode = "", string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
         projects.CreateAsync(new CreateProjectCommand(name, sourcePath, installPath, repositoryUrl, repositoryProvider, buildProvider, deployMode, actorType, actorName), cancellationToken);
+
+    [McpServerTool(Name = "project_ensure", Idempotent = true), Description("Returns an existing Project or creates it using only its name. Preserves existing settings and archive state. Call before operations when automatic registration is needed.")]
+    public Task<Project> ProjectEnsure(string name, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
+        projects.EnsureAsync(name, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "project_configure"), Description("Associates execution settings with an existing Project using optimistic concurrency. Omitted settings are preserved.")]
+    public Task<Project> ProjectConfigure(string name, long expectedRevision, string? sourcePath = null, string? installPath = null, string? repositoryUrl = null, string? repositoryProvider = null, string? buildProvider = null, string? deployMode = null, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
+        projects.ConfigureAsync(name, expectedRevision, sourcePath, installPath, repositoryUrl, repositoryProvider, buildProvider, deployMode, actorType, actorName, cancellationToken);
+
+    /// <summary>名前だけを変更する操作をCLIとMCPへ公開します。</summary>
+    [McpServerTool(Name = "project_rename"), Description("Renames a Project while preserving its ID, settings, archive state, and related data. Requires the current revision and records a project_renamed audit event.")]
+    public Task<Project> ProjectRename(string currentName, string name, long expectedRevision, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
+        projects.RenameAsync(currentName, name, expectedRevision, actorType, actorName, cancellationToken);
 
     [McpServerTool(Name = "project_update"), Description("Updates a Moyai project using optimistic concurrency and records an audit event.")]
     public Task<Project> ProjectUpdate(string currentName, string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
@@ -132,49 +151,49 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
         authentication.IntrospectAsync(token, audience, scope, cancellationToken);
 
     [McpServerTool(Name = "repository_status", ReadOnly = true), Description("Gets repository status through the Provider configured for a Moyai-managed project.")]
-    public Task<RepositoryProviderResult> RepositoryStatus(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Status, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> RepositoryStatus(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Status, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "provider_version", ReadOnly = true), Description("Returns version information from the Repository Provider selected by the Project.")]
-    public Task<RepositoryProviderResult> ProviderVersion(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.ProviderVersion, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> ProviderVersion(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.ProviderVersion, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "provider_capabilities", ReadOnly = true), Description("Returns Repository Provider capabilities for negotiation before optional operations.")]
-    public Task<RepositoryProviderResult> ProviderCapabilities(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.ProviderCapabilities, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> ProviderCapabilities(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.ProviderCapabilities, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "repository_diff", ReadOnly = true), Description("Gets repository diff through the Provider configured for a Moyai-managed project.")]
-    public Task<RepositoryProviderResult> RepositoryDiff(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Diff, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> RepositoryDiff(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Diff, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "repository_commit"), Description("Commits a Moyai-managed repository through its configured Provider using internal service authentication.")]
-    public Task<RepositoryProviderResult> RepositoryCommit(string project, string message, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Commit, message, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> RepositoryCommit(string project, string message, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Commit, message, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "repository_push"), Description("Pushes a Moyai-managed repository through its configured Provider using internal service authentication.")]
-    public Task<RepositoryProviderResult> RepositoryPush(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Push, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> RepositoryPush(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Push, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "repository_pull"), Description("Pulls a Moyai-managed repository through its configured Provider using internal service authentication.")]
-    public Task<RepositoryProviderResult> RepositoryPull(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.Pull, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> RepositoryPull(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Pull, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "branch_list", ReadOnly = true), Description("Lists branches through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> BranchList(string project, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.BranchList, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> BranchList(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchList, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "branch_create"), Description("Creates a branch through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> BranchCreate(string project, string branch, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.BranchCreate, branch: branch, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> BranchCreate(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchCreate, branch: branch, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "branch_delete", Destructive = true), Description("Deletes an allowed branch through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_create"), Description("Creates a tag through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> TagCreate(string project, string tag, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> TagCreate(string project, string tag, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_delete", Destructive = true), Description("Deletes an allowed tag through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> TagDelete(string project, string tag, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.TagDelete, tag: tag, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> TagDelete(string project, string tag, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagDelete, tag: tag, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_push"), Description("Pushes an existing local tag through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> TagPush(string project, string tag, CancellationToken cancellationToken = default) => routing.ExecuteAsync(project, RepositoryOperation.TagPush, tag: tag, cancellationToken: cancellationToken);
+    public Task<RepositoryProviderResult> TagPush(string project, string tag, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagPush, tag: tag, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "build", Destructive = true), Description("Builds a tracked clean repository commit through the configured Provider.")]
-    public Task<Build> Build(string project, string actorType, string actorName, string configuration = "Release", CancellationToken cancellationToken = default) => builds.StartAsync(project, configuration, actorType, actorName, cancellationToken);
+    public Task<Build> Build(string project, string actorType, string actorName, string configuration = "Release", CancellationToken cancellationToken = default) => WithConfigurationErrors(() => builds.StartAsync(project, configuration, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "build_start", Destructive = true), Description("Starts a tracked build from a clean repository commit.")]
-    public Task<Build> BuildStart(string project, string actorType, string actorName, string configuration = "Release", CancellationToken cancellationToken = default) => builds.StartAsync(project, configuration, actorType, actorName, cancellationToken);
+    public Task<Build> BuildStart(string project, string actorType, string actorName, string configuration = "Release", CancellationToken cancellationToken = default) => WithConfigurationErrors(() => builds.StartAsync(project, configuration, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "build_get", ReadOnly = true), Description("Gets a tracked build.")]
     public Task<Build> BuildGet(string project, Guid buildId, CancellationToken cancellationToken = default) => builds.GetAsync(project, buildId, cancellationToken);
@@ -186,7 +205,7 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<IReadOnlyList<BuildArtifact>> BuildArtifacts(string project, Guid buildId, CancellationToken cancellationToken = default) => builds.ListArtifactsAsync(project, buildId, cancellationToken);
 
     [McpServerTool(Name = "build_clean", Destructive = true), Description("Removes artifact metadata for completed builds without deleting build history.")]
-    public Task<LifecycleResult> BuildClean(string project, string actorType, string actorName, CancellationToken cancellationToken = default) => builds.CleanAsync(project, actorType, actorName, cancellationToken);
+    public Task<LifecycleResult> BuildClean(string project, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => builds.CleanAsync(project, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "release_create"), Description("Creates a draft release in Moyai and records an audit event.")]
     public Task<Release> ReleaseCreate(string project, string version, ReleaseChannel channel, string actorType, string actorName, string? notes = null, CancellationToken cancellationToken = default) => releases.CreateAsync(new CreateReleaseCommand(project, version, channel, notes, actorType, actorName), cancellationToken);
@@ -222,25 +241,25 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<IReadOnlyList<ReleaseArtifact>> ReleaseListArtifacts(string project, string version, CancellationToken cancellationToken = default) => releaseContent.ListArtifactsAsync(project, version, cancellationToken);
 
     [McpServerTool(Name = "release_prepare"), Description("Moves a planned release into preparation.")]
-    public Task<Release> ReleasePrepare(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseOrchestration.PrepareAsync(project, version, expectedRevision, actorType, actorName, cancellationToken);
+    public Task<Release> ReleasePrepare(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => releaseOrchestration.PrepareAsync(project, version, expectedRevision, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "release_mark_ready"), Description("Marks a prepared release as ready to publish.")]
-    public Task<Release> ReleaseMarkReady(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseOrchestration.MarkReadyAsync(project, version, expectedRevision, actorType, actorName, cancellationToken);
+    public Task<Release> ReleaseMarkReady(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => releaseOrchestration.MarkReadyAsync(project, version, expectedRevision, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "release_publish", Destructive = true), Description("Publishes an existing ready release. Call only after explicit user approval for the exact project, version, and destination.")]
-    public Task<ReleasePublishResult> ReleasePublish(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseOrchestration.PublishAsync(project, version, expectedRevision, actorType, actorName, cancellationToken);
+    public Task<ReleasePublishResult> ReleasePublish(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => releaseOrchestration.PublishAsync(project, version, expectedRevision, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "release_retry", Destructive = true), Description("Retries a failed release publish idempotently. Requires explicit approval.")]
-    public Task<ReleasePublishResult> ReleaseRetry(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseOrchestration.RetryAsync(project, version, expectedRevision, actorType, actorName, cancellationToken);
+    public Task<ReleasePublishResult> ReleaseRetry(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => releaseOrchestration.RetryAsync(project, version, expectedRevision, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "release_withdraw", Destructive = true), Description("Withdraws an existing release through the repository Provider.")]
-    public Task<ReleasePublishResult> ReleaseWithdraw(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => releaseOrchestration.WithdrawAsync(project, version, expectedRevision, actorType, actorName, cancellationToken);
+    public Task<ReleasePublishResult> ReleaseWithdraw(string project, string version, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => releaseOrchestration.WithdrawAsync(project, version, expectedRevision, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "release_latest", ReadOnly = true), Description("Gets the latest released stable release.")]
-    public Task<Release?> ReleaseLatest(string project, CancellationToken cancellationToken = default) => releaseOrchestration.LatestAsync(project, cancellationToken);
+    public Task<Release?> ReleaseLatest(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => releaseOrchestration.LatestAsync(project, cancellationToken));
 
     [McpServerTool(Name = "release_overview", ReadOnly = true), Description("Gets a release with its WorkItem relations and artifact metadata.")]
-    public Task<ReleaseOverview> ReleaseOverview(string project, string version, CancellationToken cancellationToken = default) => releaseOrchestration.OverviewAsync(project, version, cancellationToken);
+    public Task<ReleaseOverview> ReleaseOverview(string project, string version, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => releaseOrchestration.OverviewAsync(project, version, cancellationToken));
 
     [McpServerTool(Name = "deployment_target_get", ReadOnly = true), Description("Gets the single Deployment Target for a Project.")]
     public Task<DeploymentTarget> DeploymentTargetGet(string project, CancellationToken cancellationToken = default) => deployments.GetTargetAsync(project, cancellationToken);
@@ -249,10 +268,10 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<DeploymentTarget> DeploymentTargetUpdate(string project, string name, string mode, string destinationPath, long expectedRevision, string actorType, string actorName, string? kelpieTarget = null, string? configJson = null, CancellationToken cancellationToken = default) => deployments.UpdateTargetAsync(project, name, mode, destinationPath, kelpieTarget, configJson, expectedRevision, actorType, actorName, cancellationToken);
 
     [McpServerTool(Name = "deploy", Destructive = true), Description("Deploys a managed Build Artifact. Requires explicit approval for the exact target.")]
-    public Task<Deployment> Deploy(string project, Guid buildId, Guid artifactId, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => deployments.StartAsync(project, buildId, artifactId, version, actorType, actorName, cancellationToken);
+    public Task<Deployment> Deploy(string project, Guid buildId, Guid artifactId, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => deployments.StartAsync(project, buildId, artifactId, version, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "deploy_start", Destructive = true), Description("Starts a tracked Deployment from a managed Build Artifact.")]
-    public Task<Deployment> DeployStart(string project, Guid buildId, Guid artifactId, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => deployments.StartAsync(project, buildId, artifactId, version, actorType, actorName, cancellationToken);
+    public Task<Deployment> DeployStart(string project, Guid buildId, Guid artifactId, string actorType, string actorName, string? version = null, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => deployments.StartAsync(project, buildId, artifactId, version, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "deploy_get", ReadOnly = true), Description("Gets a Deployment.")]
     public Task<Deployment> DeployGet(string project, Guid deploymentId, CancellationToken cancellationToken = default) => deployments.GetAsync(project, deploymentId, cancellationToken);
@@ -264,8 +283,8 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<Deployment> DeployStatus(string project, Guid deploymentId, CancellationToken cancellationToken = default) => deployments.GetAsync(project, deploymentId, cancellationToken);
 
     [McpServerTool(Name = "deploy_retry", Destructive = true), Description("Retries a failed Deployment using the specified managed artifact.")]
-    public Task<Deployment> DeployRetry(string project, Guid deploymentId, Guid artifactId, string actorType, string actorName, CancellationToken cancellationToken = default) => deployments.RetryAsync(project, deploymentId, artifactId, actorType, actorName, cancellationToken);
+    public Task<Deployment> DeployRetry(string project, Guid deploymentId, Guid artifactId, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => deployments.RetryAsync(project, deploymentId, artifactId, actorType, actorName, cancellationToken));
 
     [McpServerTool(Name = "deploy_rollback", Destructive = true), Description("Rolls back a succeeded Deployment and records rollback failure.")]
-    public Task<Deployment> DeployRollback(string project, Guid deploymentId, string actorType, string actorName, CancellationToken cancellationToken = default) => deployments.RollbackAsync(project, deploymentId, actorType, actorName, cancellationToken);
+    public Task<Deployment> DeployRollback(string project, Guid deploymentId, string actorType, string actorName, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => deployments.RollbackAsync(project, deploymentId, actorType, actorName, cancellationToken));
 }
