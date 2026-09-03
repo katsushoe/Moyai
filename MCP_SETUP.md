@@ -13,18 +13,16 @@ Examples contain complete values; do not enter angle-bracket placeholders.
 
 ## Prerequisites
 
-Install the x64 MSI in `C:\Moyai`. Administrator rights are required only for MSI installation.
+Install the x64 MSI in `C:\Moyai`. MSI installation and service management require appropriate Windows permissions.
 
-## Authentication and Environment
+## Authentication and Configuration
 
-Set `MOYAI_DB_PATH` and `MOYAI_MCP_URL`. Moyai binds only to loopback. Provider service tokens must be supplied through the client or provider secret mechanism and must not be stored in this file.
+Configuration: `config/moyai.json`. See [CONFIG](CONFIG.md). CLI business commands connect to the running service.
 
 ## Start the Server
 
 ```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
-$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
-& 'C:\Moyai\bin\Moyai.Mcp.exe'
+& 'C:\Moyai\bin\moyaictl.exe' service start
 ```
 
 The pass condition is a log entry stating that the server is listening on the configured URL.
@@ -73,7 +71,7 @@ Use one server process and database per isolation boundary. Assign a distinct lo
 
 ## Troubleshooting
 
-- Missing `MOYAI_DB_PATH`: set a writable database path.
-- Missing or non-loopback `MOYAI_MCP_URL`: use `127.0.0.1` or `localhost`.
+Configuration: `config/moyai.json`. See [CONFIG](CONFIG.md). CLI business commands connect to the running service.
+Configuration: `config/moyai.json`. See [CONFIG](CONFIG.md). CLI business commands connect to the running service.
 - Port conflict: select another unused loopback port in both server and client settings.
 - No tools: restart or reload the client after updating its configuration.

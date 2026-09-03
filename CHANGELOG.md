@@ -5,7 +5,9 @@
 ## Unreleased
 
 - Added installer-managed automatic Windows service startup under LocalService, with stop/remove lifecycle and existing database preservation.
-- Added MCP host configuration arguments, service event logging, and service package validation tests. Live install/upgrade/uninstall/reboot validation remains pending.
+- Replaced environment-based service configuration with persistent JSON and routed all business CLI commands through the service.
+- Renamed the CLI to `moyaictl.exe` and added `service start`, `stop`, `pause`, `resume`, `register`, `unregister`, and `status` subcommands.
+- Validated the 1.1.1 MSI upgrade, service pause/resume/stop/start, configuration preservation, and all 23 database table counts on the installed machine. Isolated registration/unregistration and uninstall data-retention validation remain release gates.
 
 ## 1.0.7 - 2026-08-31
 

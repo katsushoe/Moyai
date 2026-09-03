@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for implementation; live installation, upgrade, uninstall and reboot validation remain required before release.
+Service installation remains accepted. Configuration and CLI ownership are superseded by [ADR 0003](0003-service-owned-state-and-cli.md). Live installation, upgrade, uninstall and reboot validation remain required before release.
 
 ## Context
 

@@ -10,5 +10,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/Moyai.Mcp/Moyai.Mcp.csproj" />
+    <ProjectReference Include="../../src/Moyai.Cli/Moyai.Cli.csproj" />
   </ItemGroup>
 </Project>

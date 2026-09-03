@@ -2,7 +2,13 @@
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
-`Moyai.Cli.exe`の公開コマンド契約です。MCP Toolは同じ操作名をunderscore形式で提供します。MCPはAI向けの`project_list`別名として`list_projects`も公開し、対応するCLI操作は`project-list`です。
+`moyaictl.exe`の公開コマンド契約です。MCP Toolは同じ操作名をunderscore形式で提供します。MCPはAI向けの`project_list`別名として`list_projects`も公開し、対応するCLI操作は`project-list`です。
+
+## サービス接続と管理
+
+全業務コマンド（`version`を含む）はサービスへ接続します。`--config <path>`でJSON設定を指定します。`commands`は稼働サービスのコマンド一覧と入力schemaを返します。`help`はサービス未起動でも使用できます。
+
+管理コマンドは`service start`、`service stop`、`service pause`、`service resume`、`service register`、`service unregister`、`service status`です。登録は同じbin内のMCP実行ファイルと設定を使用し、Auto／LocalServiceと必要なディレクトリ権限を設定します。登録解除前は停止が必要です。`config-init`は設定不在時だけ初期JSONを作成します。管理コマンドはWindows SCMを使用し、業務処理やDBへ直接アクセスしません。
 
 ## Command Groups
 

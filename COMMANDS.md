@@ -2,7 +2,13 @@
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
-This document is the public command contract for `Moyai.Cli.exe`. MCP tools use the same operation names with underscores. MCP also exposes `list_projects` as the AI-oriented alias of `project_list`; `project-list` is the corresponding CLI operation.
+This document is the public command contract for `moyaictl.exe`. MCP tools use the same operation names with underscores. MCP also exposes `list_projects` as the AI-oriented alias of `project_list`; `project-list` is the corresponding CLI operation.
+
+## Service connection and management
+
+All business commands, including `version`, connect to the service. `--config <path>` selects JSON settings. `commands` returns the running service's commands and input schemas. `help` works offline.
+
+SCM commands are `service start`, `service stop`, `service pause`, `service resume`, `service register`, `service unregister`, and `service status`. Registration uses the adjacent MCP executable and configuration, Auto/LocalService and required directory permissions. Unregister requires Stopped. `config-init` creates initial JSON only when absent. Management commands use Windows SCM and never execute business logic or access SQLite directly.
 
 ## Command Groups
 
@@ -29,8 +35,8 @@ Each command below has the syntax, processing rule, and result contract. Returne
 
 ### Project commands
 
-- `project-list`: `project-list [--include-archived]`; returns all non-archived projects unless the flag is present. Example: `Moyai.Cli.exe project-list`.
-- `project-get`: `project-get --name <name>`; returns the persisted project or an error when absent. Example: `Moyai.Cli.exe project-get --name Sample`.
+- `project-list`: `project-list [--include-archived]`; returns all non-archived projects unless the flag is present. Example: `moyaictl.exe project-list`.
+- `project-get`: `project-get --name <name>`; returns the persisted project or an error when absent. Example: `moyaictl.exe project-get --name Sample`.
 - `project-create`: requires `--name --source-path --repository-url --build-provider --deploy-mode --actor-type --actor-name`; optional `--install-path --repository-provider`; creates both the Project and its one Repository association. Names must be unique.
 - `project-update`: requires `--current-name --name --git-remote-name --expected-revision --actor-type --actor-name`; optional `--repository-url --repository-provider --description --build-config-json --git-user-name --git-user-email --git-default-branch`; updates and returns the project, rejecting stale revisions. A supplied URL with no Provider re-runs Provider inference; a supplied Provider changes routing explicitly.
 - `project-set-archived`: requires `--name --expected-revision --archived --actor-type --actor-name`; archives or restores and returns the project.

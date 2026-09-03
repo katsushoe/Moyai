@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Moyai.Configuration/Moyai.Configuration.csproj" />
     <Project Path="src/Moyai.Application/Moyai.Application.csproj" />
     <Project Path="src/Moyai.Cli/Moyai.Cli.csproj" />
     <Project Path="src/Moyai.Domain/Moyai.Domain.csproj" />

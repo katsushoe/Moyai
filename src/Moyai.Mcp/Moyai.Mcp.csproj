@@ -6,6 +6,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Moyai.Configuration\Moyai.Configuration.csproj" />
     <ProjectReference Include="..\Moyai.Application\Moyai.Application.csproj" />
     <ProjectReference Include="..\Moyai.Infrastructure\Moyai.Infrastructure.csproj" />
     <ProjectReference Include="..\Moyai.Presentation.Windows\Moyai.Presentation.Windows.csproj" />

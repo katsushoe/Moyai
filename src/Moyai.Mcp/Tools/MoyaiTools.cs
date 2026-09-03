@@ -18,8 +18,20 @@ namespace Moyai.Mcp.Tools;
 
 /// <summary>MoyaiのProject State操作を公開します。</summary>
 [McpServerToolType]
-public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, ReleaseOrchestrationService releaseOrchestration, BuildService builds, DeploymentService deployments, AuthIntrospectionService authentication, ProviderRoutingService routing)
+public sealed class MoyaiTools(ProjectService projects, ProjectQueryService queries, WorkItemService items, WorkItemCollaborationService collaboration, ReleaseService releases, ReleaseContentService releaseContent, ReleaseOrchestrationService releaseOrchestration, BuildService builds, DeploymentService deployments, AuthIntrospectionService authentication, ProviderRoutingService routing, ServiceTokenLifecycleService tokens)
 {
+    [McpServerTool(Name = "token_issue"), Description("Issues a Provider service token. Returns the secret once; do not log it.")]
+    public Task<Moyai.Domain.Authentication.ServiceToken> TokenIssue(string audience, string[] scopes, string actorType, string actorName, DateTimeOffset? expiresAt = null, CancellationToken cancellationToken = default) => tokens.IssueAsync(audience, scopes, expiresAt, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "token_rotate", Destructive = true), Description("Replaces a Provider service token. Returns the new secret once; do not log it.")]
+    public Task<Moyai.Domain.Authentication.ServiceToken> TokenRotate(string audience, string[] scopes, string actorType, string actorName, DateTimeOffset? expiresAt = null, CancellationToken cancellationToken = default) => tokens.RotateAsync(audience, scopes, expiresAt, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "token_revoke", Destructive = true), Description("Revokes a Provider service token and records an audit event.")]
+    public Task<bool> TokenRevoke(string audience, string actorType, string actorName, CancellationToken cancellationToken = default) => tokens.RevokeAsync(audience, actorType, actorName, cancellationToken);
+
+    [McpServerTool(Name = "token_cleanup", Destructive = true), Description("Removes expired Provider service tokens.")]
+    public Task<int> TokenCleanup(string actorType, string actorName, CancellationToken cancellationToken = default) => tokens.DeleteExpiredAsync(actorType, actorName, cancellationToken);
+
     [McpServerTool(Name = "get_version", ReadOnly = true), Description("Returns the running Moyai server version.")]
     public static object GetVersion() => new { name = "Moyai", version = typeof(MoyaiTools).Assembly.GetName().Version?.ToString() ?? "0.0.0.0" };
 

@@ -9,16 +9,14 @@ Moyai is a Windows tool for managing projects and work items in SQLite and deleg
 Install the MSI, then run:
 
 ```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
-& 'C:\Moyai\bin\Moyai.Cli.exe' version
-& 'C:\Moyai\bin\Moyai.Cli.exe' project-list
+& 'C:\Moyai\bin\moyaictl.exe' version
+& 'C:\Moyai\bin\moyaictl.exe' project-list
 ```
 
-The development MSI now registers and starts a Windows service automatically; see [automatic Windows startup](CONFIG.md#automatic-windows-startup). The published v1.0.7 MSI predates this change. For manual execution only (stop the service first to avoid a port conflict):
+The development MSI registers and starts a Windows service automatically; see [automatic Windows startup](CONFIG.md#automatic-windows-startup). The published v1.0.7 MSI predates this change. To start a stopped service:
 
 ```powershell
-$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
-& 'C:\Moyai\bin\Moyai.Mcp.exe'
+& 'C:\Moyai\bin\moyaictl.exe' service start
 ```
 
 Register `http://127.0.0.1:43120/mcp` as a Streamable HTTP server in the MCP client. See [MCP Setup](MCP_SETUP.md) for complete client configuration.
@@ -46,7 +44,7 @@ dotnet test .\Moyai.slnx --configuration Release --no-build
 
 ## Configuration
 
-Moyai reads configuration from environment variables; MCP host arguments override its DB path and listen URL. The MSI supplies these arguments for the service. `MOYAI_DB_PATH` is required for data commands and both `MOYAI_DB_PATH` and `MOYAI_MCP_URL` are required by the MCP server. See [Configuration](CONFIG.md) for types, defaults, constraints, and examples.
+Configuration: `config/moyai.json`. See [CONFIG](CONFIG.md). CLI business commands connect to the running service.
 
 ## Usage
 
@@ -64,6 +62,7 @@ The CLI writes successful JSON to standard output, structured errors to standard
 - [v1 Acceptance Criteria Traceability](V1_TRACEABILITY.md)
 - [Architecture decision](docs/adr/0001-initial-architecture.md)
 - [Installer-managed Windows service decision](docs/adr/0002-installer-managed-windows-service.md)
+- [Service configuration and CLI decision](docs/adr/0003-service-owned-state-and-cli.md)
 
 ## Security
 

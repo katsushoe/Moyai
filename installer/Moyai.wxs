@@ -7,6 +7,10 @@
     Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer version of Moyai is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <CustomAction Id="InitializeConfig" FileRef="CliExecutable" ExeCommand="config-init --config &quot;[ConfigFolder]moyai.json&quot;" Execute="deferred" Impersonate="no" Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="InitializeConfig" Before="InstallServices" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
     <SetDirectory Id="INSTALLFOLDER" Value="C:\Moyai" Sequence="both" />
     <Property Id="MOYAI_MCP_URL" Value="http://127.0.0.1:43120" Secure="yes">
       <RegistrySearch Id="SavedMcpUrl" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="McpUrl" Type="raw" Bitness="always64" />
@@ -33,13 +37,17 @@
     <ComponentGroup Id="ProductFiles" Directory="BinFolder">
       <Files Include="$(PublishDirectory)\**">
         <Exclude Files="$(PublishDirectory)\Moyai.Mcp.exe" />
+        <Exclude Files="$(PublishDirectory)\moyaictl.exe" />
       </Files>
+      <Component Id="CliProgram" Guid="9D4A1330-94FD-49EC-A921-1B3A3D4932AB">
+        <File Id="CliExecutable" Source="$(PublishDirectory)\moyaictl.exe" KeyPath="yes" />
+      </Component>
       <Component Id="McpService" Guid="B53E9DA5-FD3B-4A18-97BA-7CB9AA75FB68">
         <File Id="McpExecutable" Source="$(PublishDirectory)\Moyai.Mcp.exe" KeyPath="yes" />
         <ServiceInstall Id="InstallMoyaiService" Name="Moyai" DisplayName="Moyai MCP"
                         Description="Moyai loopback MCP server" Type="ownProcess" Start="auto"
                         ErrorControl="normal" Account="NT AUTHORITY\LocalService" Vital="yes"
-                        Arguments="--MOYAI_DB_PATH &quot;[DataFolder]moyai.db&quot; --MOYAI_MCP_URL &quot;[MOYAI_MCP_URL]&quot;" />
+                        Arguments="--config &quot;[ConfigFolder]moyai.json&quot;" />
         <ServiceControl Id="ControlMoyaiService" Name="Moyai" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
       </Component>
       <Component Id="McpServiceSettings" Guid="D07774D4-A351-4D3D-A688-77CE6893F9DC" Permanent="yes" NeverOverwrite="yes">
@@ -50,7 +58,7 @@
     <ComponentGroup Id="DataDirectories">
       <Component Id="CreateConfigFolder" Directory="ConfigFolder" Guid="2E311E54-4488-4B68-A9A5-0328CD991DA6">
         <CreateFolder>
-          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)" />
+          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;BU)(A;OICI;GRGX;;;LS)" />
         </CreateFolder>
       </Component>
       <Component Id="CreateLogsFolder" Directory="LogsFolder" Guid="99FC7854-B5A7-4C27-8557-EBA8EC0507C3">

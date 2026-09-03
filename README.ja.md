@@ -9,16 +9,14 @@ Moyaiは、プロジェクトと作業項目をSQLiteで管理し、リポジト
 MSIをインストールし、次のコマンドを実行します。
 
 ```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
-& 'C:\Moyai\bin\Moyai.Cli.exe' version
-& 'C:\Moyai\bin\Moyai.Cli.exe' project-list
+& 'C:\Moyai\bin\moyaictl.exe' version
+& 'C:\Moyai\bin\moyaictl.exe' project-list
 ```
 
-開発版MSIはWindowsサービスを自動登録・起動します。[Windows起動時の自動起動](CONFIG.ja.md#Windows起動時の自動起動)を参照してください。公開済みv1.0.7 MSIにはこの変更は含まれません。手動起動する場合だけ、ポート競合を避けるためサービスを停止してから次を実行します。
+開発版MSIはWindowsサービスを自動登録・起動します。[Windows起動時の自動起動](CONFIG.ja.md#Windows起動時の自動起動)を参照してください。公開済みv1.0.7 MSIにはこの変更は含まれません。停止中のサービスを起動する場合は次を実行します。
 
 ```powershell
-$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
-& 'C:\Moyai\bin\Moyai.Mcp.exe'
+& 'C:\Moyai\bin\moyaictl.exe' service start
 ```
 
 MCPクライアントには`http://127.0.0.1:43120/mcp`をStreamable HTTPサーバーとして登録します。完全なクライアント設定は[MCPセットアップ](MCP_SETUP.ja.md)を参照してください。
@@ -46,7 +44,7 @@ dotnet test .\Moyai.slnx --configuration Release --no-build
 
 ## Configuration
 
-Moyaiは環境変数から設定を読み込み、MCPのDBパス・待受URLは起動引数が優先されます。MSIはサービス用の起動引数を設定します。データ操作には`MOYAI_DB_PATH`、MCPサーバーには`MOYAI_DB_PATH`と`MOYAI_MCP_URL`が必要です。型、既定値、制約、例は[設定](CONFIG.ja.md)を参照してください。
+設定は`config/moyai.json`を使用します。[設定仕様](CONFIG.ja.md)を参照してください。CLIの業務コマンドは稼働サービスへ接続します。
 
 ## Usage
 

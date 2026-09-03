@@ -19,8 +19,11 @@ public sealed class InstallerContractTests
         XElement file = Assert.Single(service.Parent!.Elements(Wix + "File"));
         Assert.Equal("yes", (string?)file.Attribute("KeyPath"));
         Assert.EndsWith(@"\Moyai.Mcp.exe", (string?)file.Attribute("Source"));
-        Assert.Equal((string?)file.Attribute("Source"), (string?)Assert.Single(document.Descendants(Wix + "Exclude")).Attribute("Files"));
-        Assert.Equal("--MOYAI_DB_PATH \"[DataFolder]moyai.db\" --MOYAI_MCP_URL \"[MOYAI_MCP_URL]\"", (string?)service.Attribute("Arguments"));
+        Assert.Contains(document.Descendants(Wix + "Exclude"), item => (string?)item.Attribute("Files") == (string?)file.Attribute("Source"));
+        Assert.Equal("--config \"[ConfigFolder]moyai.json\"", (string?)service.Attribute("Arguments"));
+        XElement initializer = Assert.Single(document.Descendants(Wix + "CustomAction"));
+        Assert.Equal("CliExecutable", (string?)initializer.Attribute("FileRef"));
+        Assert.Equal("deferred", (string?)initializer.Attribute("Execute"));
         XElement control = Assert.Single(document.Descendants(Wix + "ServiceControl"));
         Assert.Equal("install", (string?)control.Attribute("Start"));
         Assert.Equal("both", (string?)control.Attribute("Stop"));
