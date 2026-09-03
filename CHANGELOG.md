@@ -2,6 +2,19 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.2.0 - 2026-09-03
+
+- Updated the local installer to 1.2.0 and verified the installed service, CLI, configuration preservation, and unchanged counts across all 23 database tables.
+
+- Add `project-rename` / `project_rename` to change only the Project name while retaining settings and related data, with revision checking and audit history.
+
+- Allow name-only Project creation, idempotent registration through `project-ensure`, and later execution settings through `project-configure`. Validate required settings when Repository/build/deploy operations execute.
+
+- Added installer-managed automatic Windows service startup under LocalService, with stop/remove lifecycle and existing database preservation.
+- Replaced environment-based service configuration with persistent JSON and routed all business CLI commands through the service.
+- Renamed the CLI to `moyaictl.exe` and added `service start`, `stop`, `pause`, `resume`, `register`, `unregister`, and `status` subcommands.
+- Validated the 1.1.1 MSI upgrade, service pause/resume/stop/start, configuration preservation, and all 23 database table counts on the installed machine. For 1.2.0, all 17 isolated Windows VM checks passed, including service registration/unregistration, uninstall DB/configuration preservation, and reinstall data recovery.
+
 ## 1.0.7 - 2026-08-31
 
 - Added MCP project discovery guidance, the `list_projects` tool alias, and registered-project candidates in not-found errors.

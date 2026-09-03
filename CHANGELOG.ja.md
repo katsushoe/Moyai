@@ -2,6 +2,19 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
+## 1.2.0 - 2026-09-03
+
+- ローカルインストーラを1.2.0へ更新し、実機サービス・CLI・設定保持・DB全23テーブルの件数一致を確認しました。
+
+- `project-rename` / `project_rename`を追加しました。設定と関連データを保持して名前だけを変更し、revision検査と監査履歴を記録します。
+
+- 名前だけでのProject作成、`project-ensure`による未登録時だけの作成、`project-configure`による後からの設定に対応しました。Repository・ビルド・デプロイの必要設定は操作実行時に検査します。
+
+- インストーラによるLocalServiceでのWindowsサービス自動起動、停止・登録解除、既存DB保持の構成を追加しました。
+- 環境変数によるサービス設定を永続JSONへ変更し、CLIの業務コマンドをサービス接続方式へ統一しました。
+- CLIを`moyaictl.exe`へ改名し、`service start`、`stop`、`pause`、`resume`、`register`、`unregister`、`status`サブコマンドを追加しました。
+- 1.1.1のMSI実機更新、一時停止・再開・停止・起動、設定保持、DB全23テーブルの件数一致を確認しました。1.2.0では隔離Windows VMで17項目に合格し、サービス登録・解除、アンインストール時のDB・設定保持、再インストール後のデータ保持を確認しました。
+
 ## 1.0.7 - 2026-08-31
 
 - MCPのProject探索指示、`list_projects` Tool別名、未登録エラーの登録済みProject候補を追加しました。

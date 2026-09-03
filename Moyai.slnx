@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Moyai.Configuration/Moyai.Configuration.csproj" />
     <Project Path="src/Moyai.Application/Moyai.Application.csproj" />
     <Project Path="src/Moyai.Cli/Moyai.Cli.csproj" />
     <Project Path="src/Moyai.Domain/Moyai.Domain.csproj" />
@@ -10,5 +11,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Moyai.Domain.Tests/Moyai.Domain.Tests.csproj" />
     <Project Path="tests/Moyai.Infrastructure.Tests/Moyai.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Moyai.Mcp.Tests/Moyai.Mcp.Tests.csproj" />
   </Folder>
 </Solution>

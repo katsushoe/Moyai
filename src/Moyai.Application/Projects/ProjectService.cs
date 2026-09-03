@@ -27,11 +27,42 @@ public sealed class ProjectService
         return project;
     }
 
+    public async Task<Project> EnsureAsync(string name, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default)
+    {
+        Project? existing = await _repository.GetByNameAsync(name, cancellationToken).ConfigureAwait(false);
+        if (existing is not null) return existing;
+        try { return await CreateAsync(new CreateProjectCommand(name, ActorType: actorType, ActorName: actorName), cancellationToken).ConfigureAwait(false); }
+        catch (ProjectNameConflictException)
+        {
+            return await _repository.GetRequiredAsync(name, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    public async Task<Project> ConfigureAsync(string name, long expectedRevision, string? sourcePath, string? installPath, string? repositoryUrl, string? repositoryProvider, string? buildProvider, string? deployMode, string actorType, string actorName, CancellationToken cancellationToken = default)
+    {
+        Project project = await GetAsync(name, cancellationToken).ConfigureAwait(false);
+        string before = JsonSerializer.Serialize(project);
+        project.Configure(sourcePath, installPath, repositoryUrl, repositoryProvider, buildProvider, deployMode, _timeProvider);
+        await _repository.UpdateAsync(project, expectedRevision, CreateEvent(project, "project_configured", actorType, actorName, before, JsonSerializer.Serialize(project)), cancellationToken).ConfigureAwait(false);
+        return project;
+    }
+
     public async Task<Project> GetAsync(string name, CancellationToken cancellationToken = default) =>
         await _repository.GetRequiredAsync(name, cancellationToken).ConfigureAwait(false);
 
     public Task<IReadOnlyList<Project>> ListAsync(bool includeArchived, CancellationToken cancellationToken = default) =>
         _repository.ListAsync(includeArchived, cancellationToken);
+
+    /// <summary>設定を保持して名前を変更し、監査イベントを同一トランザクションで記録します。</summary>
+    public async Task<Project> RenameAsync(string currentName, string name, long expectedRevision, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default)
+    {
+        Project project = await GetAsync(currentName, cancellationToken).ConfigureAwait(false);
+        string beforeJson = JsonSerializer.Serialize(project);
+        project.Rename(name, _timeProvider);
+        ProjectEvent projectEvent = CreateEvent(project, "project_renamed", actorType, actorName, beforeJson, JsonSerializer.Serialize(project));
+        await _repository.UpdateAsync(project, expectedRevision, projectEvent, cancellationToken).ConfigureAwait(false);
+        return project;
+    }
 
     public async Task<Project> UpdateAsync(UpdateProjectCommand command, CancellationToken cancellationToken = default)
     {

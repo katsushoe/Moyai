@@ -1,57 +1,42 @@
-# Moyai Configuration
+# Moyai設定
 
 [English](CONFIG.md) | [日本語](CONFIG.ja.md)
 
-MoyaiのCLI、MCPサーバー、Provider接続に使う環境変数の正本です。
+## 設定ファイル
 
-## Configuration Directory
+サービスとCLIはインストール先の`config/moyai.json`を読み込みます。既定位置は実行ファイルの`bin`ディレクトリの親から解決します。`--config <path>`で別ファイルを指定できます。環境変数は設定として読み込みません。CLIはサービスに接続し、DBを直接開きません。設定変更後はサービスを再起動します。
 
-設定ファイルは使用しません。MSIは`C:\Moyai\config`を作成しますが、v1.0.7は環境変数だけを読み込みます。
-
-## File Generation
-
-設定は利用者がプロセス環境へ設定します。Moyai、ビルド、MSIは設定や秘密情報を生成しません。
-
-## Main Settings
-
-| 項目 | 必須 | 型 | 既定値 | 制約 |
-| :--- | :--- | :--- | :--- | :--- |
-| `MOYAI_DB_PATH` | CLIデータ操作・MCPで必須 | 文字列 | なし | SQLiteファイルの書き込み可能なパス |
-| `MOYAI_MCP_URL` | MCPで必須 | 絶対URL | なし | ループバックホストのみ |
-
-### `MOYAI_DB_PATH`
-
-SQLiteデータベースのファイルパスです。省略時はデータ操作またはMCP起動が失敗します。例: `$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'`
-
-### `MOYAI_MCP_URL`
-
-MCP待受URLです。省略時はMCP起動が失敗します。`127.0.0.1`または`localhost`だけを使用できます。例: `$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'`
-
-## Profile Settings
-
-| 項目 | 必須 | 型 | 既定値 | 制約 |
-| :--- | :--- | :--- | :--- | :--- |
-| `GITHUBIE_MCP_URL` | 任意 | 絶対URL | 未登録 | GithubieのループバックMCP endpoint |
-| `BUCKETTIE_MCP_URL` | 任意 | 絶対URL | 未登録 | BuckettieのループバックMCP endpoint |
-| `MOYAI_BUILD_PROVIDER_NAME` | 任意グループ | 文字列 | 未登録 | URL・prefixと3項目同時指定 |
-| `MOYAI_BUILD_PROVIDER_URL` | 任意グループ | 絶対URL | 未登録 | ループバックMCP endpoint |
-| `MOYAI_BUILD_PROVIDER_PREFIX` | 任意グループ | 文字列 | 未登録 | Tool prefix |
-| `MOYAI_DEPLOY_PROVIDER_NAME` | 任意グループ | 文字列 | 未登録 | URL・prefixと3項目同時指定 |
-| `MOYAI_DEPLOY_PROVIDER_URL` | 任意グループ | 絶対URL | 未登録 | ループバックMCP endpoint |
-| `MOYAI_DEPLOY_PROVIDER_PREFIX` | 任意グループ | 文字列 | 未登録 | Tool prefix |
-
-KelpieSSH経由のServer DeployではDeploy Provider名を`server`にします。MoyaiはDeployment TargetへKelpie Target名／IDだけを保存し、SSH資格情報を保存しません。Local Targetは既定でProjectの`install_path`を使用します。
-
-組み込みBuild Providerは`csharp`、`node`、`php`です。`build_config_json`には`configuration`と`artifacts`配列を指定できます。各Artifactには`name`、`artifact_type`、Project相対の`file_path`が必要です。FileはSHA-256、Directoryは相対PathとFile Hashからなる決定的ManifestでHash化します。同名の外部Provider設定がある場合は外部Providerを優先します。
-
-各URLには対応Providerの`/mcp` endpointを指定します。Providerグループは3項目がすべて非空の場合だけ登録されます。例: `$env:GITHUBIE_MCP_URL = 'http://127.0.0.1:43121/mcp'`
-
-## Samples
-
-```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
-$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
-$env:GITHUBIE_MCP_URL = 'http://127.0.0.1:43121/mcp'
+```json
+{
+  "databasePath": "../data/moyai.db",
+  "serverUrl": "http://127.0.0.1:43120",
+  "requestTimeoutSeconds": 60,
+  "providers": []
+}
 ```
 
-秘密値は環境変数の例や文書へ直接記録しないでください。
+`databasePath`の相対パスはJSONファイルのディレクトリ基準です。`serverUrl`は資格情報を含まないHTTP(S)のループバックURLです。CLIは末尾へ`/mcp`を付けます。`requestTimeoutSeconds`はCLI操作のタイムアウト秒数（1〜3600）です。ファイル不在、不正JSON、未知の設定項目、不正URLは明示的なエラーとなり、環境変数へ切り替えません。
+
+## Provider
+
+各項目は`name`、`endpoint`、`toolPrefix`と任意の`repository`（既定false）で構成します。URLはHTTP(S)ループバック、名前は重複不可です。既存のGithubieルーティング識別子は`githubbie`、prefixは`github`、repositoryはtrueです。Buckettieは`buckettie`／`bitbucket`／trueです。組み込みBuild Providerは`csharp`、`node`、`php`で、同名の外部Provider設定を優先します。KelpieSSH配備は`server`名を使用します。TokenはサービスDBで管理し、JSONへ保存しません。
+
+```json
+{"name":"githubbie","endpoint":"http://127.0.0.1:43121/mcp","toolPrefix":"github","repository":true}
+```
+
+Projectの`build_config_json`では`configuration`と`artifacts`配列（`name`、`artifact_type`、Project相対の`file_path`）を指定します。配備先は既存のProject設定を使用します。
+
+## インストール・移行
+
+MSIはサービス起動前にCLIの`config-init`を実行します。JSONがない場合だけ初期設定を生成し、以前のレジストリ`McpUrl`があれば取り込みます。既存JSONは検証して保持します。管理者がJSONを編集し、`service stop`、`service start`で反映します。既存JSONを旧MSIプロパティやレジストリで上書きしません。
+
+旧環境変数方式から移行する場合、更新前にDBパス・待受URL・Provider設定をJSONへ明示的に移してください。開発MSIを承認なく稼働環境へ適用しません。アンインストールでは配布バイナリとサービス登録を削除し、利用者設定・DB・ログは保持します。
+
+## Windows起動時の自動起動
+
+サービス名は`Moyai`、自動起動、実行アカウントはLocalServiceです。設定はLocalServiceが読み取り、管理者が更新します。data・logsにはLocalServiceの変更権限を設定します。LocalServiceは利用者のファイル権限やネットワークドライブ割り当てを引き継ぎません。
+
+管理CLIは`service register`（登録）、`service start`（起動）、`service status`（状態）、`service pause`（一時停止）、`service resume`（再開）、`service stop`（停止）、`service unregister`（登録解除）です。変更にはWindows権限が必要です。解除には停止状態が必要で、DB・設定は削除しません。一時停止中は新しいHTTP要求を503で拒否し、受付済み処理は完了できます。再開は受付を戻し、停止はホストを終了します。業務CLIは接続できない場合エラーとなり、SQLiteへ直接アクセスしません。
+
+サービスログはWindows Applicationイベントログへ出力します。非対話のエラーではダイアログを表示しません。隔離試験では別DB・別ポートのJSONを用意し、`Moyai.Mcp.exe --config <path>`で起動できます。リリース前には管理者権限のある隔離WindowsでInstall・Upgrade・一時停止・再開・Uninstall・再起動・DB保持を検証します。

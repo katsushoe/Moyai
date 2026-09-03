@@ -2,72 +2,41 @@
 
 [English](CONFIG.md) | [日本語](CONFIG.ja.md)
 
-This document is the source of truth for environment configuration used by the CLI, MCP server, and Providers.
+## Configuration file
 
-## Configuration Directory
+The service and CLI read `config/moyai.json`, relative to the installation root (the parent of `bin`). `--config <path>` selects another file. Configuration never comes from environment variables. The CLI uses the endpoint only and never opens the database. Changes take effect after restarting the service.
 
-Version 1.0.7 reads environment variables only. The MSI creates `C:\Moyai\config` but does not generate or load a configuration file.
-
-## File Generation
-
-Users set process environment variables. Moyai, the build, and the MSI do not generate settings or secrets.
-
-## Main Settings
-
-## Environment variables
-
-- `MOYAI_DB_PATH`: SQLite database file path. Required by the CLI and MCP server.
-- `MOYAI_MCP_URL`: Streamable HTTP listen URL. Required by the MCP server and restricted to a loopback host, for example `http://127.0.0.1:43120`.
-- `GITHUBIE_MCP_URL`: Githubie Streamable HTTP MCP endpoint on a loopback host.
-- `BUCKETTIE_MCP_URL`: Buckettie Streamable HTTP MCP endpoint on a loopback host.
-- `MOYAI_BUILD_PROVIDER_NAME`, `MOYAI_BUILD_PROVIDER_URL`, `MOYAI_BUILD_PROVIDER_PREFIX`: optional build Provider identity, loopback MCP endpoint, and Tool prefix.
-- `MOYAI_DEPLOY_PROVIDER_NAME`, `MOYAI_DEPLOY_PROVIDER_URL`, `MOYAI_DEPLOY_PROVIDER_PREFIX`: optional deploy Provider identity, loopback MCP endpoint, and Tool prefix.
-
-For Server Deploy through KelpieSSH, set the deploy Provider name to `server`; Moyai stores only the Kelpie target name/ID in the Deployment Target and never stores SSH credentials. Local targets use the Project `install_path` by default.
-
-The built-in Build Providers are `csharp`, `node`, and `php`. `build_config_json` may contain `configuration` and an `artifacts` array. Each artifact requires `name`, `artifact_type`, and a project-relative `file_path`. Moyai hashes files with SHA-256 and directories with a deterministic relative-path/file-hash manifest. An external Provider with the same configured name overrides the built-in Provider.
-
-All values are strings with no default. `MOYAI_DB_PATH` is required for CLI data operations and MCP; `MOYAI_MCP_URL` is required for MCP and must be an absolute loopback URL. Provider triplets are optional but register only when all three values are non-empty. URL values must identify the applicable Streamable HTTP endpoint.
-
-## Profile Settings
-
-`GITHUBIE_MCP_URL` and `BUCKETTIE_MCP_URL` register repository and lifecycle Providers. Build and deploy triplets register additional lifecycle Providers. Omitting a Provider setting leaves that capability unregistered.
-
-## Samples
-
-```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
-$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
-$env:GITHUBIE_MCP_URL = 'http://127.0.0.1:43121/mcp'
+```json
+{
+  "databasePath": "../data/moyai.db",
+  "serverUrl": "http://127.0.0.1:43120",
+  "requestTimeoutSeconds": 60,
+  "providers": []
+}
 ```
 
-Do not include real token values in configuration examples, source, logs, or documentation.
+`databasePath` is resolved relative to the JSON file. `serverUrl` must be an HTTP(S) loopback URL without credentials. The CLI appends `/mcp`. `requestTimeoutSeconds` is the CLI operation timeout, 1..3600 seconds. Missing files, unknown properties, invalid JSON, and unsafe URLs fail explicitly. No environment fallback exists.
 
-The MCP endpoint is `${MOYAI_MCP_URL}/mcp`. Legacy SSE transport and browser CORS are not enabled.
+## Providers
 
-## CLI
+Each entry has `name`, `endpoint`, `toolPrefix`, and optional `repository` (default false). Endpoints are loopback HTTP(S). Names are unique. For the existing Githubie routing identifier use `githubbie`, prefix `github`, repository true; Buckettie uses `buckettie`, prefix `bitbucket`, repository true. Built-in build providers are `csharp`, `node`, and `php`; a configured provider with the same name overrides it. KelpieSSH deployment uses name `server` and the configured tool prefix. Tokens remain in the service database, never JSON.
 
-The CLI returns JSON to standard output and structured errors to standard error. Commands are `version`, `project-list`, `project-get`, `project-create`, `project-update`, `project-set-archived`, `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, and `work-item-transition`.
-
-Options use `--kebab-case`. Mutating commands require `--actor-type` and `--actor-name`; update, archive, delete, and transition commands also require `--expected-revision`.
-
-Repository commands are `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, and `repository-pull`. Authentication commands are `token-issue`, `token-rotate`, `token-revoke`, and `token-cleanup`. Lifecycle commands are `build`, `release-create`, `release-publish`, `release-withdraw`, and `deploy`.
-
-## MCP
-
-The MCP server uses stateless Streamable HTTP. It exposes CLI-equivalent Project and WorkItem operations plus the internal `auth_introspect` tool and the read-only `get_version` tool.
-
-## Installation
-
-The Windows MSI installer must install Moyai under `C:\Moyai`.
-
-The x64 MSI is built with WiX Toolset. Run:
-
-```powershell
-.\scripts\Build-Installer.ps1
+```json
+{"name":"githubbie","endpoint":"http://127.0.0.1:43121/mcp","toolPrefix":"github","repository":true}
 ```
 
-The installer places self-contained CLI and MCP binaries in `C:\Moyai\bin` and creates
-`C:\Moyai\config`, `C:\Moyai\logs`, and `C:\Moyai\data`. The MSI does not ship settings,
-secrets, user data, or logs. These directories and their user-created contents are preserved
-when they are not empty during upgrade or uninstall.
+Project `build_config_json` accepts `configuration` and an `artifacts` array with `name`, `artifact_type`, and project-relative `file_path`. Deployment targets retain their existing Project configuration and secret handling.
+
+## Installation and migration
+
+The MSI runs `config-init` before starting the automatic `Moyai` service under LocalService. Initial configuration is generated only when absent; a previously saved registry `McpUrl` is imported once. Existing JSON is validated and retained. Edit JSON as administrator, then use `service stop` and `service start`. The legacy MSI URL property/registry does not override an existing JSON file.
+
+Before upgrading an environment-configured installation, explicitly migrate its DB path, endpoint and Provider settings to JSON. Environment variables are no longer read. Do not install a development MSI over the running instance without approval. Configuration, data and logs are retained by uninstall; packaged binaries and the service registration are removed.
+
+## Automatic Windows startup
+
+The MSI registers Auto/LocalService. Configuration is readable by LocalService and writable by administrators; data/log directories permit LocalService modification. LocalService does not inherit a user's file permissions or mapped drives. Grant required project access explicitly or use external Providers.
+
+CLI management commands: `service register`, `service start`, `service status`, `service pause`, `service resume`, `service stop`, `service unregister`. SCM changes require Windows permissions; status is read-only. Unregister requires Stopped and retains data/configuration. Pause rejects newly arriving HTTP requests with 503; requests already admitted may finish. Resume restores admission. Stop terminates the host. Business commands fail when the endpoint is unavailable and never fall back to SQLite.
+
+Logs use console output and the Windows Application event log in service mode. Headless errors never display dialogs. For isolated testing only, launch `Moyai.Mcp.exe --config <isolated-json>` with a separate DB and port. Validate install/upgrade/pause/resume/uninstall/reboot and data retention on an isolated Windows administrator environment before release.

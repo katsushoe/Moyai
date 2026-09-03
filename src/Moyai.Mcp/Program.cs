@@ -1,5 +1,7 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
 using Moyai.Application.Builds;
@@ -10,8 +12,10 @@ using Moyai.Application.Projects;
 using Moyai.Application.Providers;
 using Moyai.Application.Releases;
 using Moyai.Application.WorkItems;
+using Moyai.Configuration;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
+using Moyai.Mcp;
 using Moyai.Mcp.Tools;
 using Moyai.Presentation.Windows;
 
@@ -22,16 +26,30 @@ static async Task<int> RunAsync(string[] arguments)
 {
     try
     {
-        string databasePath = Environment.GetEnvironmentVariable("MOYAI_DB_PATH") ?? throw new InvalidOperationException("MOYAI_DB_PATH is required.");
-        string serverUrl = Environment.GetEnvironmentVariable("MOYAI_MCP_URL") ?? throw new InvalidOperationException("MOYAI_MCP_URL is required.");
-        var uri = new Uri(serverUrl, UriKind.Absolute);
-        if (!uri.IsLoopback) throw new InvalidOperationException("MOYAI_MCP_URL must use a loopback host.");
+        string configPath = arguments.Length switch
+        {
+            0 => MoyaiSettings.DefaultPath,
+            2 when arguments[0] == "--config" => Path.GetFullPath(arguments[1]),
+            _ => throw new ArgumentException("Usage: Moyai.Mcp.exe [--config <moyai.json>]."),
+        };
+        MoyaiSettings settings = MoyaiSettings.Load(configPath);
 
-        var builder = WebApplication.CreateBuilder(arguments);
-        builder.WebHost.UseUrls(serverUrl);
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = [],
+            EnvironmentName = Environments.Production,
+            ContentRootPath = AppContext.BaseDirectory,
+        });
+        builder.Configuration.Sources.Clear();
+        builder.Configuration.AddInMemoryCollection();
+        builder.WebHost.UseUrls(settings.ServerUrl);
         builder.Logging.ClearProviders();
         builder.Logging.AddSimpleConsole();
-        var options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString());
+        builder.Services.AddWindowsService(options => options.ServiceName = "Moyai");
+        builder.Services.AddSingleton<ServiceAdmission>();
+        if (WindowsServiceHelpers.IsWindowsService()) builder.Services.AddSingleton<IHostLifetime, PausableServiceLifetime>();
+        builder.Services.Configure<Microsoft.Extensions.Logging.EventLog.EventLogSettings>(settings => settings.SourceName = "Application");
+        var options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = settings.DatabasePath }.ToString());
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton<SqliteProjectRepository>();
         builder.Services.AddSingleton<SqliteWorkItemRepository>();
@@ -53,12 +71,14 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<AuthIntrospectionService>(serviceProvider => new AuthIntrospectionService(serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<ServiceTokenLifecycleService>(serviceProvider => new ServiceTokenLifecycleService(serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddHttpClient();
-        string? externalBuildProvider = Environment.GetEnvironmentVariable("MOYAI_BUILD_PROVIDER_NAME");
-        foreach (string name in new[] { "csharp", "node", "php" }) if (!string.Equals(name, externalBuildProvider, StringComparison.Ordinal)) builder.Services.AddSingleton<ILifecycleProvider>(new StandardBuildProvider(name));
-        RegisterProvider(builder.Services, "githubbie", "GITHUBIE_MCP_URL", "github");
-        RegisterProvider(builder.Services, "buckettie", "BUCKETTIE_MCP_URL", "bitbucket");
-        RegisterOptionalLifecycleProvider(builder.Services, "MOYAI_BUILD_PROVIDER_NAME", "MOYAI_BUILD_PROVIDER_URL", "MOYAI_BUILD_PROVIDER_PREFIX");
-        RegisterOptionalLifecycleProvider(builder.Services, "MOYAI_DEPLOY_PROVIDER_NAME", "MOYAI_DEPLOY_PROVIDER_URL", "MOYAI_DEPLOY_PROVIDER_PREFIX");
+        foreach (string name in new[] { "csharp", "node", "php" })
+            if (!settings.Providers.Any(provider => provider.Name == name)) builder.Services.AddSingleton<ILifecycleProvider>(new StandardBuildProvider(name));
+        foreach (ProviderSettings provider in settings.Providers)
+        {
+            var providerOptions = new McpRepositoryProviderOptions(provider.Name, new Uri(provider.Endpoint), provider.ToolPrefix);
+            if (provider.Repository) builder.Services.AddSingleton<IRepositoryProvider>(services => new McpRepositoryProvider(providerOptions, services.GetRequiredService<IHttpClientFactory>()));
+            builder.Services.AddSingleton<ILifecycleProvider>(services => new McpLifecycleProvider(providerOptions, services.GetRequiredService<IHttpClientFactory>()));
+        }
         builder.Services.AddSingleton<ProviderRoutingService>(serviceProvider => new ProviderRoutingService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<IRepositoryProvider>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<LifecycleService>(serviceProvider => new LifecycleService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<ILifecycleProvider>(), serviceProvider.GetRequiredService<SqliteLifecycleEventWriter>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<BuildService>(serviceProvider => new BuildService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<ProviderRoutingService>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
@@ -69,6 +89,17 @@ static async Task<int> RunAsync(string[] arguments)
             .WithTools<MoyaiTools>();
 
         var app = builder.Build();
+        ServiceAdmission admission = app.Services.GetRequiredService<ServiceAdmission>();
+        app.Use(async (context, next) =>
+        {
+            if (admission.IsPaused)
+            {
+                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                await context.Response.WriteAsJsonAsync(new { ok = false, error = "service_paused" });
+                return;
+            }
+            await next(context);
+        });
         await new SqliteDatabaseInitializer(options).InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<ServiceTokenLifecycleService>().DeleteExpiredAsync("system", "startup", app.Lifetime.ApplicationStopping);
         app.MapMcp("/mcp");
@@ -89,27 +120,19 @@ static async Task<int> RunAsync(string[] arguments)
     }
 }
 
-static void WriteError(Exception exception, bool fatal) => Console.Error.WriteLine(JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant(), message = exception.Message } }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+static void WriteError(Exception exception, bool fatal)
+{
+    string message = JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant(), message = exception.Message } }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    Console.Error.WriteLine(message);
+    if (WindowsServiceHelpers.IsWindowsService())
+    {
+        try { EventLog.WriteEntry("Application", "Moyai MCP: " + message, EventLogEntryType.Error); }
+        catch (Exception loggingException) { Console.Error.WriteLine(loggingException); }
+    }
+}
 
 static void ReportFatalError(Exception exception)
 {
     WriteError(exception, true);
-    ErrorDialog.Show("Moyai MCP", exception);
-}
-
-static void RegisterProvider(IServiceCollection services, string name, string environmentVariable, string toolPrefix)
-{
-    string? endpoint = Environment.GetEnvironmentVariable(environmentVariable);
-    if (string.IsNullOrWhiteSpace(endpoint)) return;
-    services.AddSingleton<IRepositoryProvider>(serviceProvider => new McpRepositoryProvider(new McpRepositoryProviderOptions(name, new Uri(endpoint, UriKind.Absolute), toolPrefix), serviceProvider.GetRequiredService<IHttpClientFactory>()));
-    services.AddSingleton<ILifecycleProvider>(serviceProvider => new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri(endpoint, UriKind.Absolute), toolPrefix), serviceProvider.GetRequiredService<IHttpClientFactory>()));
-}
-
-static void RegisterOptionalLifecycleProvider(IServiceCollection services, string nameVariable, string urlVariable, string prefixVariable)
-{
-    string? name = Environment.GetEnvironmentVariable(nameVariable);
-    string? endpoint = Environment.GetEnvironmentVariable(urlVariable);
-    string? prefix = Environment.GetEnvironmentVariable(prefixVariable);
-    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(prefix)) return;
-    services.AddSingleton<ILifecycleProvider>(serviceProvider => new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri(endpoint, UriKind.Absolute), prefix), serviceProvider.GetRequiredService<IHttpClientFactory>()));
+    // Console and service hosts report structured errors without interactive dialogs.
 }

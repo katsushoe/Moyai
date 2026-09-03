@@ -1,8 +1,9 @@
 # PACKAGES.md Version
-2026.08.28
+2026.09.03
 
 # 変更履歴
 - 2026.08.28
+- 2026.09.03 Service-connected CLI and Windows SCM package.
 
 # Moyai Package Inventory
 
@@ -10,7 +11,7 @@ This document is the source of truth for package references and update verificat
 
 # Target Projects
 
-Production targets are `net8.0` and `net8.0-windows`; tests target `net8.0`.
+Production and test targets are `net8.0` and `net8.0-windows`.
 
 # Package Sources
 
@@ -22,6 +23,8 @@ Packages restore from the configured public NuGet source. No private feed or cre
 | :--- | :--- | :--- |
 | `Microsoft.Data.Sqlite` | `8.0.12` | SQLite persistence |
 | `Microsoft.Extensions.Http` | `8.0.1` | Provider HTTP clients |
+| `Microsoft.Extensions.Hosting.WindowsServices` | `8.0.1` | Windows service lifetime and event logging |
+| `System.ServiceProcess.ServiceController` | `8.0.1` | CLI service lifecycle management |
 | `ModelContextProtocol` | `2.2.0` | MCP client transport |
 | `ModelContextProtocol.AspNetCore` | `2.2.0` | MCP HTTP server |
 | `Microsoft.NET.Test.Sdk` | `17.8.0` | Test host |

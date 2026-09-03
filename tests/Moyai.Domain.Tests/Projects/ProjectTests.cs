@@ -16,9 +16,10 @@ public sealed class ProjectTests
     }
 
     [Fact]
-    public void CreateLocalProjectRequiresInstallPath()
+    public void LocalProjectDefersInstallPathRequirementUntilExecution()
     {
-        Assert.Throws<ArgumentException>(() => Project.Create("Moyai", "source", null, "https://github.com/example/repo", null, "csharp", "local", TimeProvider.System));
+        Project project = Project.Create("Moyai", "source", null, "https://github.com/example/repo", null, "csharp", "local", TimeProvider.System);
+        Assert.Throws<ProjectConfigurationException>(() => project.RequireConfiguration("installPath"));
     }
 
     [Fact]

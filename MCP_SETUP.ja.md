@@ -13,18 +13,16 @@
 
 ## Prerequisites
 
-x64 MSIを`C:\Moyai`へインストールします。管理者権限が必要なのはMSIインストール時だけです。
+x64 MSIを`C:\Moyai`へインストールします。MSIインストールとサービス管理には適切なWindows権限が必要です。
 
-## Authentication and Environment
+## Authentication and Configuration
 
-`MOYAI_DB_PATH`と`MOYAI_MCP_URL`を設定します。Moyaiはループバックだけで待ち受けます。Provider tokenはクライアントまたはProviderの秘密情報機構から渡し、本書へ保存しません。
+設定は`config/moyai.json`を使用します。[設定仕様](CONFIG.ja.md)を参照してください。CLIの業務コマンドは稼働サービスへ接続します。
 
 ## Start the Server
 
 ```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
-$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
-& 'C:\Moyai\bin\Moyai.Mcp.exe'
+& 'C:\Moyai\bin\moyaictl.exe' service start
 ```
 
 設定URLで待受開始したログが合格条件です。
@@ -73,7 +71,7 @@ Server名は`moyai`、transportはStreamable HTTP、`get_version`は認証不要
 
 ## Troubleshooting
 
-- `MOYAI_DB_PATH`不足: 書き込み可能なDBパスを設定します。
-- `MOYAI_MCP_URL`不足または非ループバック: `127.0.0.1`か`localhost`を使います。
+設定は`config/moyai.json`を使用します。[設定仕様](CONFIG.ja.md)を参照してください。CLIの業務コマンドは稼働サービスへ接続します。
+設定は`config/moyai.json`を使用します。[設定仕様](CONFIG.ja.md)を参照してください。CLIの業務コマンドは稼働サービスへ接続します。
 - ポート競合: serverとclientの両方を別の未使用ポートへ変更します。
 - Toolがない: client設定更新後に再起動または再読込します。

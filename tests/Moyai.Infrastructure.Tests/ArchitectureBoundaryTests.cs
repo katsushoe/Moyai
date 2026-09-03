@@ -21,16 +21,18 @@ public sealed class ArchitectureBoundaryTests
     ];
 
     [Fact]
-    public void CliAndMcpComposeTheSameApplicationServices()
+    public void OnlyMcpComposesApplicationServicesAndCliUsesTransport()
     {
-        string cli = ReadSource("src", "Moyai.Cli", "Program.cs");
+        string cli = ReadSource("src", "Moyai.Cli", "ClientProgram.cs");
         string mcp = ReadSource("src", "Moyai.Mcp", "Program.cs");
 
         foreach (string service in SharedApplicationServices)
         {
-            Assert.Contains(service, cli, StringComparison.Ordinal);
+            Assert.DoesNotContain("new " + service, cli, StringComparison.Ordinal);
             Assert.Contains(service, mcp, StringComparison.Ordinal);
         }
+        Assert.Contains("CallToolAsync", cli, StringComparison.Ordinal);
+        Assert.DoesNotContain("Moyai.Infrastructure", ReadSource("src", "Moyai.Cli", "Moyai.Cli.csproj"), StringComparison.Ordinal);
     }
 
     [Fact]

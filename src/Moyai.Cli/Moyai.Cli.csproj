@@ -2,12 +2,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Moyai.Application\Moyai.Application.csproj" />
-    <ProjectReference Include="..\Moyai.Infrastructure\Moyai.Infrastructure.csproj" />
+    <ProjectReference Include="..\Moyai.Configuration\Moyai.Configuration.csproj" />
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
   </ItemGroup>
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>moyaictl</AssemblyName>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

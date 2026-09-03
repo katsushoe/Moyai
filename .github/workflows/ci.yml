@@ -49,12 +49,12 @@ jobs:
 
       - name: Build MSI installer
         shell: pwsh
-        run: .\scripts\Build-Installer.ps1 -Version 1.0.7
+        run: .\scripts\Build-Installer.ps1 -Version 1.2.0
 
       - name: Upload MSI installer
         uses: actions/upload-artifact@v4
         with:
-          name: Moyai-1.0.7-win-x64
-          path: artifacts/installer/Moyai-1.0.7-x64.msi
+          name: Moyai-1.2.0-win-x64
+          path: artifacts/installer/Moyai-1.2.0-x64.msi
           if-no-files-found: error
           retention-days: 14

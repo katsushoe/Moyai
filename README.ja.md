@@ -1,5 +1,7 @@
 # Moyai
 
+`moyaictl.exe project-create --name Sample`で名前だけのProjectを作成できます。未登録時だけ自動作成する場合は`moyaictl.exe project-ensure --name Sample`を使います。登録済みの設定は保持します。Repository・ビルド・デプロイ設定は`project-configure --name Sample --expected-revision 1`で後から関連付けます。Project作成や作業項目の管理にパスは不要です。[コマンド仕様](COMMANDS.ja.md)と[ADR 0004](docs/adr/0004-name-only-projects.md)を参照してください。
+
 [English](README.md) | [日本語](README.ja.md)
 
 Moyaiは、プロジェクトと作業項目をSQLiteで管理し、リポジトリ、ビルド、リリース、デプロイ操作を設定済みProviderへ委譲するWindows向けツールです。JSON CLIとstateless Streamable HTTP MCPサーバーを提供します。
@@ -9,16 +11,14 @@ Moyaiは、プロジェクトと作業項目をSQLiteで管理し、リポジト
 MSIをインストールし、次のコマンドを実行します。
 
 ```powershell
-$env:MOYAI_DB_PATH = 'C:\Moyai\data\moyai.db'
-& 'C:\Moyai\bin\Moyai.Cli.exe' version
-& 'C:\Moyai\bin\Moyai.Cli.exe' project-list
+& 'C:\Moyai\bin\moyaictl.exe' version
+& 'C:\Moyai\bin\moyaictl.exe' project-list
 ```
 
-MCPサーバーを起動する場合は次を実行します。
+開発版MSIはWindowsサービスを自動登録・起動します。[Windows起動時の自動起動](CONFIG.ja.md#Windows起動時の自動起動)を参照してください。公開済みv1.0.7 MSIにはこの変更は含まれません。停止中のサービスを起動する場合は次を実行します。
 
 ```powershell
-$env:MOYAI_MCP_URL = 'http://127.0.0.1:43120'
-& 'C:\Moyai\bin\Moyai.Mcp.exe'
+& 'C:\Moyai\bin\moyaictl.exe' service start
 ```
 
 MCPクライアントには`http://127.0.0.1:43120/mcp`をStreamable HTTPサーバーとして登録します。完全なクライアント設定は[MCPセットアップ](MCP_SETUP.ja.md)を参照してください。
@@ -46,7 +46,7 @@ dotnet test .\Moyai.slnx --configuration Release --no-build
 
 ## Configuration
 
-Moyaiは環境変数から設定を読み込みます。データ操作には`MOYAI_DB_PATH`、MCPサーバーには`MOYAI_DB_PATH`と`MOYAI_MCP_URL`が必要です。型、既定値、制約、例は[設定](CONFIG.ja.md)を参照してください。
+設定は`config/moyai.json`を使用します。[設定仕様](CONFIG.ja.md)を参照してください。CLIの業務コマンドは稼働サービスへ接続します。
 
 ## Usage
 
@@ -63,6 +63,7 @@ CLIは成功時のJSONを標準出力、構造化エラーを標準エラーへ�
 - [v1完成ロードマップ](ROADMAP.ja.md)
 - [v1受入基準追跡表](V1_TRACEABILITY.ja.md)
 - [アーキテクチャ判断](docs/adr/0001-initial-architecture.md)
+- [インストーラ管理のWindowsサービス判断（英語）](docs/adr/0002-installer-managed-windows-service.md)
 
 ## Security
 

@@ -2,11 +2,11 @@
 
 public sealed record CreateProjectCommand(
     string Name,
-    string SourcePath,
-    string? InstallPath,
-    string RepositoryUrl,
-    string? RepositoryProvider,
-    string BuildProvider,
-    string DeployMode,
-    string ActorType,
-    string ActorName);
+    string SourcePath = "",
+    string? InstallPath = null,
+    string RepositoryUrl = "",
+    string? RepositoryProvider = null,
+    string BuildProvider = "",
+    string DeployMode = "",
+    string ActorType = "client",
+    string ActorName = "unspecified");

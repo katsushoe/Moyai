@@ -35,6 +35,13 @@ public sealed class LifecycleService
         ArgumentException.ThrowIfNullOrWhiteSpace(actorType);
         ArgumentException.ThrowIfNullOrWhiteSpace(actorName);
         Project project = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
+        if (action is LifecycleAction.Build or LifecycleAction.BuildClean) project.RequireConfiguration("sourcePath", "buildProvider");
+        else if (action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw) project.RequireConfiguration("repositoryUrl", "repositoryProvider");
+        else if (action is LifecycleAction.Deploy or LifecycleAction.DeployRollback)
+        {
+            project.RequireConfiguration("sourcePath", "deployMode");
+            if (project.DeployMode == "local") project.RequireConfiguration("installPath");
+        }
         ValidateInput(action, version, artifactPath);
         string providerName = ResolveProvider(project, action);
         if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)) throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
