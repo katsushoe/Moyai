@@ -104,6 +104,32 @@ public sealed class ProviderRoutingServiceTests
         Assert.Equal(source, provider.LastRequest?.BranchSource);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task ExecuteAsyncRejectsTagCreateWithoutSource(string? source)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => service.ExecuteAsync("Moyai", RepositoryOperation.TagCreate, tag: "v1.0.0", source: source));
+
+        Assert.Null(provider.LastRequest);
+    }
+
+    [Theory]
+    [InlineData("develop")]
+    [InlineData("0123456789abcdef0123456789abcdef01234567")]
+    public async Task ExecuteAsyncRoutesTagCreateSource(string source)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+
+        await service.ExecuteAsync("Moyai", RepositoryOperation.TagCreate, tag: "v1.0.0", source: source);
+
+        Assert.Equal(source, provider.LastRequest?.BranchSource);
+    }
+
     private sealed class RoutingFixture : IAsyncDisposable
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-routing-{Guid.NewGuid():N}.db");

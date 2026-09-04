@@ -24,8 +24,8 @@ public sealed class ReleaseOrchestrationService(ReleaseService releases, Release
         {
             IReadOnlyList<ReleaseArtifact> artifacts = await content.ListArtifactsAsync(project, version, cancellationToken).ConfigureAwait(false);
             string? artifactPath = artifacts.Select(static artifact => artifact.FilePath).FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path));
-            LifecycleResult createResult = await lifecycle.ExecuteAsync(project, LifecycleAction.ReleaseCreate, actorType, actorName, version, notes: current.ReleaseNotes, cancellationToken: cancellationToken).ConfigureAwait(false);
-            if (!createResult.Ok)
+            LifecycleResult createResult = await lifecycle.ExecuteAsync(project, LifecycleAction.ReleaseCreate, actorType, actorName, version, artifactPath, current.ReleaseNotes, cancellationToken).ConfigureAwait(false);
+            if (!createResult.Ok && !string.Equals(createResult.ErrorCode, "provider_conflict", StringComparison.Ordinal))
             {
                 Release failed = await releases.TransitionAsync(new TransitionReleaseCommand(project, version, ReleaseStatus.Failed, publishing.Revision, actorType, actorName), cancellationToken).ConfigureAwait(false);
                 return new ReleasePublishResult(failed, createResult, false);

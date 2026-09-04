@@ -9,21 +9,25 @@ namespace Moyai.Infrastructure.Tests.Providers;
 public sealed class LifecycleProviderTransportTests
 {
     [Theory]
-    [InlineData("githubbie", "github", "artifact_path", true)]
-    [InlineData("buckettie", "buckettie", "artifactPath", false)]
-    public async Task ReleasePublishUsesProviderSpecificContract(string name, string prefix, string artifactProperty, bool includesProject)
+    [InlineData("githubbie", "github", "artifact_path", true, LifecycleAction.ReleaseCreate, "release_create")]
+    [InlineData("githubbie", "github", "artifact_path", true, LifecycleAction.ReleasePublish, "release_publish")]
+    [InlineData("buckettie", "buckettie", "artifactPath", false, LifecycleAction.ReleaseCreate, "release_create")]
+    [InlineData("buckettie", "buckettie", "artifactPath", false, LifecycleAction.ReleasePublish, "release_publish")]
+    public async Task ReleaseOperationsUseProviderSpecificContract(string name, string prefix, string artifactProperty, bool includesProject, LifecycleAction action, string operation)
     {
         using var handler = new ProviderHandler();
         using var client = new HttpClient(handler);
         var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri("http://localhost/mcp"), prefix), new ClientFactory(client));
-        var request = new LifecycleRequest("Moyai", "source", null, LifecycleAction.ReleasePublish, "1.2.2", "artifact.msi", "notes", null);
+        var request = new LifecycleRequest("Moyai", "source", null, action, "1.2.2", "artifact.msi", "notes", null);
 
         LifecycleResult result = await provider.ExecuteAsync(request);
 
         Assert.True(result.Ok);
-        Assert.Equal($"{prefix}_release_publish", handler.CalledTool);
+        Assert.Equal($"{prefix}_{operation}", handler.CalledTool);
         JsonElement arguments = handler.Arguments!.Value;
         Assert.Equal("Moyai", arguments.GetProperty("repository").GetString());
+        Assert.Equal("1.2.2", arguments.GetProperty("version").GetString());
+        Assert.Equal("notes", arguments.GetProperty("notes").GetString());
         Assert.Equal("artifact.msi", arguments.GetProperty(artifactProperty).GetString());
         Assert.Equal(includesProject, arguments.TryGetProperty("project", out _));
         Assert.False(arguments.TryGetProperty(artifactProperty == "artifact_path" ? "artifactPath" : "artifact_path", out _));

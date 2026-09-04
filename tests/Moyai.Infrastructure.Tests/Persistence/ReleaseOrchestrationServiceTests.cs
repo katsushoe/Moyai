@@ -33,9 +33,20 @@ public sealed class ReleaseOrchestrationServiceTests
 
         await service.PublishAsync("Moyai", ready.Version, ready.Revision, "agent", "test");
 
-        Assert.Equal("artifact.msi", fixture.Provider.LastRequest?.ArtifactPath);
-        Assert.Equal("release notes", fixture.Provider.LastRequest?.Notes);
-        Assert.Equal(LifecycleAction.ReleasePublish, fixture.Provider.LastRequest?.Action);
+        Assert.Collection(
+            fixture.Provider.Requests,
+            request =>
+            {
+                Assert.Equal(LifecycleAction.ReleaseCreate, request.Action);
+                Assert.Equal("artifact.msi", request.ArtifactPath);
+                Assert.Equal("release notes", request.Notes);
+            },
+            request =>
+            {
+                Assert.Equal(LifecycleAction.ReleasePublish, request.Action);
+                Assert.Equal("artifact.msi", request.ArtifactPath);
+                Assert.Equal("release notes", request.Notes);
+            });
     }
 
     [Fact]
@@ -52,6 +63,22 @@ public sealed class ReleaseOrchestrationServiceTests
         Assert.Equal("provider_failure", failed.ProviderResult?.ErrorCode);
         Assert.Equal(ReleaseStatus.Released, retried.Release.Status);
         Assert.Equal(4, fixture.Provider.CallCount);
+    }
+
+    [Fact]
+    public async Task RetryContinuesWhenProviderReleaseAlreadyExists()
+    {
+        await using var fixture = new Fixture(false);
+        (ReleaseOrchestrationService service, Release ready) = await fixture.CreateReadyAsync(withArtifact: true);
+        ReleasePublishResult failed = await service.PublishAsync("Moyai", ready.Version, ready.Revision, "agent", "test");
+        fixture.Provider.Succeeds = true;
+        fixture.Provider.CreateConflicts = true;
+
+        ReleasePublishResult retried = await service.RetryAsync("Moyai", ready.Version, failed.Release.Revision, "agent", "test");
+
+        Assert.Equal(ReleaseStatus.Released, retried.Release.Status);
+        Assert.Equal(LifecycleAction.ReleasePublish, fixture.Provider.LastRequest?.Action);
+        Assert.Equal("artifact.msi", fixture.Provider.LastRequest?.ArtifactPath);
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -93,13 +120,17 @@ public sealed class ReleaseOrchestrationServiceTests
     {
         public string Name => "githubbie";
         public bool Succeeds { get; set; } = succeeds;
+        public bool CreateConflicts { get; set; }
         public int CallCount { get; private set; }
         public LifecycleRequest? LastRequest { get; private set; }
+        public List<LifecycleRequest> Requests { get; } = [];
 
         public Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default)
         {
             CallCount++;
             LastRequest = request;
+            Requests.Add(request);
+            if (request.Action == LifecycleAction.ReleaseCreate && CreateConflicts) return Task.FromResult(new LifecycleResult(false, "release_create", null, "provider_conflict", "already exists"));
             if (request.Action == LifecycleAction.ReleaseCreate) return Task.FromResult(new LifecycleResult(true, "release_create", "draft", null, null));
             return Task.FromResult(Succeeds
                 ? new LifecycleResult(true, "release_publish", "published", null, null)
