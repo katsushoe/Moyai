@@ -4,6 +4,14 @@
 
 ## 未公開
 
+## 1.2.2 - 2026-09-04
+
+- `branch_create`でliteral branch名または完全なcommit SHAの作成元を明示必須とし、不正なrevision式をProvider実行前に拒否して、Repository Provider契約へ無変更で転送するようにしました。
+- Release公開時にProvider側のdraftを先に作成し、登録済み成果物とリリースノートをGithubieまたはBuckettieの正確なProvider引数契約で渡すよう修正しました。
+- Lifecycle Providerの業務失敗をRelease成功扱いする問題を修正し、誤分類済みReleaseを訂正する遷移を追加しました。
+- `tag_create`で作成元のliteral branch名または完全なcommit SHAを必須とし、Githubieへ無変更で転送するようにしました。
+- Tag作成時にGithubieで必須となるnull許容の注釈メッセージ項目を送信するようにしました。
+
 ## 1.2.1 - 2026-09-04
 
 - Repository Providerの業務失敗を成功扱いする問題と、CLIが業務失敗でも終了コード0を返す問題を修正しました。構造化・テキスト応答の検証と回帰テストを追加しました。

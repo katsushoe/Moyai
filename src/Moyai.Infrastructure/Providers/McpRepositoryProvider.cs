@@ -33,7 +33,7 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
             string toolName = RepositoryProviderContract.ToolName(_options.ToolPrefix, request.Operation);
-            IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(request);
+            IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(_options.ToolPrefix, request);
             CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
             return RepositoryProviderResponse.Parse(request.Operation, result);
         }

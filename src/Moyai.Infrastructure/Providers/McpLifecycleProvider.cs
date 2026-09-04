@@ -33,13 +33,13 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
             string operation = OperationName(request.Action);
-            var arguments = new Dictionary<string, object?> { ["repository"] = request.Project, ["project"] = request.Project };
+            var arguments = new Dictionary<string, object?> { ["repository"] = request.Project };
+            if (IsGithubie) arguments["project"] = request.Project;
             Add(arguments, "version", request.Version);
-            Add(arguments, "artifactPath", request.ArtifactPath);
+            Add(arguments, IsGithubie ? "artifact_path" : "artifactPath", request.ArtifactPath);
             Add(arguments, "notes", request.Notes);
             CallToolResult result = await client.CallToolAsync($"{_options.ToolPrefix}_{operation}", arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-            string? output = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
-            return result.IsError is true ? new LifecycleResult(false, operation, null, "provider_operation_failed", output) : new LifecycleResult(true, operation, output, null, null);
+            return LifecycleProviderResponse.Parse(operation, result);
         }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
         {
@@ -51,6 +51,8 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     {
         if (value is not null) arguments[name] = value;
     }
+
+    private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
 
     private static string OperationName(LifecycleAction action) => action switch
     {

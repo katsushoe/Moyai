@@ -65,14 +65,69 @@ public sealed class ProviderRoutingServiceTests
         await using var fixture = new RoutingFixture();
         (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
 
-        await service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreate, branch: "feature/test");
+        await service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreate, branch: "feature/test", source: "main");
 
         RepositoryProviderRequest request = Assert.IsType<RepositoryProviderRequest>(provider.LastRequest);
         Assert.Equal("feature/test", request.Branch);
+        Assert.Equal("main", request.BranchSource);
         Assert.Equal("source", request.SourcePath);
         Assert.Equal("https://github.com/example/moyai", request.RepositoryUrl);
         Assert.Equal("origin", request.RemoteName);
         Assert.NotNull(request.ServiceToken);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("HEAD~1")]
+    [InlineData("main^2")]
+    [InlineData("refs/heads/main..develop")]
+    public async Task ExecuteAsyncRejectsInvalidBranchSource(string? source)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreate, branch: "feature/test", source: source));
+
+        Assert.Null(provider.LastRequest);
+    }
+
+    [Fact]
+    public async Task ExecuteAsyncRoutesFullCommitShaBranchSource()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+        const string source = "0123456789abcdef0123456789abcdef01234567";
+
+        await service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreate, branch: "feature/test", source: source);
+
+        Assert.Equal(source, provider.LastRequest?.BranchSource);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task ExecuteAsyncRejectsTagCreateWithoutSource(string? source)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => service.ExecuteAsync("Moyai", RepositoryOperation.TagCreate, tag: "v1.0.0", source: source));
+
+        Assert.Null(provider.LastRequest);
+    }
+
+    [Theory]
+    [InlineData("develop")]
+    [InlineData("0123456789abcdef0123456789abcdef01234567")]
+    public async Task ExecuteAsyncRoutesTagCreateSource(string source)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+
+        await service.ExecuteAsync("Moyai", RepositoryOperation.TagCreate, tag: "v1.0.0", source: source);
+
+        Assert.Equal(source, provider.LastRequest?.BranchSource);
     }
 
     private sealed class RoutingFixture : IAsyncDisposable

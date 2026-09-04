@@ -109,3 +109,7 @@ Each command below has the syntax, processing rule, and result contract. Returne
 Review Provider targets before commit, push, pull, build, release, or deploy. `release-publish` and `deploy` require explicit approval for the exact target. Never place returned token secrets in logs, source, or documentation.
 
 Moyai v1 models exactly one Repository as part of each Project. It has no independent `repository-register` or `repository-unregister` command; archive the Project to stop using the association.
+# Repository branches
+
+`branch_create` requires `project`, `branch`, and an explicit `source`. `source` must be a literal branch name or a full 40-character commit SHA. Moyai never substitutes `main`, `develop`, or the current `HEAD` when it is omitted.
+`tag_create` likewise requires `project`, `tag`, and an explicit literal branch or full commit SHA `source`; Moyai forwards it unchanged when the Provider supports explicit tag sources.

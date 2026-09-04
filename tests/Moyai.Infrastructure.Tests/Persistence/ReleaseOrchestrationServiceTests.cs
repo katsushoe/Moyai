@@ -22,7 +22,31 @@ public sealed class ReleaseOrchestrationServiceTests
         Assert.Equal(ReleaseStatus.Released, first.Release.Status);
         Assert.NotNull(first.Release.ReleasedAt);
         Assert.True(second.AlreadyCompleted);
-        Assert.Equal(1, fixture.Provider.CallCount);
+        Assert.Equal(2, fixture.Provider.CallCount);
+    }
+
+    [Fact]
+    public async Task PublishPassesReleaseNotesAndArtifactPathToProvider()
+    {
+        await using var fixture = new Fixture(true);
+        (ReleaseOrchestrationService service, Release ready) = await fixture.CreateReadyAsync(withArtifact: true);
+
+        await service.PublishAsync("Moyai", ready.Version, ready.Revision, "agent", "test");
+
+        Assert.Collection(
+            fixture.Provider.Requests,
+            request =>
+            {
+                Assert.Equal(LifecycleAction.ReleaseCreate, request.Action);
+                Assert.Equal("artifact.msi", request.ArtifactPath);
+                Assert.Equal("release notes", request.Notes);
+            },
+            request =>
+            {
+                Assert.Equal(LifecycleAction.ReleasePublish, request.Action);
+                Assert.Equal("artifact.msi", request.ArtifactPath);
+                Assert.Equal("release notes", request.Notes);
+            });
     }
 
     [Fact]
@@ -38,7 +62,23 @@ public sealed class ReleaseOrchestrationServiceTests
         Assert.Equal(ReleaseStatus.Failed, failed.Release.Status);
         Assert.Equal("provider_failure", failed.ProviderResult?.ErrorCode);
         Assert.Equal(ReleaseStatus.Released, retried.Release.Status);
-        Assert.Equal(2, fixture.Provider.CallCount);
+        Assert.Equal(4, fixture.Provider.CallCount);
+    }
+
+    [Fact]
+    public async Task RetryContinuesWhenProviderReleaseAlreadyExists()
+    {
+        await using var fixture = new Fixture(false);
+        (ReleaseOrchestrationService service, Release ready) = await fixture.CreateReadyAsync(withArtifact: true);
+        ReleasePublishResult failed = await service.PublishAsync("Moyai", ready.Version, ready.Revision, "agent", "test");
+        fixture.Provider.Succeeds = true;
+        fixture.Provider.CreateConflicts = true;
+
+        ReleasePublishResult retried = await service.RetryAsync("Moyai", ready.Version, failed.Release.Revision, "agent", "test");
+
+        Assert.Equal(ReleaseStatus.Released, retried.Release.Status);
+        Assert.Equal(LifecycleAction.ReleasePublish, fixture.Provider.LastRequest?.Action);
+        Assert.Equal("artifact.msi", fixture.Provider.LastRequest?.ArtifactPath);
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -49,7 +89,7 @@ public sealed class ReleaseOrchestrationServiceTests
         public Fixture(bool succeeds) => Provider = new RecordingProvider(succeeds);
         public RecordingProvider Provider { get; }
 
-        public async Task<(ReleaseOrchestrationService Service, Release Ready)> CreateReadyAsync()
+        public async Task<(ReleaseOrchestrationService Service, Release Ready)> CreateReadyAsync(bool withArtifact = false)
         {
             _options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString());
             await new SqliteDatabaseInitializer(_options).InitializeAsync();
@@ -59,12 +99,13 @@ public sealed class ReleaseOrchestrationServiceTests
             await tokens.AddAsync(ServiceToken.Issue("githubbie", ["release.write"], DateTimeOffset.UtcNow.AddHours(1), TimeProvider.System));
             var repository = new SqliteReleaseRepository(_options);
             var releaseService = new ReleaseService(projects, repository, TimeProvider.System);
-            Release release = await releaseService.CreateAsync(new CreateReleaseCommand("Moyai", "1.0.0", ReleaseChannel.Stable, null, "agent", "test"));
+            Release release = await releaseService.CreateAsync(new CreateReleaseCommand("Moyai", "1.0.0", ReleaseChannel.Stable, "release notes", "agent", "test"));
             release = await releaseService.TransitionAsync(new TransitionReleaseCommand("Moyai", release.Version, ReleaseStatus.Planned, release.Revision, "agent", "test"));
             release = await releaseService.TransitionAsync(new TransitionReleaseCommand("Moyai", release.Version, ReleaseStatus.Preparing, release.Revision, "agent", "test"));
             release = await releaseService.TransitionAsync(new TransitionReleaseCommand("Moyai", release.Version, ReleaseStatus.Ready, release.Revision, "agent", "test"));
             var lifecycle = new LifecycleService(projects, tokens, [Provider], new SqliteLifecycleEventWriter(_options, TimeProvider.System), TimeProvider.System);
             var content = new ReleaseContentService(projects, new SqliteWorkItemRepository(_options), repository, new SqliteReleaseContentRepository(_options), TimeProvider.System);
+            if (withArtifact) await content.AddArtifactAsync(new AddReleaseArtifactCommand("Moyai", release.Version, null, "installer", "installer", "windows", "x64", "artifact.msi", "artifact.msi", null, 1, new string('a', 64), null, null, "agent", "test"));
             return (new ReleaseOrchestrationService(releaseService, content, lifecycle), release);
         }
 
@@ -79,11 +120,18 @@ public sealed class ReleaseOrchestrationServiceTests
     {
         public string Name => "githubbie";
         public bool Succeeds { get; set; } = succeeds;
+        public bool CreateConflicts { get; set; }
         public int CallCount { get; private set; }
+        public LifecycleRequest? LastRequest { get; private set; }
+        public List<LifecycleRequest> Requests { get; } = [];
 
         public Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default)
         {
             CallCount++;
+            LastRequest = request;
+            Requests.Add(request);
+            if (request.Action == LifecycleAction.ReleaseCreate && CreateConflicts) return Task.FromResult(new LifecycleResult(false, "release_create", null, "provider_conflict", "already exists"));
+            if (request.Action == LifecycleAction.ReleaseCreate) return Task.FromResult(new LifecycleResult(true, "release_create", "draft", null, null));
             return Task.FromResult(Succeeds
                 ? new LifecycleResult(true, "release_publish", "published", null, null)
                 : new LifecycleResult(false, "release_publish", null, "provider_failure", "failed"));

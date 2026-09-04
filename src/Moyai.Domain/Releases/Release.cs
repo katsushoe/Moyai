@@ -11,6 +11,7 @@ public sealed class Release
         (ReleaseStatus.Ready, ReleaseStatus.Publishing),
         (ReleaseStatus.Publishing, ReleaseStatus.Released),
         (ReleaseStatus.Publishing, ReleaseStatus.Failed),
+        (ReleaseStatus.Released, ReleaseStatus.Failed),
         (ReleaseStatus.Failed, ReleaseStatus.Preparing),
         (ReleaseStatus.Failed, ReleaseStatus.Ready),
         (ReleaseStatus.Released, ReleaseStatus.Withdrawn),

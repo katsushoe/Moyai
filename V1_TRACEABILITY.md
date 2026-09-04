@@ -6,8 +6,8 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 
 ## Summary
 
-- Verified: 42
-- Partial: 3
+- Verified: 43
+- Partial: 2
 - Not implemented: 0
 - Milestone 8 remains incomplete until every `Partial` row is verified or resolved by an explicitly approved specification correction.
 
@@ -28,9 +28,9 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 | 11 | Release Artifact metadata can be managed. | Verified | `SqliteReleaseContentRepositoryTests`. | — |
 | 12 | Releases and WorkItems can be related. | Verified | `SqliteReleaseContentRepositoryTests`. | — |
 | 13 | Githubie and Buckettie can be selected through the Repository Provider Contract. | Verified | `ProviderRoutingServiceTests` covers configured provider routing. | — |
-| 14 | Githubie and Buckettie can implement one common Tool Contract. | Partial | Both providers reported repository diff/commit source implementations complete: Githubie with 292 tests and Buckettie with 281 tests passing. Neither update is committed, released, installed, or verified by Moyai against the running servers. | Re-run conformance after both installed providers are updated. |
+| 14 | Githubie and Buckettie can implement one common Tool Contract. | Verified | On 2026-09-04, Moyai queried the running Githubie 1.8.6.3 and Buckettie 1.3.20.0 servers and both reported support for `repository_diff` and `repository_commit`. Moyai-routed `repository_diff` also succeeded for the registered GitHub project `Moyai` and Bitbucket project `picturebooks`. | — |
 | 15 | Moyai does not execute Git CLI. | Verified | `ArchitectureBoundaryTests.MoyaiSourceDoesNotInvokeGitCli`. | — |
-| 16 | Commit, push, tag, and release run through providers. | Partial | Moyai routes mutations through providers. Githubie and Buckettie reported repository commit implementations complete in their working trees, while running servers remain on versions without those Tools. | Install released provider updates, then run explicitly approved mutation tests. |
+| 16 | Commit, push, tag, and release run through providers. | Partial | Moyai routes mutations through providers. The running Githubie server successfully performed commit, push, tag, and release for Moyai 1.2.1 on 2026-09-04, but Githubie was called directly because Moyai itself was not registered as a Moyai Project; this is not evidence of the Moyai routing path. | Run explicitly approved mutation tests on Moyai-registered GitHub and Bitbucket test projects. |
 | 17 | Provider outage returns `provider_unavailable`. | Verified | `McpRepositoryProviderTests.ExecuteAsyncReturnsUnavailableWhenProviderCannotBeReached`. | — |
 | 18 | Moyai does not automatically start providers. | Verified | `ArchitectureBoundaryTests.RepositoryAndLifecycleAdaptersDoNotStartProviderProcesses`. | — |
 | 19 | Partial Release Publish failure is recorded. | Verified | `ReleaseOrchestrationServiceTests.PublishFailurePersistsFailedAndAllowsRetry`. | — |
@@ -51,7 +51,7 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 | 34 | BuildArtifact is immutable and stores a file or directory-manifest hash. | Verified | Schema immutability, file SHA-256, and deterministic directory-manifest SHA-256 are tested. | — |
 | 35 | Each project supports `local` or `server` Deploy Mode. | Verified | Project domain validation and deployment service routing cover both modes. | — |
 | 36 | Local Deploy places a BuildArtifact at `install_path`. | Verified | `DeploymentServiceTests.LocalDeployVerifiesArtifactAndRollbackRestoresPreviousContent`. | — |
-| 37 | Server Deploy uses KelpieSSH over Streamable HTTP. | Partial | Streamable HTTP transport exists, but the current lifecycle adapter calls one `<prefix>_deploy` Tool. Specification section 19.5 requires staged operations. A formal contract/environment CR is in progress in the Kelpie project for the KelpieSSH product under task `kelpiessh-moyai-deploy-contract-20260830`. | Implement against the confirmed KelpieSSH contract, then run integration tests. |
+| 37 | Server Deploy uses KelpieSSH over Streamable HTTP. | Partial | Streamable HTTP transport exists, but the current lifecycle adapter calls one `<prefix>_deploy` Tool. The KelpieSSH task `kelpiessh-moyai-deploy-contract-20260830` reached 95% after sending an integration-test request to Moyai, then became `Expired` during database maintenance. | Reconfirm the KelpieSSH contract and integration environment, implement staged orchestration, and complete integration tests. |
 | 38 | Moyai does not store SSH passwords or private keys. | Verified | DeploymentTarget contains a provider target reference and no credential fields; the ADR documents credential separation. | — |
 | 39 | DeploymentTarget is an independent entity. | Verified | Domain, SQLite table, repository, CLI, and MCP surface are implemented. | — |
 | 40 | v1 guarantees one DeploymentTarget per project. | Verified | SQLite schema enforces unique `project_id` and initializer constraint tests cover it. | — |
@@ -63,4 +63,4 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 
 ## Next Verification Batch
 
-Remaining closure work: complete the Githubie/Buckettie repository diff/commit CRs and run approved mutations; implement the section 19.5 staged KelpieSSH orchestration, then install/provide KelpieSSH for integration.
+Remaining closure work: run approved mutations on Moyai-registered GitHub and Bitbucket test projects; implement section 19.5 staged KelpieSSH orchestration and complete real-provider integration.

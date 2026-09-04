@@ -175,13 +175,13 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<RepositoryProviderResult> BranchList(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchList, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "branch_create"), Description("Creates a branch through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> BranchCreate(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchCreate, branch: branch, cancellationToken: cancellationToken));
+    public Task<RepositoryProviderResult> BranchCreate(string project, string branch, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchCreate, branch: branch, source: source, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "branch_delete", Destructive = true), Description("Deletes an allowed branch through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_create"), Description("Creates a tag through the Project Repository Provider.")]
-    public Task<RepositoryProviderResult> TagCreate(string project, string tag, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, cancellationToken: cancellationToken));
+    public Task<RepositoryProviderResult> TagCreate(string project, string tag, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, source: source, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_delete", Destructive = true), Description("Deletes an allowed tag through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> TagDelete(string project, string tag, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagDelete, tag: tag, cancellationToken: cancellationToken));
