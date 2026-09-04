@@ -9,4 +9,6 @@ public sealed record LifecycleRequest(
     string? Version,
     string? ArtifactPath,
     string? Notes,
-    string? ServiceToken);
+    string? ServiceToken,
+    IReadOnlyList<string>? ArtifactPaths = null,
+    long? ProviderReleaseId = null);

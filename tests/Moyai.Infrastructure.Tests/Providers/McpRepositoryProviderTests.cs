@@ -45,6 +45,7 @@ public sealed class McpRepositoryProviderTests
     [InlineData("{\"ok\":false,\"error\":{\"code\":\"temporarily_unavailable\",\"retryable\":true}}", "provider_retryable_failure")]
     [InlineData("{\"error\":{\"code\":\"rate_limited\"}}", "provider_retryable_failure")]
     [InlineData("tag already exists", "provider_conflict")]
+    [InlineData("{\"error\":{\"code\":\"release_already_exists\"}}", "provider_conflict")]
     [InlineData("branch not found", "provider_not_found")]
     [InlineData("Unauthorized token", "provider_authentication_failed")]
     [InlineData("unknown failure", "provider_operation_failed")]

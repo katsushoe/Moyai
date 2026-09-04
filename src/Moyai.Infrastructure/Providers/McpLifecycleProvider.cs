@@ -2,6 +2,8 @@
 using ModelContextProtocol.Protocol;
 using Moyai.Application.Lifecycle;
 
+using System.Text.Json;
+
 namespace Moyai.Infrastructure.Providers;
 
 /// <summary>Streamable HTTP MCP経由でLifecycle Providerを呼び出します。</summary>
@@ -37,9 +39,30 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             if (IsGithubie) arguments["project"] = request.Project;
             Add(arguments, "version", request.Version);
             Add(arguments, IsGithubie ? "artifact_path" : "artifactPath", request.ArtifactPath);
+            if (IsGithubie && request.ArtifactPaths is { Count: > 0 }) arguments["assets"] = request.ArtifactPaths;
             Add(arguments, "notes", request.Notes);
-            CallToolResult result = await client.CallToolAsync($"{_options.ToolPrefix}_{operation}", arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return LifecycleProviderResponse.Parse(operation, result);
+            string toolName = $"{_options.ToolPrefix}_{operation}";
+            if (IsGithubie && request.Action == LifecycleAction.ReleasePublish && request.ProviderReleaseId is long releaseId)
+            {
+                toolName = "github_release_update";
+                arguments.Remove("version");
+                arguments.Remove("artifact_path");
+                arguments.Remove("assets");
+                arguments.Remove("notes");
+                arguments["release_id"] = releaseId;
+                arguments["draft"] = false;
+            }
+            CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+            LifecycleResult parsed = LifecycleProviderResponse.Parse(operation, result);
+            if (IsGithubie && request.Action == LifecycleAction.ReleaseCreate && parsed.ErrorCode == "provider_conflict")
+            {
+                var listArguments = new Dictionary<string, object?> { ["repository"] = request.Project, ["project"] = request.Project };
+                CallToolResult listResult = await client.CallToolAsync("github_release_list", listArguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+                LifecycleResult listed = LifecycleProviderResponse.Parse(operation, listResult);
+                long? existingId = FindReleaseId(listed.Output, request.Version);
+                if (listed.Ok && existingId is not null) return listed with { ResourceId = existingId };
+            }
+            return parsed;
         }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
         {
@@ -53,6 +76,38 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     }
 
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
+
+    private static long? FindReleaseId(string? output, string? version)
+    {
+        if (string.IsNullOrWhiteSpace(output) || string.IsNullOrWhiteSpace(version)) return null;
+        using JsonDocument document = JsonDocument.Parse(output);
+        string expectedTag = version.StartsWith('v') ? version : $"v{version}";
+        return FindReleaseId(document.RootElement, expectedTag);
+    }
+
+    private static long? FindReleaseId(JsonElement element, string expectedTag)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            bool matches = element.TryGetProperty("tag_name", out JsonElement tag) && string.Equals(tag.GetString(), expectedTag, StringComparison.OrdinalIgnoreCase);
+            bool draft = !element.TryGetProperty("draft", out JsonElement draftElement) || draftElement.ValueKind == JsonValueKind.True;
+            if (matches && draft && element.TryGetProperty("id", out JsonElement id) && id.TryGetInt64(out long value)) return value;
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                long? nested = FindReleaseId(property.Value, expectedTag);
+                if (nested is not null) return nested;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                long? nested = FindReleaseId(item, expectedTag);
+                if (nested is not null) return nested;
+            }
+        }
+        return null;
+    }
 
     private static string OperationName(LifecycleAction action) => action switch
     {

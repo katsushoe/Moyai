@@ -29,7 +29,7 @@ public sealed class ReleaseOrchestrationServiceTests
     public async Task PublishPassesReleaseNotesAndArtifactPathToProvider()
     {
         await using var fixture = new Fixture(true);
-        (ReleaseOrchestrationService service, Release ready) = await fixture.CreateReadyAsync(withArtifact: true);
+        (ReleaseOrchestrationService service, Release ready) = await fixture.CreateReadyAsync(withArtifact: true, withChecksum: true);
 
         await service.PublishAsync("Moyai", ready.Version, ready.Revision, "agent", "test");
 
@@ -39,12 +39,15 @@ public sealed class ReleaseOrchestrationServiceTests
             {
                 Assert.Equal(LifecycleAction.ReleaseCreate, request.Action);
                 Assert.Equal("artifact.msi", request.ArtifactPath);
+                Assert.Equal(["artifact.msi", "checksums.txt"], request.ArtifactPaths);
                 Assert.Equal("release notes", request.Notes);
             },
             request =>
             {
                 Assert.Equal(LifecycleAction.ReleasePublish, request.Action);
                 Assert.Equal("artifact.msi", request.ArtifactPath);
+                Assert.Equal(["artifact.msi", "checksums.txt"], request.ArtifactPaths);
+                Assert.Equal(42, request.ProviderReleaseId);
                 Assert.Equal("release notes", request.Notes);
             });
     }
@@ -89,7 +92,7 @@ public sealed class ReleaseOrchestrationServiceTests
         public Fixture(bool succeeds) => Provider = new RecordingProvider(succeeds);
         public RecordingProvider Provider { get; }
 
-        public async Task<(ReleaseOrchestrationService Service, Release Ready)> CreateReadyAsync(bool withArtifact = false)
+        public async Task<(ReleaseOrchestrationService Service, Release Ready)> CreateReadyAsync(bool withArtifact = false, bool withChecksum = false)
         {
             _options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString());
             await new SqliteDatabaseInitializer(_options).InitializeAsync();
@@ -106,6 +109,7 @@ public sealed class ReleaseOrchestrationServiceTests
             var lifecycle = new LifecycleService(projects, tokens, [Provider], new SqliteLifecycleEventWriter(_options, TimeProvider.System), TimeProvider.System);
             var content = new ReleaseContentService(projects, new SqliteWorkItemRepository(_options), repository, new SqliteReleaseContentRepository(_options), TimeProvider.System);
             if (withArtifact) await content.AddArtifactAsync(new AddReleaseArtifactCommand("Moyai", release.Version, null, "installer", "installer", "windows", "x64", "artifact.msi", "artifact.msi", null, 1, new string('a', 64), null, null, "agent", "test"));
+            if (withChecksum) await content.AddArtifactAsync(new AddReleaseArtifactCommand("Moyai", release.Version, null, "checksum", "other", "windows", "x64", "checksums.txt", "checksums.txt", null, 1, new string('b', 64), null, null, "agent", "test"));
             return (new ReleaseOrchestrationService(releaseService, content, lifecycle), release);
         }
 
@@ -131,7 +135,7 @@ public sealed class ReleaseOrchestrationServiceTests
             LastRequest = request;
             Requests.Add(request);
             if (request.Action == LifecycleAction.ReleaseCreate && CreateConflicts) return Task.FromResult(new LifecycleResult(false, "release_create", null, "provider_conflict", "already exists"));
-            if (request.Action == LifecycleAction.ReleaseCreate) return Task.FromResult(new LifecycleResult(true, "release_create", "draft", null, null));
+            if (request.Action == LifecycleAction.ReleaseCreate) return Task.FromResult(new LifecycleResult(true, "release_create", "draft", null, null, 42));
             return Task.FromResult(Succeeds
                 ? new LifecycleResult(true, "release_publish", "published", null, null)
                 : new LifecycleResult(false, "release_publish", null, "provider_failure", "failed"));
