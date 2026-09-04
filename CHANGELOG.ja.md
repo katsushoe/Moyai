@@ -4,7 +4,7 @@
 
 ## 未公開
 
-## 1.2.2 - 2026-09-04
+## 1.2.3 - 2026-09-04
 
 - `branch_create`でliteral branch名または完全なcommit SHAの作成元を明示必須とし、不正なrevision式をProvider実行前に拒否して、Repository Provider契約へ無変更で転送するようにしました。
 - Release公開時にProvider側のdraftを先に作成し、登録済み成果物とリリースノートをGithubieまたはBuckettieの正確なProvider引数契約で渡すよう修正しました。

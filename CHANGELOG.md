@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-## 1.2.2 - 2026-09-04
+## 1.2.3 - 2026-09-04
 
 - Changed `branch_create` to require an explicit literal branch or full commit SHA source, validate invalid revision expressions before Provider execution, and forward the source unchanged through the Repository Provider contract.
 - Fixed release publication to create the Provider draft first, then pass the registered artifact and notes using the exact Githubie or Buckettie Provider argument contract.
