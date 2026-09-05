@@ -41,9 +41,11 @@ public sealed class ProviderRoutingServiceTests
         await using var fixture = new RoutingFixture();
         (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false);
 
-        ProviderRoutingException exception = await Assert.ThrowsAsync<ProviderRoutingException>(() => service.ExecuteAsync("Moyai", RepositoryOperation.Commit, "message"));
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.Commit, "message");
 
-        Assert.Equal("invalid_service_token", exception.Code);
+        Assert.False(result.Ok);
+        Assert.Equal("invalid_service_token", result.ErrorCode);
+        Assert.Equal("repository_commit", result.Operation);
         Assert.Null(provider.LastRequest);
     }
 
@@ -53,9 +55,11 @@ public sealed class ProviderRoutingServiceTests
         await using var fixture = new RoutingFixture();
         (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true, scope: "repository.read");
 
-        ProviderRoutingException exception = await Assert.ThrowsAsync<ProviderRoutingException>(() => service.ExecuteAsync("Moyai", RepositoryOperation.Pull));
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.Pull);
 
-        Assert.Equal("service_token_scope_missing", exception.Code);
+        Assert.False(result.Ok);
+        Assert.Equal("service_token_scope_missing", result.ErrorCode);
+        Assert.Equal("pull", result.Operation);
         Assert.Null(provider.LastRequest);
     }
 

@@ -29,23 +29,7 @@ public static class RepositoryProviderContract
         return arguments;
     }
 
-    public static string OperationName(RepositoryOperation operation) => operation switch
-    {
-        RepositoryOperation.ProviderVersion => "provider_version",
-        RepositoryOperation.ProviderCapabilities => "provider_capabilities",
-        RepositoryOperation.Status => "repository_status",
-        RepositoryOperation.Diff => "repository_diff",
-        RepositoryOperation.Commit => "repository_commit",
-        RepositoryOperation.Push => "push",
-        RepositoryOperation.Pull => "pull",
-        RepositoryOperation.BranchList => "branch_list",
-        RepositoryOperation.BranchCreate => "branch_create",
-        RepositoryOperation.BranchDelete => "branch_delete",
-        RepositoryOperation.TagCreate => "tag_create",
-        RepositoryOperation.TagDelete => "tag_delete",
-        RepositoryOperation.TagPush => "tag_push",
-        _ => throw new ArgumentOutOfRangeException(nameof(operation)),
-    };
+    public static string OperationName(RepositoryOperation operation) => operation.ContractName();
 
     public static string NormalizeErrorCode(string? detail)
     {

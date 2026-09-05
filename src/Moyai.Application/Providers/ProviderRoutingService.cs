@@ -33,21 +33,24 @@ public sealed class ProviderRoutingService
         string providerName = ProviderName(project.RepositoryProvider);
         if (!_providers.TryGetValue(providerName, out IRepositoryProvider? provider))
         {
-            throw new ProviderRoutingException("provider_unavailable", $"Repository provider '{providerName}' is unavailable.");
+            return Failure(operation, "provider_unavailable", $"Repository provider '{providerName}' is unavailable.");
         }
 
         string? tokenValue = null;
         if (IsMutation(operation))
         {
-            ServiceToken token = await _tokens.FindByAudienceAsync(providerName, cancellationToken).ConfigureAwait(false)
-                ?? throw new ProviderRoutingException("invalid_service_token", $"An active service token for '{providerName}' is required.");
+            ServiceToken? token = await _tokens.FindByAudienceAsync(providerName, cancellationToken).ConfigureAwait(false);
+            if (token is null)
+            {
+                return Failure(operation, "invalid_service_token", $"An active service token for '{providerName}' is required.");
+            }
             if (token.ExpiresAt is not null && token.ExpiresAt <= _timeProvider.GetUtcNow())
             {
-                throw new ProviderRoutingException("service_token_expired", $"The service token for '{providerName}' has expired.");
+                return Failure(operation, "service_token_expired", $"The service token for '{providerName}' has expired.");
             }
             if (!token.Scopes.Contains("repository.write"))
             {
-                throw new ProviderRoutingException("service_token_scope_missing", $"The service token for '{providerName}' lacks repository.write scope.");
+                return Failure(operation, "service_token_scope_missing", $"The service token for '{providerName}' lacks repository.write scope.");
             }
             tokenValue = token.Token;
         }
@@ -56,6 +59,9 @@ public sealed class ProviderRoutingService
         var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source);
         return await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
     }
+
+    private static RepositoryProviderResult Failure(RepositoryOperation operation, string code, string message) =>
+        new(false, operation.ContractName(), null, code, message);
 
     private static bool IsMutation(RepositoryOperation operation) => operation is RepositoryOperation.Commit or RepositoryOperation.Push or RepositoryOperation.Pull or RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush;
 
