@@ -58,7 +58,26 @@ public sealed class LifecycleProviderTransportTests
         LifecycleResult result = await provider.ExecuteAsync(request);
 
         Assert.True(result.Ok);
-        Assert.Equal(["installer.msi", "checksums.txt"], handler.Arguments!.Value.GetProperty("assets").EnumerateArray().Select(static item => item.GetString()));
+        JsonElement arguments = handler.Arguments!.Value;
+        Assert.Equal(["installer.msi", "checksums.txt"], arguments.GetProperty("assets").EnumerateArray().Select(static item => item.GetString()));
+        Assert.False(arguments.TryGetProperty("artifact_path", out _));
+    }
+
+    [Fact]
+    public async Task BuckettieReleaseCreateKeepsSingleArtifactContract()
+    {
+        using var handler = new ProviderHandler();
+        using var client = new HttpClient(handler);
+        var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions("buckettie", new Uri("http://localhost/mcp"), "buckettie"), new ClientFactory(client));
+        var request = new LifecycleRequest("Moyai", "source", null, LifecycleAction.ReleaseCreate, "1.2.3", "installer.msi", "notes", null, ["installer.msi", "checksums.txt"]);
+
+        LifecycleResult result = await provider.ExecuteAsync(request);
+
+        Assert.True(result.Ok);
+        JsonElement arguments = handler.Arguments!.Value;
+        Assert.Equal("installer.msi", arguments.GetProperty("artifactPath").GetString());
+        Assert.False(arguments.TryGetProperty("artifact_path", out _));
+        Assert.False(arguments.TryGetProperty("assets", out _));
     }
 
     [Fact]
@@ -75,6 +94,9 @@ public sealed class LifecycleProviderTransportTests
         Assert.Equal("github_release_update", handler.CalledTool);
         Assert.Equal(383033902, handler.Arguments!.Value.GetProperty("release_id").GetInt64());
         Assert.False(handler.Arguments.Value.GetProperty("draft").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, handler.Arguments.Value.GetProperty("name").ValueKind);
+        Assert.Equal(JsonValueKind.Null, handler.Arguments.Value.GetProperty("body").ValueKind);
+        Assert.Equal(JsonValueKind.Null, handler.Arguments.Value.GetProperty("prerelease").ValueKind);
         Assert.False(handler.Arguments.Value.TryGetProperty("artifact_path", out _));
     }
 

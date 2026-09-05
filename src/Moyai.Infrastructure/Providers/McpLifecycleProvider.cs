@@ -38,8 +38,14 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             var arguments = new Dictionary<string, object?> { ["repository"] = request.Project };
             if (IsGithubie) arguments["project"] = request.Project;
             Add(arguments, "version", request.Version);
-            Add(arguments, IsGithubie ? "artifact_path" : "artifactPath", request.ArtifactPath);
-            if (IsGithubie && request.ArtifactPaths is { Count: > 0 }) arguments["assets"] = request.ArtifactPaths;
+            if (IsGithubie && request.Action == LifecycleAction.ReleaseCreate && request.ArtifactPaths is { Count: > 0 })
+            {
+                arguments["assets"] = request.ArtifactPaths;
+            }
+            else
+            {
+                Add(arguments, IsGithubie ? "artifact_path" : "artifactPath", request.ArtifactPath);
+            }
             Add(arguments, "notes", request.Notes);
             string toolName = $"{_options.ToolPrefix}_{operation}";
             if (request.Action == LifecycleAction.ReleaseCreate)
@@ -55,6 +61,9 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
                 arguments.Remove("assets");
                 arguments.Remove("notes");
                 arguments["release_id"] = releaseId;
+                arguments["name"] = null;
+                arguments["body"] = null;
+                arguments["prerelease"] = null;
                 arguments["draft"] = false;
             }
             CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
