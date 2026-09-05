@@ -47,7 +47,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
                 Add(arguments, IsGithubie ? "artifact_path" : "artifactPath", request.ArtifactPath);
             }
             Add(arguments, "notes", request.Notes);
-            string toolName = $"{_options.ToolPrefix}_{operation}";
+            string toolName = $"{LifecycleToolPrefix}_{operation}";
             if (request.Action == LifecycleAction.ReleaseCreate)
             {
                 LifecycleResult? existing = await ReconcileExistingReleaseAsync(client, request, operation, cancellationToken).ConfigureAwait(false);
@@ -88,9 +88,13 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
 
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
 
+    private string LifecycleToolPrefix => string.Equals(_options.Name, "buckettie", StringComparison.OrdinalIgnoreCase)
+        ? "buckettie"
+        : _options.ToolPrefix;
+
     private async Task<LifecycleResult?> ReconcileExistingReleaseAsync(McpClient client, LifecycleRequest request, string operation, CancellationToken cancellationToken)
     {
-        string getTool = IsGithubie ? "github_release_get" : $"{_options.ToolPrefix}_release_get";
+        string getTool = $"{LifecycleToolPrefix}_release_get";
         var getArguments = new Dictionary<string, object?> { ["repository"] = request.Project, ["version"] = request.Version };
         if (IsGithubie) getArguments["project"] = request.Project;
         CallToolResult getResponse = await client.CallToolAsync(getTool, getArguments, cancellationToken: cancellationToken).ConfigureAwait(false);

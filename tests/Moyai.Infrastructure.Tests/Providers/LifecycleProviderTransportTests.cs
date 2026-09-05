@@ -9,21 +9,21 @@ namespace Moyai.Infrastructure.Tests.Providers;
 public sealed class LifecycleProviderTransportTests
 {
     [Theory]
-    [InlineData("githubbie", "github", "artifact_path", true, LifecycleAction.ReleaseCreate, "release_create")]
-    [InlineData("githubbie", "github", "artifact_path", true, LifecycleAction.ReleasePublish, "release_publish")]
-    [InlineData("buckettie", "buckettie", "artifactPath", false, LifecycleAction.ReleaseCreate, "release_create")]
-    [InlineData("buckettie", "buckettie", "artifactPath", false, LifecycleAction.ReleasePublish, "release_publish")]
-    public async Task ReleaseOperationsUseProviderSpecificContract(string name, string prefix, string artifactProperty, bool includesProject, LifecycleAction action, string operation)
+    [InlineData("githubbie", "github", "github", "artifact_path", true, LifecycleAction.ReleaseCreate, "release_create")]
+    [InlineData("githubbie", "github", "github", "artifact_path", true, LifecycleAction.ReleasePublish, "release_publish")]
+    [InlineData("buckettie", "bitbucket", "buckettie", "artifactPath", false, LifecycleAction.ReleaseCreate, "release_create")]
+    [InlineData("buckettie", "bitbucket", "buckettie", "artifactPath", false, LifecycleAction.ReleasePublish, "release_publish")]
+    public async Task ReleaseOperationsUseProviderSpecificContract(string name, string toolPrefix, string lifecyclePrefix, string artifactProperty, bool includesProject, LifecycleAction action, string operation)
     {
         using var handler = new ProviderHandler();
         using var client = new HttpClient(handler);
-        var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri("http://localhost/mcp"), prefix), new ClientFactory(client));
+        var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri("http://localhost/mcp"), toolPrefix), new ClientFactory(client));
         var request = new LifecycleRequest("Moyai", "source", null, action, "1.2.2", "artifact.msi", "notes", null);
 
         LifecycleResult result = await provider.ExecuteAsync(request);
 
         Assert.True(result.Ok);
-        Assert.Equal($"{prefix}_{operation}", handler.CalledTool);
+        Assert.Equal($"{lifecyclePrefix}_{operation}", handler.CalledTool);
         JsonElement arguments = handler.Arguments!.Value;
         Assert.Equal("Moyai", arguments.GetProperty("repository").GetString());
         Assert.Equal("1.2.2", arguments.GetProperty("version").GetString());
@@ -68,12 +68,13 @@ public sealed class LifecycleProviderTransportTests
     {
         using var handler = new ProviderHandler();
         using var client = new HttpClient(handler);
-        var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions("buckettie", new Uri("http://localhost/mcp"), "buckettie"), new ClientFactory(client));
+        var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions("buckettie", new Uri("http://localhost/mcp"), "bitbucket"), new ClientFactory(client));
         var request = new LifecycleRequest("Moyai", "source", null, LifecycleAction.ReleaseCreate, "1.2.3", "installer.msi", "notes", null, ["installer.msi", "checksums.txt"]);
 
         LifecycleResult result = await provider.ExecuteAsync(request);
 
         Assert.True(result.Ok);
+        Assert.Equal("buckettie_release_create", handler.CalledTool);
         JsonElement arguments = handler.Arguments!.Value;
         Assert.Equal("installer.msi", arguments.GetProperty("artifactPath").GetString());
         Assert.False(arguments.TryGetProperty("artifact_path", out _));
@@ -102,7 +103,7 @@ public sealed class LifecycleProviderTransportTests
 
     [Theory]
     [InlineData("githubbie", "github", "{\"ok\":true,\"data\":{\"tag\":\"v1.2.3\",\"draft\":false,\"id\":42,\"assets\":[{\"name\":\"artifact.msi\"}]}}")]
-    [InlineData("buckettie", "buckettie", "{\"ok\":true,\"data\":{\"version\":\"1.2.3\",\"state\":\"published\",\"artifact_name\":\"artifact.msi\",\"notes\":\"notes\"}}")]
+    [InlineData("buckettie", "bitbucket", "{\"ok\":true,\"data\":{\"version\":\"1.2.3\",\"state\":\"published\",\"artifact_name\":\"artifact.msi\",\"notes\":\"notes\"}}")]
     public async Task ExistingPublishedReleaseIsReturnedAsCompleted(string name, string prefix, string existingRelease)
     {
         using var handler = new ProviderHandler(existingRelease: existingRelease);
