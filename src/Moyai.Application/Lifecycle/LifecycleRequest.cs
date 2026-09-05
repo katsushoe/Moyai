@@ -11,4 +11,6 @@ public sealed record LifecycleRequest(
     string? Notes,
     string? ServiceToken,
     IReadOnlyList<string>? ArtifactPaths = null,
-    long? ProviderReleaseId = null);
+    long? ProviderReleaseId = null,
+    string? TagName = null,
+    string? CommitHash = null);

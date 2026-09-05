@@ -83,7 +83,7 @@ Provider本文の`ok:false`はMCPの`isError`がfalse／未指定でも失敗で
 
 `release-prepare`と`release-mark-ready`は`--project --version --expected-revision --actor-type --actor-name`が必須で、`planned -> preparing -> ready`へ遷移します。
 
-`release-publish`は同じOptionと明示承認が必要です。Provider呼び出し前に`publishing`を保存し、結果を`released`または`failed`として記録します。公開済みVersionへの再実行ではProviderを呼びません。`release-retry`は`failed -> ready`後に再公開し、`release-withdraw`はProviderで公開停止後に状態を更新します。
+`release-publish`は同じOptionと明示承認が必要です。Provider呼び出し前に`publishing`を保存し、結果を`released`または`failed`として記録します。公開済みVersionへの再実行ではProviderを呼びません。`release-retry`は`failed -> ready`後、Providerの同一Versionを照会します。存在しなければ作成し、draftなら公開します。公開済みの場合は版／Tag、記録済みCommit、Artifactが一致するときだけ冪等な成功として整合し、不一致は相違項目を含む`provider_conflict`を返します。詳細は[ADR 0007](docs/adr/0007-provider-release-reconciliation.md)を参照してください。`release-withdraw`はProviderで公開停止後に状態を更新します。
 
 `release-latest --project`は`released_at`基準の最新Stable Release、`release-overview --project --version`はRelease、WorkItem関連、Artifact metadataを返します。
 

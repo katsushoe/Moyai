@@ -30,7 +30,7 @@ public sealed class LifecycleService
     }
 
     /// <summary>Project設定に従ってLifecycle操作を委譲します。</summary>
-    public async Task<LifecycleResult> ExecuteAsync(string projectName, LifecycleAction action, string actorType, string actorName, string? version = null, string? artifactPath = null, string? notes = null, IReadOnlyList<string>? artifactPaths = null, long? providerReleaseId = null, CancellationToken cancellationToken = default)
+    public async Task<LifecycleResult> ExecuteAsync(string projectName, LifecycleAction action, string actorType, string actorName, string? version = null, string? artifactPath = null, string? notes = null, IReadOnlyList<string>? artifactPaths = null, long? providerReleaseId = null, string? tagName = null, string? commitHash = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actorType);
         ArgumentException.ThrowIfNullOrWhiteSpace(actorName);
@@ -46,7 +46,7 @@ public sealed class LifecycleService
         string providerName = ResolveProvider(project, action);
         if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)) throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
         string? token = await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
-        var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token, artifactPaths, providerReleaseId);
+        var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token, artifactPaths, providerReleaseId, tagName, commitHash);
         LifecycleResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         await _events.WriteAsync(project.Id, action, result, actorType, actorName, cancellationToken).ConfigureAwait(false);
         return result;

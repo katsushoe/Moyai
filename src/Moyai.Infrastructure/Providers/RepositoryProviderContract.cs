@@ -87,7 +87,7 @@ public static class RepositoryProviderContract
         "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" => "provider_policy_rejected",
         "retryable" or "rate_limited" or "temporarily_unavailable" => "provider_retryable_failure",
         "conflict" or "already_exists" or "release_already_exists" => "provider_conflict",
-        "not_found" or "repository_not_found" or "branch_not_found" or "tag_not_found" => "provider_not_found",
+        "not_found" or "repository_not_found" or "branch_not_found" or "tag_not_found" or "release_not_found" => "provider_not_found",
         _ => "provider_operation_failed",
     };
 }
