@@ -14,6 +14,8 @@ SCM commands are `service start`, `service stop`, `service pause`, `service resu
 
 ## Command Groups
 
+Provider authentication administration: `assertion-key-prepare`, `assertion-key-get --kid <id>`, `assertion-key-activate --kid <id> --trust-distribution-confirmed true [--overlap-seconds 86400]`, `assertion-key-revoke --kid <id>`, `assertion-protector-rotate`, `assertion-secret-rewrap`. These commands use the service and return public metadata only. See [the operational contract](docs/specifications/provider-authentication-operations.md) for state transitions, failure codes, migration and trust distribution requirements.
+
 | Group | Commands | Purpose |
 | :--- | :--- | :--- |
 | Project | `project-list`, `project-get`, `project-create`, `project-ensure`, `project-configure`, `project-rename`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |

@@ -6,6 +6,8 @@ MCP client registration uses an explicitly selected user profile and preserves u
 
 ## Configuration file
 
+Repository authentication defaults to ES256 assertions and fails closed until configured. See [Provider authentication settings, key initialization and migration](docs/specifications/provider-authentication-operations.md). Static repository tokens require an explicitly bounded migration window of at most seven days.
+
 The service and CLI read `config/moyai.json`, relative to the installation root (the parent of `bin`). `--config <path>` selects another file. Configuration never comes from environment variables. The CLI uses the endpoint only and never opens the database. Changes take effect after restarting the service.
 
 ```json
@@ -21,13 +23,16 @@ The service and CLI read `config/moyai.json`, relative to the installation root 
 
 ## Providers
 
-Each entry has `name`, `endpoint`, `toolPrefix`, and optional `repository` (default false). Endpoints are loopback HTTP(S). Names are unique. For the existing Githubie routing identifier use `githubbie`, prefix `github`, repository true; Buckettie uses `buckettie`, prefix `bitbucket`, repository true. Built-in build providers are `csharp`, `node`, and `php`; a configured provider with the same name overrides it. KelpieSSH deployment uses name `server` and the configured tool prefix. Tokens remain in the service database, never JSON.
+Each entry has `name`, `endpoint`, `toolPrefix`, and optional `repository` (default false). Endpoints are loopback HTTP(S). Names are unique. For the existing Githubie routing identifier use `githubbie`, prefix `github`, repository true; its assertions use canonical provider ID and audience `githubie`. Buckettie uses `buckettie`, prefix `bitbucket`, repository true. Built-in build providers are `csharp`, `node`, and `php`; a configured provider with the same name overrides it. KelpieSSH deployment uses name `server` (or canonical name `kelpiessh`) and Protocol v2 assertions. Internal `server` routing is signed with audience `kelpiessh`. Server deployment does not read or transmit a Moyai service token. Tokens remain in the service database, never JSON.
 
 ```json
-{"name":"githubbie","endpoint":"http://127.0.0.1:43121/mcp","toolPrefix":"github","repository":true}
+[
+  {"name":"githubbie","endpoint":"http://127.0.0.1:43121/mcp","toolPrefix":"github","repository":true},
+  {"name":"server","endpoint":"http://127.0.0.1:45432/mcp","toolPrefix":"kelpie","repository":false}
+]
 ```
 
-Project `build_config_json` accepts `configuration` and an `artifacts` array with `name`, `artifact_type`, and project-relative `file_path`. Deployment targets retain their existing Project configuration and secret handling.
+Project `build_config_json` accepts `configuration` and an `artifacts` array with `name`, `artifact_type`, and project-relative `file_path`. A server deployment target must set `kelpieTarget` to the immutable KelpieSSH target ID and supply a destination path. Deployment requires one file artifact with a SHA-256 value. The fixed Protocol v2 scopes are described in the [Provider authentication operations contract](docs/specifications/provider-authentication-operations.md).
 
 ## Installation and migration
 

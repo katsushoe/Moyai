@@ -4,6 +4,23 @@
 
 ## Unreleased
 
+## 1.3.2.0 - 2026-09-25 (local package)
+
+- Before delegating a state-changing (non-read) operation to Buckettie, Moyai now checks `integration_mode` through the bootstrap `bitbucket_provider_capabilities` tool and rejects the operation with `provider_integration_mode_mismatch` unless it is `moyai`.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.1.0 - 2026-09-24 (local package)
+
+- Resolved the Provider assertion provider ID and audience to the canonical `githubie` ID while keeping the internal routing name `githubbie`.
+- Included the shared Provider authentication package (Moyai.ProviderAuthentication 1.0.2) and the KelpieSSH Lifecycle Protocol v2 staged deployment adapter.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.0.0 - 2026-09-07 (local package)
+
+- Added per-operation ES256 Provider assertions, shared claim/replay validation, encrypted secret envelopes, signing-key and KEK rotation, and six service-backed MCP/CLI key-management operations.
+- Added CNG, Keychain, Secret Service and authenticated broker key-protector adapters. Repository authentication now fails closed until configured; legacy operation requires an explicit migration window of at most seven days.
+- Native macOS/Linux and real Provider migration/integration verification remain pending. This entry describes a local installation package, not a public release.
+
 ## 1.2.3 - 2026-09-04
 
 - Changed `branch_create` to require an explicit literal branch or full commit SHA source, validate invalid revision expressions before Provider execution, and forward the source unchanged through the Repository Provider contract.

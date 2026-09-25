@@ -66,6 +66,11 @@ public static class RepositoryProviderContract
 
     private static string NormalizeKnownCode(string? code) => code switch
     {
+        "authentication_unavailable" or "auth_assertion_invalid" or "auth_assertion_expired"
+            or "auth_assertion_not_yet_valid" or "auth_audience_mismatch" or "auth_scope_denied"
+            or "auth_project_mismatch" or "auth_key_unknown" or "auth_key_revoked" or "auth_replay_detected"
+            or "auth_key_provider_unavailable" or "auth_secret_decryption_failed" or "auth_protocol_unsupported"
+            or "provider_capability_missing" => code,
         "provider_unavailable" => "provider_unavailable",
         "unauthorized" or "invalid_service_token" or "service_token_expired" or "service_token_scope_missing" => "provider_authentication_failed",
         "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" => "provider_policy_rejected",

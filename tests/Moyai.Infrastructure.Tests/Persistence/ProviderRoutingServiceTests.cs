@@ -153,7 +153,8 @@ public sealed class ProviderRoutingServiceTests
                 await tokenRepository.AddAsync(token);
             }
             var provider = new RecordingProvider();
-            return (new ProviderRoutingService(projectRepository, tokenRepository, [provider], TimeProvider.System), provider);
+            return (new ProviderRoutingService(projectRepository, tokenRepository, [provider], TimeProvider.System,
+                new RepositoryAuthentication("legacy", DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddDays(1))), provider);
         }
 
         public ValueTask DisposeAsync()

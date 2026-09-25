@@ -54,6 +54,9 @@ The CLI writes successful JSON to standard output, structured errors to standard
 
 ## Documentation
 
+- [Provider authentication and local secret protection specification (Japanese)](docs/specifications/Provider_Authentication_Specification.md)
+- [Authentication specification transfer and remaining work (Japanese)](docs/specifications/provider-authentication-transfer.md)
+- [KelpieSSH Protocol v2 staged deployment decision](docs/adr/0009-kelpiessh-protocol-v2.md)
 - [Configuration](CONFIG.md)
 - [Commands](COMMANDS.md)
 - [MCP Setup](MCP_SETUP.md)

@@ -30,7 +30,7 @@ public sealed class LifecycleService
     }
 
     /// <summary>Project設定に従ってLifecycle操作を委譲します。</summary>
-    public async Task<LifecycleResult> ExecuteAsync(string projectName, LifecycleAction action, string actorType, string actorName, string? version = null, string? artifactPath = null, string? notes = null, IReadOnlyList<string>? artifactPaths = null, long? providerReleaseId = null, string? tagName = null, string? commitHash = null, CancellationToken cancellationToken = default)
+    public async Task<LifecycleResult> ExecuteAsync(string projectName, LifecycleAction action, string actorType, string actorName, string? version = null, string? artifactPath = null, string? notes = null, IReadOnlyList<string>? artifactPaths = null, long? providerReleaseId = null, string? tagName = null, string? commitHash = null, Guid? deploymentId = null, string? kelpieTarget = null, string? destinationPath = null, string? artifactSha256 = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actorType);
         ArgumentException.ThrowIfNullOrWhiteSpace(actorName);
@@ -44,9 +44,12 @@ public sealed class LifecycleService
         }
         ValidateInput(action, version, artifactPath);
         string providerName = ResolveProvider(project, action);
-        if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)) throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
+        if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)
+            && !(providerName == "server" && _providers.TryGetValue("kelpiessh", out provider)))
+            throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
         string? token = await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
-        var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token, artifactPaths, providerReleaseId, tagName, commitHash);
+        var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token,
+            artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256);
         LifecycleResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         await _events.WriteAsync(project.Id, action, result, actorType, actorName, cancellationToken).ConfigureAwait(false);
         return result;
@@ -54,6 +57,7 @@ public sealed class LifecycleService
 
     private async Task<string?> ResolveTokenAsync(Project project, LifecycleAction action, CancellationToken cancellationToken)
     {
+        if ((action is LifecycleAction.Deploy or LifecycleAction.DeployRollback) && project.DeployMode == "server") return null;
         string? scope = action switch
         {
             LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw => "release.write",

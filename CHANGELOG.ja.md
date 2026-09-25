@@ -4,6 +4,23 @@
 
 ## 未公開
 
+## 1.3.2.0 - 2026-09-25（ローカルパッケージ）
+
+- Buckettieへ状態変更操作（読み取り以外）を委譲する前に、Bootstrapの`bitbucket_provider_capabilities`で`integration_mode`を確認し、`moyai`でない場合は`provider_integration_mode_mismatch`で拒否するようにしました。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
+## 1.3.1.0 - 2026-09-24（ローカルパッケージ）
+
+- 内部routing名`githubbie`を維持したまま、Provider AssertionのProvider IDとAudienceを正規ID`githubie`へ解決するようにしました。
+- Provider用共通認証パッケージ（Moyai.ProviderAuthentication 1.0.2）とKelpieSSH向けLifecycle Protocol v2・段階Deploy Adapterを含めました。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
+## 1.3.0.0 - 2026-09-07（ローカルパッケージ）
+
+- 操作ごとのES256 Provider Assertion、共通Claim・Replay検証、秘密情報のEnvelope暗号化、署名鍵・KEK更新、サービス経由のMCP／CLI鍵管理6操作を追加しました。
+- CNG、Keychain、Secret Service、認証済みBrokerのKey Protectorを追加しました。Repository認証は未構成時に操作を拒否し、旧方式は最大7日の明示的な移行期間に限定します。
+- macOS／Linux実機と実Providerの移行・結合検証は継続中です。ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.2.3 - 2026-09-04
 
 - `branch_create`でliteral branch名または完全なcommit SHAの作成元を明示必須とし、不正なrevision式をProvider実行前に拒否して、Repository Provider契約へ無変更で転送するようにしました。

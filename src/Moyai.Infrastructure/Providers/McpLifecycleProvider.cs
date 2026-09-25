@@ -1,8 +1,9 @@
-﻿using ModelContextProtocol.Client;
+﻿using System.Text.Json;
+using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using Moyai.Application.Authentication;
 using Moyai.Application.Lifecycle;
-
-using System.Text.Json;
+using Moyai.Infrastructure.Authentication;
 
 namespace Moyai.Infrastructure.Providers;
 
@@ -11,14 +12,19 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
 {
     private readonly McpRepositoryProviderOptions _options;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IAssertionIssuer? _issuer;
+    private readonly IAssertionAudit? _audit;
 
-    public McpLifecycleProvider(McpRepositoryProviderOptions options, IHttpClientFactory httpClientFactory)
+    public McpLifecycleProvider(McpRepositoryProviderOptions options, IHttpClientFactory httpClientFactory,
+        IAssertionIssuer? issuer = null, IAssertionAudit? audit = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(httpClientFactory);
         if (!options.Endpoint.IsLoopback) throw new ArgumentException("Provider endpoint must use a loopback host.", nameof(options));
         _options = options;
         _httpClientFactory = httpClientFactory;
+        _issuer = issuer;
+        _audit = audit;
     }
 
     public string Name => _options.Name;
@@ -26,6 +32,9 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     public async Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (IsKelpie && (request.Action is LifecycleAction.Deploy or LifecycleAction.DeployRollback))
+            return await new KelpieLifecycleAdapter(_options, _httpClientFactory, _issuer, _audit)
+                .ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         try
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -87,6 +96,9 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     }
 
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsKelpie => string.Equals(_options.Name, "server", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(_options.Name, "kelpiessh", StringComparison.OrdinalIgnoreCase);
 
     private string LifecycleToolPrefix => string.Equals(_options.Name, "buckettie", StringComparison.OrdinalIgnoreCase)
         ? "buckettie"

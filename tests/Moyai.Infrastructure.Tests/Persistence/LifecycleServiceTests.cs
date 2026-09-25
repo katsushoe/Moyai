@@ -39,6 +39,32 @@ public sealed class LifecycleServiceTests
         Assert.Null(providers["githubbie"].LastRequest);
     }
 
+    [Fact]
+    public async Task ServerDeployUsesCanonicalKelpieProviderWithoutServiceToken()
+    {
+        await using var fixture = new LifecycleFixture();
+        (LifecycleService service, RecordingProvider provider, Guid projectId) = await fixture.CreateServerAsync();
+        Guid deploymentId = Guid.NewGuid();
+
+        await service.ExecuteAsync(
+            "Moyai",
+            LifecycleAction.Deploy,
+            "test",
+            "lifecycle",
+            "1.0.0",
+            "artifact.zip",
+            deploymentId: deploymentId,
+            kelpieTarget: "target-01",
+            destinationPath: "/srv/app/artifact.zip",
+            artifactSha256: new string('a', 64));
+
+        Assert.NotNull(provider.LastRequest);
+        Assert.Null(provider.LastRequest.ServiceToken);
+        Assert.Equal(projectId, provider.LastRequest.ProjectId);
+        Assert.Equal(deploymentId, provider.LastRequest.DeploymentId);
+        Assert.Equal("target-01", provider.LastRequest.KelpieTarget);
+    }
+
     private sealed class LifecycleFixture : IAsyncDisposable
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-lifecycle-{Guid.NewGuid():N}.db");
@@ -60,6 +86,24 @@ public sealed class LifecycleServiceTests
                 ["local"] = new("local", "deploy.write"),
             };
             return (new LifecycleService(projects, tokens, providers.Values, new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System), providers);
+        }
+
+        public async Task<(LifecycleService Service, RecordingProvider Provider, Guid ProjectId)> CreateServerAsync()
+        {
+            string connectionString = new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString();
+            var options = new SqliteDatabaseOptions(connectionString);
+            await new SqliteDatabaseInitializer(options).InitializeAsync();
+            var projects = new SqliteProjectRepository(options);
+            var project = await new ProjectService(projects, TimeProvider.System).CreateAsync(
+                new CreateProjectCommand("Moyai", "source", null, "", null, "", "server", "test", "lifecycle"));
+            var provider = new RecordingProvider("kelpiessh", null);
+            var service = new LifecycleService(
+                projects,
+                new SqliteServiceTokenRepository(options),
+                [provider],
+                new SqliteLifecycleEventWriter(options, TimeProvider.System),
+                TimeProvider.System);
+            return (service, provider, project.Id);
         }
 
         public async Task<long> LifecycleEventCountAsync()

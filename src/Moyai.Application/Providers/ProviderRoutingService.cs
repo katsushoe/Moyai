@@ -12,8 +12,9 @@ public sealed class ProviderRoutingService
     private readonly IServiceTokenRepository _tokens;
     private readonly Dictionary<string, IRepositoryProvider> _providers;
     private readonly TimeProvider _timeProvider;
+    private readonly RepositoryAuthentication _authentication;
 
-    public ProviderRoutingService(IProjectRepository projects, IServiceTokenRepository tokens, IEnumerable<IRepositoryProvider> providers, TimeProvider timeProvider)
+    public ProviderRoutingService(IProjectRepository projects, IServiceTokenRepository tokens, IEnumerable<IRepositoryProvider> providers, TimeProvider timeProvider, RepositoryAuthentication? authentication = null)
     {
         ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(tokens);
@@ -23,6 +24,7 @@ public sealed class ProviderRoutingService
         _tokens = tokens;
         _providers = providers.ToDictionary(static provider => provider.Name, StringComparer.Ordinal);
         _timeProvider = timeProvider;
+        _authentication = authentication ?? new RepositoryAuthentication();
     }
 
     /// <summary>Projectに設定されたProviderへ標準Repository操作を委譲します。</summary>
@@ -37,7 +39,10 @@ public sealed class ProviderRoutingService
         }
 
         string? tokenValue = null;
-        if (IsMutation(operation))
+        bool legacy;
+        try { legacy = _authentication.UseLegacy(_timeProvider); }
+        catch (ProviderAuthenticationException exception) { return Failure(operation, exception.Code, exception.Code); }
+        if (legacy && IsMutation(operation))
         {
             ServiceToken? token = await _tokens.FindByAudienceAsync(providerName, cancellationToken).ConfigureAwait(false);
             if (token is null)
@@ -56,8 +61,18 @@ public sealed class ProviderRoutingService
         }
 
         ValidateArguments(operation, message, branch, tag, source);
-        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source);
-        return await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source, project.Id, Guid.NewGuid().ToString("N"), !legacy);
+        RepositoryProviderResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!legacy && result.ErrorCode == "auth_assertion_expired")
+        {
+            // Re-read persisted authorization; retry only if the complete execution context remains unchanged.
+            Project current = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
+            if (current.Id != project.Id || current.Revision != project.Revision || current.RepositoryUrl != request.RepositoryUrl
+                || ProviderName(current.RepositoryProvider) != providerName)
+                return Failure(operation, "auth_project_mismatch", "Authorization context changed.");
+            result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        return result;
     }
 
     private static RepositoryProviderResult Failure(RepositoryOperation operation, string code, string message) =>

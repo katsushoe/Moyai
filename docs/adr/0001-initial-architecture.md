@@ -4,6 +4,8 @@
 
 Accepted
 
+2026-09-06追記: Repository Provider間認証とローカル秘密情報保護の設計は、[Provider認証仕様](../specifications/Provider_Authentication_Specification.md)を正本とします。本ADRのService Token、Introspection、Token Rotationの記述は移行前方式の記録です。新仕様のAssertion、Envelope Encryption、鍵更新と段階移行を優先します。新方式は実装承認を受け、開発コードへ追加しました。実運用の移行完了を意味しません。実装と残る検証は[ADR 0008](0008-provider-assertions.md)を参照してください。外部サービスCredentialのProvider所有権は維持します。SSH認証は今回の変更対象外です。
+
 ## Context
 
 Moyaiは複数クライアントから共有されるProject Stateの正本であり、SQLite、CLI、MCP、外部Providerを明確に分離する必要があります。

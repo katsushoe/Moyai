@@ -13,4 +13,9 @@ public sealed record LifecycleRequest(
     IReadOnlyList<string>? ArtifactPaths = null,
     long? ProviderReleaseId = null,
     string? TagName = null,
-    string? CommitHash = null);
+    string? CommitHash = null,
+    Guid? ProjectId = null,
+    Guid? DeploymentId = null,
+    string? KelpieTarget = null,
+    string? DestinationPath = null,
+    string? ArtifactSha256 = null);

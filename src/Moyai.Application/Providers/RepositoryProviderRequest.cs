@@ -8,10 +8,16 @@ public sealed record RepositoryProviderRequest(
     string RemoteName,
     RepositoryOperation Operation,
     string? Message,
-    string? ServiceToken,
+    [property: System.Text.Json.Serialization.JsonIgnore] string? ServiceToken,
     string? Branch = null,
     string? Tag = null,
     string? DefaultBranch = null,
     string? GitUserName = null,
     string? GitUserEmail = null,
-    string? BranchSource = null);
+    string? BranchSource = null,
+    Guid ProjectId = default,
+    string? OperationId = null,
+    bool UseAssertion = false)
+{
+    public override string ToString() => $"Repository request: {Operation}";
+}

@@ -34,6 +34,7 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
             new SqliteMigration(2, ServiceTokenAuditMigrationSql),
             new SqliteMigration(3, StateFoundationMigrationSql),
             new SqliteMigration(4, WorkItemSearchMigrationSql),
+            new SqliteMigration(5, AssertionSchemaSql),
         ]);
         await migrationRunner.MigrateAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -44,6 +45,33 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
         command.CommandText = sql;
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    private const string AssertionSchemaSql = """
+        CREATE TABLE protector_state (key_namespace TEXT PRIMARY KEY, active_version TEXT NOT NULL);
+        CREATE TABLE assertion_replay (
+            issuer TEXT NOT NULL, jti_hash TEXT NOT NULL, expires_at INTEGER NOT NULL,
+            PRIMARY KEY(issuer,jti_hash)
+        );
+        CREATE INDEX assertion_replay_expiry ON assertion_replay(expires_at);
+        CREATE TABLE secret_envelopes (
+            secret_id TEXT PRIMARY KEY, owner_type TEXT NOT NULL, owner_id TEXT NOT NULL,
+            project_id TEXT NULL, secret_kind TEXT NOT NULL, ciphertext BLOB NOT NULL,
+            nonce BLOB NOT NULL CHECK(length(nonce)=12), tag BLOB NOT NULL CHECK(length(tag)=16),
+            wrapped_dek BLOB NOT NULL, key_version TEXT NOT NULL, aad_version INTEGER NOT NULL CHECK(aad_version=1)
+        );
+        CREATE TABLE assertion_keys (
+            issuer TEXT NOT NULL, kid TEXT NOT NULL, secret_id TEXT NOT NULL REFERENCES secret_envelopes(secret_id),
+            public_x TEXT NOT NULL, public_y TEXT NOT NULL, not_before INTEGER NOT NULL, not_after INTEGER NOT NULL,
+            state TEXT NOT NULL CHECK(state IN ('Next','Active','Retiring','Retired','Revoked')),
+            retire_after INTEGER NULL, PRIMARY KEY(issuer,kid)
+        );
+        CREATE UNIQUE INDEX assertion_active_key ON assertion_keys(issuer) WHERE state='Active';
+        CREATE TABLE assertion_audit (
+            operation_id TEXT NOT NULL, provider_id TEXT NOT NULL, project_id TEXT NOT NULL,
+            repository_id TEXT NOT NULL, scopes_json TEXT NOT NULL, key_id TEXT NOT NULL,
+            result_code TEXT NOT NULL, created_at INTEGER NOT NULL
+        );
+        """;
 
     private const string SchemaSql = """
         CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);

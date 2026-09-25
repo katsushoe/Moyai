@@ -1,5 +1,7 @@
 # Moyai Commands
 
+Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`、`assertion-key-activate --kid <id> --trust-distribution-confirmed true [--overlap-seconds 86400]`、`assertion-key-revoke --kid <id>`、`assertion-protector-rotate`、`assertion-secret-rewrap`。すべてサービス経由で公開情報だけを返します。[運用Contract](docs/specifications/provider-authentication-operations.md)に状態遷移・エラー・移行・Trust配布条件を記載しています。
+
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
 ローカル接続管理は `configure codex|claude [--profile <path>] [--config <path>]`、`unconfigure codex|claude [--profile <path>]`、復元は `client-transaction codex|claude --phase rollback|commit [--profile <path>]` です。`--transaction`はMSI用の復元情報を残します。業務MCPではなくインストール管理コマンドです。[MCP設定手順](MCP_SETUP.ja.md)を参照してください。

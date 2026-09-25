@@ -10,6 +10,8 @@ Use GitHub's private security advisory reporting for this repository. Do not dis
 
 ## Security Model
 
+The design authority for Repository Provider authentication and local secret protection is the [Provider authentication specification](docs/specifications/Provider_Authentication_Specification.md). The development code defaults to per-operation ES256 assertions and fails closed until keys and Provider capabilities are configured. Native-platform and real-Provider rollout status is tracked in the [implementation receipt](docs/specifications/provider-authentication-transfer.md). Legacy repository authentication requires an explicit window of at most seven days. Existing service-token behavior below also serves lifecycle providers; it is not the new assertion protocol. External-service credentials remain owned by each Provider.
+
 The MCP server binds only to loopback. Repository and lifecycle operations are delegated to configured providers. Service tokens are scoped by audience and scope and can expire, rotate, or be revoked. Release publishing and deployment require explicit target approval.
 
 ## Secrets Handling
