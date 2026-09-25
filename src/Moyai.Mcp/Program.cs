@@ -133,7 +133,8 @@ static async Task<int> RunAsync(string[] arguments)
                 providerOptions,
                 services.GetRequiredService<IHttpClientFactory>(),
                 services.GetService<IAssertionIssuer>(),
-                new SqliteAssertionAudit(options, TimeProvider.System)));
+                new SqliteAssertionAudit(options, TimeProvider.System),
+                auth.Mode == "assertion" ? new AssertionCapability(provider.AssertionProviderId, provider.AssertionProviderId, "1", "ES256", true, provider.AssertionToolScopes) : null));
         }
         builder.Services.AddSingleton<ProviderRoutingService>(serviceProvider => new ProviderRoutingService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<IRepositoryProvider>(), serviceProvider.GetRequiredService<TimeProvider>(), new RepositoryAuthentication(auth.Mode, auth.LegacyStartedAt, auth.LegacyUntil)));
         builder.Services.AddSingleton<LifecycleService>(serviceProvider => new LifecycleService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<ILifecycleProvider>(), serviceProvider.GetRequiredService<SqliteLifecycleEventWriter>(), serviceProvider.GetRequiredService<TimeProvider>()));

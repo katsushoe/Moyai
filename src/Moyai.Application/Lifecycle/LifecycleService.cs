@@ -49,7 +49,7 @@ public sealed class LifecycleService
             throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
         string? token = await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
         var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token,
-            artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256);
+            artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256, project.RepositoryUrl);
         LifecycleResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         await _events.WriteAsync(project.Id, action, result, actorType, actorName, cancellationToken).ConfigureAwait(false);
         return result;

@@ -14,9 +14,10 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAssertionIssuer? _issuer;
     private readonly IAssertionAudit? _audit;
+    private readonly AssertionCapability? _capability;
 
     public McpLifecycleProvider(McpRepositoryProviderOptions options, IHttpClientFactory httpClientFactory,
-        IAssertionIssuer? issuer = null, IAssertionAudit? audit = null)
+        IAssertionIssuer? issuer = null, IAssertionAudit? audit = null, AssertionCapability? capability = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(httpClientFactory);
@@ -25,6 +26,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         _httpClientFactory = httpClientFactory;
         _issuer = issuer;
         _audit = audit;
+        _capability = capability;
     }
 
     public string Name => _options.Name;
@@ -37,12 +39,9 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
                 .ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         try
         {
-            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (request.ServiceToken is not null) headers["Authorization"] = $"Bearer {request.ServiceToken}";
-            var transportOptions = new HttpClientTransportOptions { Endpoint = _options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
-            using HttpClient httpClient = _httpClientFactory.CreateClient(Name);
-            await using var transport = new HttpClientTransport(transportOptions, httpClient);
-            await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await using ToolCaller client = UsesAssertion
+                ? new AssertionToolCaller(this, request)
+                : await LegacyToolCaller.CreateAsync(this, request, cancellationToken).ConfigureAwait(false);
             string operation = OperationName(request.Action);
             var arguments = new Dictionary<string, object?> { ["repository"] = request.Project };
             if (IsGithubie) arguments["project"] = request.Project;
@@ -75,14 +74,17 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
                 arguments["prerelease"] = null;
                 arguments["draft"] = false;
             }
-            CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-            LifecycleResult parsed = LifecycleProviderResponse.Parse(operation, result);
+            LifecycleResult parsed = await client.CallAsync(toolName, arguments, operation, cancellationToken).ConfigureAwait(false);
             if (IsGithubie && request.Action == LifecycleAction.ReleaseCreate && parsed.ErrorCode == "provider_conflict")
             {
                 LifecycleResult? existing = await ReconcileExistingReleaseAsync(client, request, operation, cancellationToken).ConfigureAwait(false);
                 if (existing is not null) return existing;
             }
             return parsed;
+        }
+        catch (ProviderAuthenticationException exception)
+        {
+            return new LifecycleResult(false, OperationName(request.Action), null, exception.Code, exception.Code);
         }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
         {
@@ -95,6 +97,9 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         if (value is not null) arguments[name] = value;
     }
 
+    /// <summary>GithubieのRelease系Toolは、Capabilityが構成されている場合にTool単位のAssertionを必須とします。</summary>
+    private bool UsesAssertion => IsGithubie && _capability is not null;
+
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
 
     private bool IsKelpie => string.Equals(_options.Name, "server", StringComparison.OrdinalIgnoreCase)
@@ -104,13 +109,12 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         ? "buckettie"
         : _options.ToolPrefix;
 
-    private async Task<LifecycleResult?> ReconcileExistingReleaseAsync(McpClient client, LifecycleRequest request, string operation, CancellationToken cancellationToken)
+    private async Task<LifecycleResult?> ReconcileExistingReleaseAsync(ToolCaller client, LifecycleRequest request, string operation, CancellationToken cancellationToken)
     {
         string getTool = $"{LifecycleToolPrefix}_release_get";
         var getArguments = new Dictionary<string, object?> { ["repository"] = request.Project, ["version"] = request.Version };
         if (IsGithubie) getArguments["project"] = request.Project;
-        CallToolResult getResponse = await client.CallToolAsync(getTool, getArguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-        LifecycleResult found = LifecycleProviderResponse.Parse(operation, getResponse);
+        LifecycleResult found = await client.CallAsync(getTool, getArguments, operation, cancellationToken).ConfigureAwait(false);
         if (!found.Ok) return found.ErrorCode == "provider_not_found" ? null : found;
         if (string.IsNullOrWhiteSpace(found.Output)) return Invalid(operation, "Provider release lookup returned no data.");
 
@@ -151,14 +155,13 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         }
     }
 
-    private async Task<LifecycleResult?> VerifyCommitAsync(McpClient client, LifecycleRequest request, string operation, List<string> differences, CancellationToken cancellationToken)
+    private async Task<LifecycleResult?> VerifyCommitAsync(ToolCaller client, LifecycleRequest request, string operation, List<string> differences, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.CommitHash)) return null;
         string expectedTag = ExpectedTag(request);
         string toolName = IsGithubie ? "github_tag_get" : "bitbucket_tag_get";
         var arguments = new Dictionary<string, object?> { ["repository"] = request.Project, ["tag"] = expectedTag };
-        CallToolResult response = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-        LifecycleResult tagResult = LifecycleProviderResponse.Parse(operation, response);
+        LifecycleResult tagResult = await client.CallAsync(toolName, arguments, operation, cancellationToken).ConfigureAwait(false);
         if (!tagResult.Ok) return tagResult;
         try
         {
@@ -232,4 +235,91 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         LifecycleAction.DeployRollback => "deploy_rollback",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
+
+    private abstract class ToolCaller : IAsyncDisposable
+    {
+        public abstract Task<LifecycleResult> CallAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken);
+
+        public abstract ValueTask DisposeAsync();
+    }
+
+    /// <summary>従来方式で1つのMCP接続を共有します。</summary>
+    private sealed class LegacyToolCaller : ToolCaller
+    {
+        private HttpClient? _httpClient;
+        private HttpClientTransport? _transport;
+        private McpClient? _client;
+
+        public static async Task<LegacyToolCaller> CreateAsync(McpLifecycleProvider owner, LifecycleRequest request, CancellationToken cancellationToken)
+        {
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (request.ServiceToken is not null) headers["Authorization"] = $"Bearer {request.ServiceToken}";
+            var transportOptions = new HttpClientTransportOptions { Endpoint = owner._options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
+            var caller = new LegacyToolCaller();
+            try
+            {
+                caller._httpClient = owner._httpClientFactory.CreateClient(owner.Name);
+                caller._transport = new HttpClientTransport(transportOptions, caller._httpClient);
+                caller._client = await McpClient.CreateAsync(caller._transport, cancellationToken: cancellationToken).ConfigureAwait(false);
+                return caller;
+            }
+            catch
+            {
+                await caller.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        public override async Task<LifecycleResult> CallAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
+        {
+            CallToolResult result = await _client!.CallToolAsync(tool, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return LifecycleProviderResponse.Parse(operation, result);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (_client is not null) await _client.DisposeAsync().ConfigureAwait(false);
+            if (_transport is not null) await _transport.DisposeAsync().ConfigureAwait(false);
+            _httpClient?.Dispose();
+        }
+    }
+
+    /// <summary>Tool呼び出しごとに専用のAssertionとMCP接続を作成します。静的Tokenへは退避しません。</summary>
+    private sealed class AssertionToolCaller(McpLifecycleProvider owner, LifecycleRequest request) : ToolCaller
+    {
+        public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public override async Task<LifecycleResult> CallAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
+        {
+            LifecycleResult result = await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false);
+            return string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal)
+                ? await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false)
+                : result;
+        }
+
+        private async Task<LifecycleResult> CallOnceAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
+        {
+            AssertionCapability capability = owner._capability!;
+            IAssertionIssuer issuer = owner._issuer ?? throw new ProviderAuthenticationException("authentication_unavailable");
+            if (request.ProjectId is not Guid projectId || projectId == Guid.Empty || string.IsNullOrWhiteSpace(request.RepositoryUrl))
+                throw new ProviderAuthenticationException("auth_project_mismatch");
+            if (!capability.ToolScopes.TryGetValue(tool, out string[]? scopes))
+                throw new ProviderAuthenticationException("provider_capability_missing");
+            var context = new AssertionContext(capability.ProviderId, projectId, RepositoryAssertionPolicy.NormalizeRepository(request.RepositoryUrl),
+                tool, scopes, Guid.NewGuid().ToString("N"));
+            capability.Require(context);
+            var transportOptions = new HttpClientTransportOptions { Endpoint = owner._options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp };
+            using HttpClient providerClient = owner._httpClientFactory.CreateClient(owner.Name);
+            using var assertionHandler = new AssertionHttpHandler(providerClient, issuer, context, owner._audit);
+            using var httpClient = new HttpClient(assertionHandler);
+            await using var transport = new HttpClientTransport(transportOptions, httpClient);
+            await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
+            CallToolResult response = await client.CallToolAsync(tool, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+            LifecycleResult parsed = LifecycleProviderResponse.Parse(operation, response);
+            parsed = parsed with { Output = assertionHandler.Redact(parsed.Output), ErrorMessage = assertionHandler.Redact(parsed.ErrorMessage) };
+            if (owner._audit is not null)
+                await owner._audit.WriteAsync(context, assertionHandler.KeyId, parsed.Ok ? "accepted" : parsed.ErrorCode ?? "provider_operation_failed", cancellationToken).ConfigureAwait(false);
+            return parsed;
+        }
+    }
 }

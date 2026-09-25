@@ -4,6 +4,11 @@
 
 ## 未公開
 
+## 1.3.3.0 - 2026-09-25（ローカルパッケージ）
+
+- GithubieへのRelease作成・公開・照会（`github_release_get`、`github_tag_get`、`github_release_create`、`github_release_update`）に、Tool単位のProvider Assertionを付与するようにしました。Assertion必須のGithubieへMoyai経由でReleaseを公開できなかった問題を修正します。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.2.0 - 2026-09-25（ローカルパッケージ）
 
 - Buckettieへ状態変更操作（読み取り以外）を委譲する前に、Bootstrapの`bitbucket_provider_capabilities`で`integration_mode`を確認し、`moyai`でない場合は`provider_integration_mode_mismatch`で拒否するようにしました。

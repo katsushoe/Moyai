@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+## 1.3.3.0 - 2026-09-25 (local package)
+
+- Attach a per-tool Provider assertion to Githubie release lookup, creation and publication (`github_release_get`, `github_tag_get`, `github_release_create`, `github_release_update`), fixing Moyai release publication against assertion-only Githubie.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.2.0 - 2026-09-25 (local package)
 
 - Before delegating a state-changing (non-read) operation to Buckettie, Moyai now checks `integration_mode` through the bootstrap `bitbucket_provider_capabilities` tool and rejects the operation with `provider_integration_mode_mismatch` unless it is `moyai`.

@@ -18,4 +18,5 @@ public sealed record LifecycleRequest(
     Guid? DeploymentId = null,
     string? KelpieTarget = null,
     string? DestinationPath = null,
-    string? ArtifactSha256 = null);
+    string? ArtifactSha256 = null,
+    string? RepositoryUrl = null);
