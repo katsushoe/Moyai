@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 1.3.7.0 - 2026-09-27 (local package)
+
+- Re-check the Project ID, revision, repository, provider and deploy mode before retrying `auth_assertion_expired` in release lifecycle and KelpieSSH deployment, returning `auth_project_mismatch` instead of retrying when they changed.
+- Made the legacy test-only `Es256AssertionValidator` internal; production validation uses the shared Moyai.ProviderAuthentication validator.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.6.0 - 2026-09-26 (local package)
 
 - Call `get_version` and `*_provider_capabilities` without an assertion as bootstrap operations when the Provider capability does not list them, enabling Buckettie capability queries.

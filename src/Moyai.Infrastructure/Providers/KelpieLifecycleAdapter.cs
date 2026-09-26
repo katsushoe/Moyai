@@ -191,6 +191,11 @@ internal sealed class KelpieLifecycleAdapter
         KelpieCallResult result = await CallOnceAsync(request, tool, arguments, cancellationToken).ConfigureAwait(false);
         if (string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal))
         {
+            if (request.RevalidateContext is not null && !await request.RevalidateContext(cancellationToken).ConfigureAwait(false))
+            {
+                return new KelpieCallResult(false, null, "auth_project_mismatch", "Authorization context changed.", null, false);
+            }
+
             result = await CallOnceAsync(request, tool, arguments, cancellationToken).ConfigureAwait(false);
         }
 

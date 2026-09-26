@@ -6,7 +6,8 @@ using Moyai.Application.Authentication;
 namespace Moyai.Infrastructure.Authentication;
 
 /// <summary>Provider非依存の署名、Context、Capability、Replay検証です。</summary>
-public sealed class Es256AssertionValidator(IAssertionTrustStore trust, IAssertionReplayCache replay,
+/// <remarks>テスト用の参照実装です。本番の検証にはMoyai.ProviderAuthenticationの共通Validatorを使用します。</remarks>
+internal sealed class Es256AssertionValidator(IAssertionTrustStore trust, IAssertionReplayCache replay,
     AssertionOptions options, AssertionCapability capability, TimeProvider clock) : IAssertionValidator
 {
     public async Task<AssertionPrincipal> ValidateAsync(string assertion, AssertionContext expected, CancellationToken cancellationToken = default)

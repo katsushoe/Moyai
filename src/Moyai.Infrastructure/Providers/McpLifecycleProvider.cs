@@ -304,9 +304,10 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         public override async Task<LifecycleResult> CallAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
         {
             LifecycleResult result = await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false);
-            return string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal)
-                ? await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false)
-                : result;
+            if (!string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal)) return result;
+            if (request.RevalidateContext is not null && !await request.RevalidateContext(cancellationToken).ConfigureAwait(false))
+                return new LifecycleResult(false, operation, null, "auth_project_mismatch", "Authorization context changed.");
+            return await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<LifecycleResult> CallOnceAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)

@@ -63,10 +63,19 @@ public sealed class LifecycleService
         }
         string? token = usesAssertion ? null : await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
         var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token,
-            artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256, project.RepositoryUrl);
+            artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256, project.RepositoryUrl,
+            cancellation => IsSameContextAsync(project, cancellation));
         LifecycleResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         await _events.WriteAsync(project.Id, action, result, actorType, actorName, cancellationToken).ConfigureAwait(false);
         return result;
+    }
+
+    /// <summary>Assertion期限切れの再試行前に、永続化されたProjectの実行文脈が変わっていないことを確認します。</summary>
+    private async Task<bool> IsSameContextAsync(Project original, CancellationToken cancellationToken)
+    {
+        Project current = await _projects.GetRequiredAsync(original.Name, cancellationToken).ConfigureAwait(false);
+        return current.Id == original.Id && current.Revision == original.Revision && current.RepositoryUrl == original.RepositoryUrl
+            && current.RepositoryProvider == original.RepositoryProvider && current.DeployMode == original.DeployMode;
     }
 
     private async Task<string?> ResolveTokenAsync(Project project, LifecycleAction action, CancellationToken cancellationToken)

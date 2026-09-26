@@ -4,6 +4,12 @@
 
 ## 未公開
 
+## 1.3.7.0 - 2026-09-27（ローカルパッケージ）
+
+- Release系LifecycleとKelpieSSH Deployで、`auth_assertion_expired`の再試行前にProjectのID・Revision・Repository・Provider・Deploy方式を再確認し、変更時は`auth_project_mismatch`で再実行しないようにしました。
+- テスト用の旧`Es256AssertionValidator`を非公開にしました。本番の検証はMoyai.ProviderAuthenticationの共通Validatorを使用します。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.6.0 - 2026-09-26（ローカルパッケージ）
 
 - ProviderのCapabilityに含まれない`get_version`と`*_provider_capabilities`をBootstrapとして無Assertionで呼び出し、BuckettieのProvider Capability照会を利用可能にしました。
