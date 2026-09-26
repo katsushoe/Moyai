@@ -6,11 +6,13 @@
     <Project Path="src/Moyai.Domain/Moyai.Domain.csproj" />
     <Project Path="src/Moyai.Infrastructure/Moyai.Infrastructure.csproj" />
     <Project Path="src/Moyai.Mcp/Moyai.Mcp.csproj" />
+    <Project Path="src/Moyai.ProviderAuthentication/Moyai.ProviderAuthentication.csproj" />
     <Project Path="src/Moyai.Presentation.Windows/Moyai.Presentation.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Moyai.Domain.Tests/Moyai.Domain.Tests.csproj" />
     <Project Path="tests/Moyai.Infrastructure.Tests/Moyai.Infrastructure.Tests.csproj" />
     <Project Path="tests/Moyai.Mcp.Tests/Moyai.Mcp.Tests.csproj" />
+    <Project Path="tests/Moyai.ProviderAuthentication.Tests/Moyai.ProviderAuthentication.Tests.csproj" />
   </Folder>
 </Solution>

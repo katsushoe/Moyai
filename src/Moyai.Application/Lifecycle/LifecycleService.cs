@@ -14,8 +14,9 @@ public sealed class LifecycleService
     private readonly Dictionary<string, ILifecycleProvider> _providers;
     private readonly TimeProvider _timeProvider;
     private readonly ILifecycleEventWriter _events;
+    private readonly RepositoryAuthentication _authentication;
 
-    public LifecycleService(IProjectRepository projects, IServiceTokenRepository tokens, IEnumerable<ILifecycleProvider> providers, ILifecycleEventWriter events, TimeProvider timeProvider)
+    public LifecycleService(IProjectRepository projects, IServiceTokenRepository tokens, IEnumerable<ILifecycleProvider> providers, ILifecycleEventWriter events, TimeProvider timeProvider, RepositoryAuthentication? authentication = null)
     {
         ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(tokens);
@@ -27,10 +28,11 @@ public sealed class LifecycleService
         _providers = providers.ToDictionary(static provider => provider.Name, StringComparer.Ordinal);
         _timeProvider = timeProvider;
         _events = events;
+        _authentication = authentication ?? new RepositoryAuthentication();
     }
 
     /// <summary>Project設定に従ってLifecycle操作を委譲します。</summary>
-    public async Task<LifecycleResult> ExecuteAsync(string projectName, LifecycleAction action, string actorType, string actorName, string? version = null, string? artifactPath = null, string? notes = null, CancellationToken cancellationToken = default)
+    public async Task<LifecycleResult> ExecuteAsync(string projectName, LifecycleAction action, string actorType, string actorName, string? version = null, string? artifactPath = null, string? notes = null, IReadOnlyList<string>? artifactPaths = null, long? providerReleaseId = null, string? tagName = null, string? commitHash = null, Guid? deploymentId = null, string? kelpieTarget = null, string? destinationPath = null, string? artifactSha256 = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actorType);
         ArgumentException.ThrowIfNullOrWhiteSpace(actorName);
@@ -44,9 +46,24 @@ public sealed class LifecycleService
         }
         ValidateInput(action, version, artifactPath);
         string providerName = ResolveProvider(project, action);
-        if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)) throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
-        string? token = await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
-        var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token);
+        if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)
+            && !(providerName == "server" && _providers.TryGetValue("kelpiessh", out provider)))
+            throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
+        bool usesAssertion = provider.UsesAssertion(action);
+        if (!usesAssertion && action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw)
+        {
+            // Legacy移行期間外は静的Tokenを解決・送信せずに拒否します。
+            try { _authentication.UseLegacy(_timeProvider); }
+            catch (ProviderAuthenticationException exception)
+            {
+                var rejected = new LifecycleResult(false, action.ToString(), null, exception.Code, exception.Code);
+                await _events.WriteAsync(project.Id, action, rejected, actorType, actorName, cancellationToken).ConfigureAwait(false);
+                return rejected;
+            }
+        }
+        string? token = usesAssertion ? null : await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
+        var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token,
+            artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256, project.RepositoryUrl);
         LifecycleResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         await _events.WriteAsync(project.Id, action, result, actorType, actorName, cancellationToken).ConfigureAwait(false);
         return result;
@@ -54,6 +71,7 @@ public sealed class LifecycleService
 
     private async Task<string?> ResolveTokenAsync(Project project, LifecycleAction action, CancellationToken cancellationToken)
     {
+        if ((action is LifecycleAction.Deploy or LifecycleAction.DeployRollback) && project.DeployMode == "server") return null;
         string? scope = action switch
         {
             LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw => "release.write",

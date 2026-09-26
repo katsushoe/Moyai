@@ -4,5 +4,9 @@
 public interface ILifecycleProvider
 {
     string Name { get; }
+
+    /// <summary>Providerが操作単位のAssertionで認証し、静的Service Tokenを使用しない場合にtrueを返します。</summary>
+    bool UsesAssertion(LifecycleAction action) => false;
+
     Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default);
 }

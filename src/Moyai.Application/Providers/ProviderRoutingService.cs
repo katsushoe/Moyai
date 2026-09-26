@@ -12,8 +12,9 @@ public sealed class ProviderRoutingService
     private readonly IServiceTokenRepository _tokens;
     private readonly Dictionary<string, IRepositoryProvider> _providers;
     private readonly TimeProvider _timeProvider;
+    private readonly RepositoryAuthentication _authentication;
 
-    public ProviderRoutingService(IProjectRepository projects, IServiceTokenRepository tokens, IEnumerable<IRepositoryProvider> providers, TimeProvider timeProvider)
+    public ProviderRoutingService(IProjectRepository projects, IServiceTokenRepository tokens, IEnumerable<IRepositoryProvider> providers, TimeProvider timeProvider, RepositoryAuthentication? authentication = null)
     {
         ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(tokens);
@@ -23,6 +24,7 @@ public sealed class ProviderRoutingService
         _tokens = tokens;
         _providers = providers.ToDictionary(static provider => provider.Name, StringComparer.Ordinal);
         _timeProvider = timeProvider;
+        _authentication = authentication ?? new RepositoryAuthentication();
     }
 
     /// <summary>Projectに設定されたProviderへ標準Repository操作を委譲します。</summary>
@@ -33,29 +35,48 @@ public sealed class ProviderRoutingService
         string providerName = ProviderName(project.RepositoryProvider);
         if (!_providers.TryGetValue(providerName, out IRepositoryProvider? provider))
         {
-            throw new ProviderRoutingException("provider_unavailable", $"Repository provider '{providerName}' is unavailable.");
+            return Failure(operation, "provider_unavailable", $"Repository provider '{providerName}' is unavailable.");
         }
 
         string? tokenValue = null;
-        if (IsMutation(operation))
+        bool legacy;
+        try { legacy = _authentication.UseLegacy(_timeProvider); }
+        catch (ProviderAuthenticationException exception) { return Failure(operation, exception.Code, exception.Code); }
+        if (legacy && IsMutation(operation))
         {
-            ServiceToken token = await _tokens.FindByAudienceAsync(providerName, cancellationToken).ConfigureAwait(false)
-                ?? throw new ProviderRoutingException("invalid_service_token", $"An active service token for '{providerName}' is required.");
+            ServiceToken? token = await _tokens.FindByAudienceAsync(providerName, cancellationToken).ConfigureAwait(false);
+            if (token is null)
+            {
+                return Failure(operation, "invalid_service_token", $"An active service token for '{providerName}' is required.");
+            }
             if (token.ExpiresAt is not null && token.ExpiresAt <= _timeProvider.GetUtcNow())
             {
-                throw new ProviderRoutingException("service_token_expired", $"The service token for '{providerName}' has expired.");
+                return Failure(operation, "service_token_expired", $"The service token for '{providerName}' has expired.");
             }
             if (!token.Scopes.Contains("repository.write"))
             {
-                throw new ProviderRoutingException("service_token_scope_missing", $"The service token for '{providerName}' lacks repository.write scope.");
+                return Failure(operation, "service_token_scope_missing", $"The service token for '{providerName}' lacks repository.write scope.");
             }
             tokenValue = token.Token;
         }
 
         ValidateArguments(operation, message, branch, tag, source);
-        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source);
-        return await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source, project.Id, Guid.NewGuid().ToString("N"), !legacy);
+        RepositoryProviderResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!legacy && result.ErrorCode == "auth_assertion_expired")
+        {
+            // Re-read persisted authorization; retry only if the complete execution context remains unchanged.
+            Project current = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
+            if (current.Id != project.Id || current.Revision != project.Revision || current.RepositoryUrl != request.RepositoryUrl
+                || ProviderName(current.RepositoryProvider) != providerName)
+                return Failure(operation, "auth_project_mismatch", "Authorization context changed.");
+            result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        return result;
     }
+
+    private static RepositoryProviderResult Failure(RepositoryOperation operation, string code, string message) =>
+        new(false, operation.ContractName(), null, code, message);
 
     private static bool IsMutation(RepositoryOperation operation) => operation is RepositoryOperation.Commit or RepositoryOperation.Push or RepositoryOperation.Pull or RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush;
 

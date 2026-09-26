@@ -39,11 +39,82 @@ public sealed class LifecycleServiceTests
         Assert.Null(providers["githubbie"].LastRequest);
     }
 
+    [Fact]
+    public async Task LegacyReleaseOutsideMigrationWindowIsRejectedWithoutToken()
+    {
+        await using var fixture = new LifecycleFixture();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        (LifecycleService service, IReadOnlyDictionary<string, RecordingProvider> providers) = await fixture.CreateAsync(
+            authentication: new Moyai.Application.Authentication.RepositoryAuthentication("legacy", now.AddDays(-8), now.AddDays(-1)));
+
+        LifecycleResult result = await service.ExecuteAsync("Moyai", LifecycleAction.ReleaseCreate, "test", "lifecycle", "1.0.0");
+
+        Assert.False(result.Ok);
+        Assert.Equal("authentication_unavailable", result.ErrorCode);
+        Assert.Null(providers["githubbie"].LastRequest);
+    }
+
+    [Fact]
+    public async Task LegacyReleaseInsideMigrationWindowUsesServiceToken()
+    {
+        await using var fixture = new LifecycleFixture();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        (LifecycleService service, IReadOnlyDictionary<string, RecordingProvider> providers) = await fixture.CreateAsync(
+            authentication: new Moyai.Application.Authentication.RepositoryAuthentication("legacy", now.AddDays(-1), now.AddDays(1)));
+
+        LifecycleResult result = await service.ExecuteAsync("Moyai", LifecycleAction.ReleaseCreate, "test", "lifecycle", "1.0.0");
+
+        Assert.True(result.Ok);
+        Assert.NotNull(providers["githubbie"].LastRequest?.ServiceToken);
+    }
+
+    [Fact]
+    public async Task AssertionReleaseProviderDoesNotRequireLegacyServiceToken()
+    {
+        await using var fixture = new LifecycleFixture();
+        (LifecycleService service, AssertionProvider provider) = await fixture.CreateAssertionAsync();
+
+        LifecycleResult result = await service.ExecuteAsync("Moyai", LifecycleAction.ReleaseCreate, "test", "lifecycle", "1.0.0", notes: "notes");
+
+        Assert.True(result.Ok);
+        Assert.NotNull(provider.LastRequest);
+        Assert.Null(provider.LastRequest.ServiceToken);
+        Assert.NotEqual(Guid.Empty, provider.LastRequest.ProjectId);
+        Assert.Equal("https://github.com/example/moyai", provider.LastRequest.RepositoryUrl);
+    }
+
+    [Fact]
+    public async Task ServerDeployUsesCanonicalKelpieProviderWithoutServiceToken()
+    {
+        await using var fixture = new LifecycleFixture();
+        (LifecycleService service, RecordingProvider provider, Guid projectId) = await fixture.CreateServerAsync();
+        Guid deploymentId = Guid.NewGuid();
+
+        await service.ExecuteAsync(
+            "Moyai",
+            LifecycleAction.Deploy,
+            "test",
+            "lifecycle",
+            "1.0.0",
+            "artifact.zip",
+            deploymentId: deploymentId,
+            kelpieTarget: "target-01",
+            destinationPath: "/srv/app/artifact.zip",
+            artifactSha256: new string('a', 64));
+
+        Assert.NotNull(provider.LastRequest);
+        Assert.Null(provider.LastRequest.ServiceToken);
+        Assert.Equal(projectId, provider.LastRequest.ProjectId);
+        Assert.Equal(deploymentId, provider.LastRequest.DeploymentId);
+        Assert.Equal("target-01", provider.LastRequest.KelpieTarget);
+    }
+
     private sealed class LifecycleFixture : IAsyncDisposable
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-lifecycle-{Guid.NewGuid():N}.db");
 
-        public async Task<(LifecycleService Service, IReadOnlyDictionary<string, RecordingProvider> Providers)> CreateAsync(string releaseScope = "release.write")
+        public async Task<(LifecycleService Service, IReadOnlyDictionary<string, RecordingProvider> Providers)> CreateAsync(string releaseScope = "release.write",
+            Moyai.Application.Authentication.RepositoryAuthentication? authentication = null)
         {
             string connectionString = new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString();
             var options = new SqliteDatabaseOptions(connectionString);
@@ -59,7 +130,37 @@ public sealed class LifecycleServiceTests
                 ["githubbie"] = new("githubbie", releaseScope),
                 ["local"] = new("local", "deploy.write"),
             };
-            return (new LifecycleService(projects, tokens, providers.Values, new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System), providers);
+            return (new LifecycleService(projects, tokens, providers.Values, new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System, authentication), providers);
+        }
+
+        public async Task<(LifecycleService Service, AssertionProvider Provider)> CreateAssertionAsync()
+        {
+            string connectionString = new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString();
+            var options = new SqliteDatabaseOptions(connectionString);
+            await new SqliteDatabaseInitializer(options).InitializeAsync();
+            var projects = new SqliteProjectRepository(options);
+            await new ProjectService(projects, TimeProvider.System).CreateAsync(new CreateProjectCommand("Moyai", "source", "install", "https://github.com/example/moyai", null, "dotnet", "local", "test", "lifecycle"));
+            var provider = new AssertionProvider();
+            var service = new LifecycleService(projects, new SqliteServiceTokenRepository(options), [provider], new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System);
+            return (service, provider);
+        }
+
+        public async Task<(LifecycleService Service, RecordingProvider Provider, Guid ProjectId)> CreateServerAsync()
+        {
+            string connectionString = new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString();
+            var options = new SqliteDatabaseOptions(connectionString);
+            await new SqliteDatabaseInitializer(options).InitializeAsync();
+            var projects = new SqliteProjectRepository(options);
+            var project = await new ProjectService(projects, TimeProvider.System).CreateAsync(
+                new CreateProjectCommand("Moyai", "source", null, "", null, "", "server", "test", "lifecycle"));
+            var provider = new RecordingProvider("kelpiessh", null);
+            var service = new LifecycleService(
+                projects,
+                new SqliteServiceTokenRepository(options),
+                [provider],
+                new SqliteLifecycleEventWriter(options, TimeProvider.System),
+                TimeProvider.System);
+            return (service, provider, project.Id);
         }
 
         public async Task<long> LifecycleEventCountAsync()
@@ -91,4 +192,17 @@ public sealed class LifecycleServiceTests
         }
     }
 
+    private sealed class AssertionProvider : ILifecycleProvider
+    {
+        public string Name => "githubbie";
+        public LifecycleRequest? LastRequest { get; private set; }
+
+        public bool UsesAssertion(LifecycleAction action) => true;
+
+        public Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(new LifecycleResult(true, request.Action.ToString(), "ok", null, null));
+        }
+    }
 }

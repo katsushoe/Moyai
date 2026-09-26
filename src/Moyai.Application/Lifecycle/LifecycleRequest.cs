@@ -9,4 +9,14 @@ public sealed record LifecycleRequest(
     string? Version,
     string? ArtifactPath,
     string? Notes,
-    string? ServiceToken);
+    string? ServiceToken,
+    IReadOnlyList<string>? ArtifactPaths = null,
+    long? ProviderReleaseId = null,
+    string? TagName = null,
+    string? CommitHash = null,
+    Guid? ProjectId = null,
+    Guid? DeploymentId = null,
+    string? KelpieTarget = null,
+    string? DestinationPath = null,
+    string? ArtifactSha256 = null,
+    string? RepositoryUrl = null);

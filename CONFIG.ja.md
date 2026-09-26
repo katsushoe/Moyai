@@ -1,5 +1,7 @@
 # Moyai設定
 
+Repository認証の既定はES256 Assertionです。未構成時は操作を拒否します。[Provider認証設定・鍵初期化・移行手順](docs/specifications/provider-authentication-operations.md)を参照してください。静的Repository Tokenは最大7日の明示的な移行期間に限ります。
+
 [English](CONFIG.md) | [日本語](CONFIG.ja.md)
 
 MCPクライアント登録は対象ユーザープロファイルを指定し、他の設定を保持します。MSIプロパティは `MOYAI_CODEX`、`MOYAI_CLAUDE`（`1`で選択）、`MOYAI_CLIENT_PROFILE`（既存プロファイルの絶対パス）です。所有権・アンインストール・復元は[MCP設定手順](MCP_SETUP.ja.md)を参照してください。
@@ -21,11 +23,16 @@ MCPクライアント登録は対象ユーザープロファイルを指定し�
 
 ## Provider
 
-各項目は`name`、`endpoint`、`toolPrefix`と任意の`repository`（既定false）で構成します。URLはHTTP(S)ループバック、名前は重複不可です。既存のGithubieルーティング識別子は`githubbie`、prefixは`github`、repositoryはtrueです。Buckettieは`buckettie`／`bitbucket`／trueです。組み込みBuild Providerは`csharp`、`node`、`php`で、同名の外部Provider設定を優先します。KelpieSSH配備は`server`名を使用します。TokenはサービスDBで管理し、JSONへ保存しません。
+各項目は`name`、`endpoint`、`toolPrefix`と任意の`repository`（既定false）で構成します。URLはHTTP(S)ループバック、名前は重複不可です。既存のGithubieルーティング識別子は`githubbie`、prefixは`github`、repositoryはtrueです。Assertionでは正規Provider ID／Audience `githubie`へ解決します。Buckettieは`buckettie`／`bitbucket`／trueです。組み込みBuild Providerは`csharp`、`node`、`php`で、同名の外部Provider設定を優先します。KelpieSSH配備は`server`名または正規名`kelpiessh`を使用し、Protocol v2 Assertionで認証します。内部`server`経路もAudience `kelpiessh`で署名し、Moyai Service Tokenを取得・送信しません。TokenはサービスDBで管理し、JSONへ保存しません。
 
 ```json
-{"name":"githubbie","endpoint":"http://127.0.0.1:43121/mcp","toolPrefix":"github","repository":true}
+[
+  {"name":"githubbie","endpoint":"http://127.0.0.1:43121/mcp","toolPrefix":"github","repository":true},
+  {"name":"server","endpoint":"http://127.0.0.1:45432/mcp","toolPrefix":"kelpie","repository":false}
+]
 ```
+
+Server配備Targetの`kelpieTarget`にはKelpieSSHの不変Target IDを設定し、配備先Pathを指定します。配備ArtifactはSHA-256付きの単一Fileが必要です。Protocol v2の固定Scopeは[Provider認証の実装・運用Contract](docs/specifications/provider-authentication-operations.md)を参照してください。
 
 Projectの`build_config_json`では`configuration`と`artifacts`配列（`name`、`artifact_type`、Project相対の`file_path`）を指定します。配備先は既存のProject設定を使用します。
 

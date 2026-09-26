@@ -14,6 +14,8 @@ SCM commands are `service start`, `service stop`, `service pause`, `service resu
 
 ## Command Groups
 
+Provider authentication administration: `assertion-key-prepare`, `assertion-key-get --kid <id>`, `assertion-key-activate --kid <id> --trust-distribution-confirmed true [--overlap-seconds 86400]`, `assertion-key-revoke --kid <id>`, `assertion-protector-rotate`, `assertion-secret-rewrap`. These commands use the service and return public metadata only. See [the operational contract](docs/specifications/provider-authentication-operations.md) for state transitions, failure codes, migration and trust distribution requirements.
+
 | Group | Commands | Purpose |
 | :--- | :--- | :--- |
 | Project | `project-list`, `project-get`, `project-create`, `project-ensure`, `project-configure`, `project-rename`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
@@ -96,7 +98,7 @@ Each command below has the syntax, processing rule, and result contract. Returne
 - `release-add-artifact`: requires `--project --version --name --artifact-type --platform --architecture --file-name --actor-type --actor-name`; optional metadata is `--build-artifact-id --file-path --download-url --file-size --sha256 --signature-path --signature-url`. Remove requires `--artifact-id`; list requires `--project --version`. File content is not stored.
 - `release-prepare` / `release-mark-ready`: require `--project --version --expected-revision --actor-type --actor-name` and move `planned -> preparing -> ready`.
 - `release-publish`: requires the same options and explicit approval; persists `publishing` before calling the Provider, then records `released` or `failed`. Repeating an already released version is idempotent and does not call the Provider.
-- `release-retry`: requires the same options and explicit approval; moves `failed -> ready` and retries publish. `release-withdraw` withdraws a released version through the Provider and is idempotent after completion.
+- `release-retry`: requires the same options and explicit approval; moves `failed -> ready`, queries the Provider for the version, and then creates an absent release or publishes an existing draft. A published release is reconciled as an idempotent success only when its version/tag, recorded commit, and artifacts match; mismatches return `provider_conflict` with the differing fields. `release-withdraw` withdraws a released version through the Provider and is idempotent after completion. See [ADR 0007](docs/adr/0007-provider-release-reconciliation.md).
 - `release-latest --project` returns the latest released stable version by `released_at`. `release-overview --project --version` returns the Release, WorkItem relations, and artifact metadata.
 - `release-publish`: requires `--project --version --actor-type --actor-name`; publishes an existing release.
 - `release-withdraw`: requires the same options; withdraws an existing release.

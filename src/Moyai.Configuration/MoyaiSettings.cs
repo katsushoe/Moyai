@@ -10,6 +10,7 @@ public sealed record MoyaiSettings
     public string ServerUrl { get; init; } = "http://127.0.0.1:43120";
     public List<ProviderSettings> Providers { get; init; } = [];
     public int RequestTimeoutSeconds { get; init; } = 60;
+    public ProviderAuthenticationSettings ProviderAuthentication { get; init; } = new();
 
     public static string DefaultPath => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "config", "moyai.json"));
 
@@ -38,6 +39,7 @@ public sealed record MoyaiSettings
             throw new InvalidOperationException("serverUrl must be a listener origin without path, query or fragment.");
         if (RequestTimeoutSeconds is < 1 or > 3600) throw new InvalidOperationException("requestTimeoutSeconds must be 1..3600.");
         if (Providers is null) throw new InvalidOperationException("providers must be an array.");
+        ProviderAuthentication.Validate();
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (ProviderSettings provider in Providers)
         {
@@ -57,4 +59,47 @@ public sealed record MoyaiSettings
 }
 
 /// <summary>Provider endpoint, role and MCP tool prefix; contains no credentials.</summary>
-public sealed record ProviderSettings(string Name, string Endpoint, string ToolPrefix, bool Repository = false);
+public sealed record ProviderSettings(string Name, string Endpoint, string ToolPrefix, bool Repository = false)
+{
+    public Dictionary<string, string[]> AssertionToolScopes { get; init; } = new(StringComparer.Ordinal);
+
+    public string AssertionProviderId => Name switch
+    {
+        "githubbie" => "githubie",
+        _ => Name,
+    };
+}
+
+/// <summary>公開設定だけを保持するProvider認証構成です。</summary>
+public sealed record ProviderAuthenticationSettings
+{
+    public string Mode { get; init; } = "assertion";
+    public DateTimeOffset? LegacyStartedAt { get; init; }
+    public DateTimeOffset? LegacyUntil { get; init; }
+    public string Issuer { get; init; } = "";
+    public int LifetimeSeconds { get; init; } = 120;
+    public int ClockSkewSeconds { get; init; } = 30;
+    public string ProtectorMode { get; init; } = "cng";
+    public string KeyNamespace { get; init; } = "";
+    public string ActiveKeyVersion { get; init; } = "";
+    public string BrokerEndpoint { get; init; } = "";
+    public string BrokerCertificateThumbprint { get; init; } = "";
+    public string SecretToolPath { get; init; } = "";
+
+    public void Validate()
+    {
+        if (Mode is not ("assertion" or "legacy") || LifetimeSeconds is < 30 or > 300 || ClockSkewSeconds is < 0 or > 60)
+            throw new InvalidOperationException("Invalid provider authentication configuration.");
+        if (Mode == "legacy" && (LegacyStartedAt is null || LegacyUntil is null || LegacyUntil <= LegacyStartedAt
+            || LegacyUntil - LegacyStartedAt > TimeSpan.FromDays(7)))
+            throw new InvalidOperationException("Legacy authentication requires an explicit window of at most seven days.");
+        if (ProtectorMode is not ("cng" or "keychain" or "secret-service" or "broker")) throw new InvalidOperationException("Unsupported key protector mode.");
+        if (ProtectorMode == "secret-service" && !Path.IsPathFullyQualified(SecretToolPath)) throw new InvalidOperationException("secretToolPath must be an absolute path to the trusted secret-tool executable.");
+        if (Issuer.Length != 0 && (!Issuer.StartsWith("moyai:", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(KeyNamespace)))
+            throw new InvalidOperationException("Configured authentication requires issuer and key namespace.");
+        if (ProtectorMode == "broker" && (!Uri.TryCreate(BrokerEndpoint, UriKind.Absolute, out Uri? uri)
+            || uri.Scheme != "https" || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0
+            || string.IsNullOrWhiteSpace(BrokerCertificateThumbprint)))
+            throw new InvalidOperationException("Broker requires HTTPS and a client certificate thumbprint.");
+    }
+}

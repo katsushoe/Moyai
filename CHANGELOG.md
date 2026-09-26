@@ -4,7 +4,40 @@
 
 ## Unreleased
 
-## 1.2.2 - 2026-09-04
+## 1.3.5.0 - 2026-09-26 (local package)
+
+- Reject release operations of non-assertion providers with `authentication_unavailable` outside the `mode=legacy` migration window instead of continuing with a static service token.
+- Fix the broker key protector clearing the receive buffer before the response was read.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.4.0 - 2026-09-25 (local package)
+
+- Assertion-based lifecycle providers (Githubie releases) no longer require a static `release.write` service token, fixing release publication that still failed in 1.3.3.0 before the Provider was called.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.3.0 - 2026-09-25 (local package)
+
+- Attach a per-tool Provider assertion to Githubie release lookup, creation and publication (`github_release_get`, `github_tag_get`, `github_release_create`, `github_release_update`), fixing Moyai release publication against assertion-only Githubie.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.2.0 - 2026-09-25 (local package)
+
+- Before delegating a state-changing (non-read) operation to Buckettie, Moyai now checks `integration_mode` through the bootstrap `bitbucket_provider_capabilities` tool and rejects the operation with `provider_integration_mode_mismatch` unless it is `moyai`.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.1.0 - 2026-09-24 (local package)
+
+- Resolved the Provider assertion provider ID and audience to the canonical `githubie` ID while keeping the internal routing name `githubbie`.
+- Included the shared Provider authentication package (Moyai.ProviderAuthentication 1.0.2) and the KelpieSSH Lifecycle Protocol v2 staged deployment adapter.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.0.0 - 2026-09-07 (local package)
+
+- Added per-operation ES256 Provider assertions, shared claim/replay validation, encrypted secret envelopes, signing-key and KEK rotation, and six service-backed MCP/CLI key-management operations.
+- Added CNG, Keychain, Secret Service and authenticated broker key-protector adapters. Repository authentication now fails closed until configured; legacy operation requires an explicit migration window of at most seven days.
+- Native macOS/Linux and real Provider migration/integration verification remain pending. This entry describes a local installation package, not a public release.
+
+## 1.2.3 - 2026-09-04
 
 - Changed `branch_create` to require an explicit literal branch or full commit SHA source, validate invalid revision expressions before Provider execution, and forward the source unchanged through the Repository Provider contract.
 - Fixed release publication to create the Provider draft first, then pass the registered artifact and notes using the exact Githubie or Buckettie Provider argument contract.

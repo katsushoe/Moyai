@@ -21,31 +21,15 @@ public static class RepositoryProviderContract
         if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) arguments["branch"] = request.Branch;
         if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
         if (request.Operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) arguments["tag"] = request.Tag;
-        if (request.Operation == RepositoryOperation.TagCreate && string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase))
+        if (request.Operation == RepositoryOperation.TagCreate)
         {
             arguments["source"] = request.BranchSource;
-            arguments["message"] = null;
+            if (string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase)) arguments["message"] = null;
         }
         return arguments;
     }
 
-    public static string OperationName(RepositoryOperation operation) => operation switch
-    {
-        RepositoryOperation.ProviderVersion => "provider_version",
-        RepositoryOperation.ProviderCapabilities => "provider_capabilities",
-        RepositoryOperation.Status => "repository_status",
-        RepositoryOperation.Diff => "repository_diff",
-        RepositoryOperation.Commit => "repository_commit",
-        RepositoryOperation.Push => "push",
-        RepositoryOperation.Pull => "pull",
-        RepositoryOperation.BranchList => "branch_list",
-        RepositoryOperation.BranchCreate => "branch_create",
-        RepositoryOperation.BranchDelete => "branch_delete",
-        RepositoryOperation.TagCreate => "tag_create",
-        RepositoryOperation.TagDelete => "tag_delete",
-        RepositoryOperation.TagPush => "tag_push",
-        _ => throw new ArgumentOutOfRangeException(nameof(operation)),
-    };
+    public static string OperationName(RepositoryOperation operation) => operation.ContractName();
 
     public static string NormalizeErrorCode(string? detail)
     {
@@ -82,12 +66,17 @@ public static class RepositoryProviderContract
 
     private static string NormalizeKnownCode(string? code) => code switch
     {
+        "authentication_unavailable" or "auth_assertion_invalid" or "auth_assertion_expired"
+            or "auth_assertion_not_yet_valid" or "auth_audience_mismatch" or "auth_scope_denied"
+            or "auth_project_mismatch" or "auth_key_unknown" or "auth_key_revoked" or "auth_replay_detected"
+            or "auth_key_provider_unavailable" or "auth_secret_decryption_failed" or "auth_protocol_unsupported"
+            or "provider_capability_missing" => code,
         "provider_unavailable" => "provider_unavailable",
         "unauthorized" or "invalid_service_token" or "service_token_expired" or "service_token_scope_missing" => "provider_authentication_failed",
         "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" => "provider_policy_rejected",
         "retryable" or "rate_limited" or "temporarily_unavailable" => "provider_retryable_failure",
-        "conflict" or "already_exists" => "provider_conflict",
-        "not_found" or "repository_not_found" or "branch_not_found" or "tag_not_found" => "provider_not_found",
+        "conflict" or "already_exists" or "release_already_exists" => "provider_conflict",
+        "not_found" or "repository_not_found" or "branch_not_found" or "tag_not_found" or "release_not_found" => "provider_not_found",
         _ => "provider_operation_failed",
     };
 }

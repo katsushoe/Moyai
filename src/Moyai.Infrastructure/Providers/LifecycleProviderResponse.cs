@@ -20,7 +20,7 @@ public static class LifecycleProviderResponse
             if (!document.RootElement.TryGetProperty("ok", out JsonElement ok) || ok.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                 return Invalid(operation, "Provider result must contain a boolean ok field.");
             return ok.GetBoolean()
-                ? new LifecycleResult(true, operation, output, null, null)
+                ? new LifecycleResult(true, operation, output, null, null, FindResourceId(document.RootElement))
                 : Failure(operation, output);
         }
         catch (JsonException exception)
@@ -34,4 +34,18 @@ public static class LifecycleProviderResponse
 
     private static LifecycleResult Invalid(string operation, string detail) =>
         new(false, operation, null, "provider_invalid_response", detail);
+
+    private static long? FindResourceId(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("id", out JsonElement id) && id.TryGetInt64(out long value)) return value;
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                long? nested = FindResourceId(property.Value);
+                if (nested is not null) return nested;
+            }
+        }
+        return null;
+    }
 }

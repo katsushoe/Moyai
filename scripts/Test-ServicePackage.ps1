@@ -34,7 +34,9 @@ try {
     $versionRows = @(Read-MsiRows "SELECT Value FROM Property WHERE Property = 'ProductVersion'")
     $packageVersion = $versionRows[0][0]
     $executableVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($resolvedExecutable).FileVersion
-    if ($executableVersion -ne ($packageVersion + '.0')) { throw 'MSI and executable versions do not match.' }
+    if ($executableVersion -ne $packageVersion -and $executableVersion -ne ($packageVersion + '.0')) {
+        throw 'MSI and executable versions do not match.'
+    }
     $service = @(Read-MsiRows 'SELECT * FROM ServiceInstall')
     if ($service.Count -ne 1) { throw 'Expected exactly one service.' }
     $row = $service[0]
