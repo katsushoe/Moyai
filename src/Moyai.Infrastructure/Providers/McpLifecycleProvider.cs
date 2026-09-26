@@ -31,6 +31,9 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
 
     public string Name => _options.Name;
 
+    public bool UsesAssertion(LifecycleAction action) =>
+        UsesToolAssertion && action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw;
+
     public async Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -39,7 +42,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
                 .ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         try
         {
-            await using ToolCaller client = UsesAssertion
+            await using ToolCaller client = UsesToolAssertion
                 ? new AssertionToolCaller(this, request)
                 : await LegacyToolCaller.CreateAsync(this, request, cancellationToken).ConfigureAwait(false);
             string operation = OperationName(request.Action);
@@ -98,7 +101,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     }
 
     /// <summary>GithubieのRelease系Toolは、Capabilityが構成されている場合にTool単位のAssertionを必須とします。</summary>
-    private bool UsesAssertion => IsGithubie && _capability is not null;
+    private bool UsesToolAssertion => IsGithubie && _capability is not null;
 
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
 

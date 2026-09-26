@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$Version = "1.3.3.0",
+    [string]$Version = "1.3.4.0",
     [string]$WixCommand = "",
     [string]$ArtifactsDirectory = ""
 )

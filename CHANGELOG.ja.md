@@ -4,6 +4,11 @@
 
 ## 未公開
 
+## 1.3.4.0 - 2026-09-25（ローカルパッケージ）
+
+- Assertion方式のLifecycle Provider（Githubie Release）では、静的Service Token（`release.write`）を要求しないようにしました。1.3.3.0でもTokenの事前検査によりProvider呼び出し前にRelease公開が失敗していた問題を修正します。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.3.0 - 2026-09-25（ローカルパッケージ）
 
 - GithubieへのRelease作成・公開・照会（`github_release_get`、`github_tag_get`、`github_release_create`、`github_release_update`）に、Tool単位のProvider Assertionを付与するようにしました。Assertion必須のGithubieへMoyai経由でReleaseを公開できなかった問題を修正します。

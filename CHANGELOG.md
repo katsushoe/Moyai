@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+## 1.3.4.0 - 2026-09-25 (local package)
+
+- Assertion-based lifecycle providers (Githubie releases) no longer require a static `release.write` service token, fixing release publication that still failed in 1.3.3.0 before the Provider was called.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.3.0 - 2026-09-25 (local package)
 
 - Attach a per-tool Provider assertion to Githubie release lookup, creation and publication (`github_release_get`, `github_tag_get`, `github_release_create`, `github_release_update`), fixing Moyai release publication against assertion-only Githubie.
