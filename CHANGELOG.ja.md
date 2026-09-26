@@ -4,6 +4,13 @@
 
 ## 未公開
 
+## 1.3.6.0 - 2026-09-26（ローカルパッケージ）
+
+- ProviderのCapabilityに含まれない`get_version`と`*_provider_capabilities`をBootstrapとして無Assertionで呼び出し、BuckettieのProvider Capability照会を利用可能にしました。
+- ProviderのHTTP 401／403による認証拒否を、通信障害の`provider_unavailable`と区別して`provider_authentication_rejected`で返すようにしました。
+- Assertion経路のHTTP ClientがRequest Timeout設定ではなく既定の100秒で打ち切られる問題を修正しました。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.5.0 - 2026-09-26（ローカルパッケージ）
 
 - `mode=legacy`の移行期間外に、Assertion方式でないProviderのRelease操作が静的Service Tokenで続行できた問題を修正し、`authentication_unavailable`で拒否するようにしました。

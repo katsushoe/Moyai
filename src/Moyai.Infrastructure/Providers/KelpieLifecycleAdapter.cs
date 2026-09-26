@@ -228,7 +228,7 @@ internal sealed class KelpieLifecycleAdapter
             };
             using HttpClient providerClient = _httpClientFactory.CreateClient(_options.Name);
             using var assertionHandler = new AssertionHttpHandler(providerClient, _issuer, context, _audit);
-            using var httpClient = new HttpClient(assertionHandler);
+            using var httpClient = new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(
                 transport,

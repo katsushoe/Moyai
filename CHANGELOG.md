@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 1.3.6.0 - 2026-09-26 (local package)
+
+- Call `get_version` and `*_provider_capabilities` without an assertion as bootstrap operations when the Provider capability does not list them, enabling Buckettie capability queries.
+- Report Provider HTTP 401/403 authentication rejections as `provider_authentication_rejected` instead of `provider_unavailable`.
+- Stop assertion-path HTTP clients from being cut off at the default 100 seconds instead of the configured request timeout.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.5.0 - 2026-09-26 (local package)
 
 - Reject release operations of non-assertion providers with `authentication_unavailable` outside the `mode=legacy` migration window instead of continuing with a static service token.

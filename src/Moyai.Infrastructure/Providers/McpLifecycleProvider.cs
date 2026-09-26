@@ -89,6 +89,15 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         {
             return new LifecycleResult(false, OperationName(request.Action), null, exception.Code, exception.Code);
         }
+        catch (HttpRequestException exception) when (McpRepositoryProvider.IsAuthenticationRejection(exception))
+        {
+            return new LifecycleResult(false, OperationName(request.Action), null, "provider_authentication_rejected",
+                $"Provider rejected authentication (HTTP {(int)exception.StatusCode!}); the operation was not executed.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new LifecycleResult(false, OperationName(request.Action), null, "provider_unavailable", "Provider request timed out; operation outcome may be unknown.");
+        }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
         {
             return new LifecycleResult(false, OperationName(request.Action), null, "provider_auth_unavailable", exception.Message);
@@ -314,7 +323,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             var transportOptions = new HttpClientTransportOptions { Endpoint = owner._options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp };
             using HttpClient providerClient = owner._httpClientFactory.CreateClient(owner.Name);
             using var assertionHandler = new AssertionHttpHandler(providerClient, issuer, context, owner._audit);
-            using var httpClient = new HttpClient(assertionHandler);
+            using var httpClient = new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
             CallToolResult response = await client.CallToolAsync(tool, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
