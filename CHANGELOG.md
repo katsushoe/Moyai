@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 1.3.5.0 - 2026-09-26 (local package)
+
+- Reject release operations of non-assertion providers with `authentication_unavailable` outside the `mode=legacy` migration window instead of continuing with a static service token.
+- Fix the broker key protector clearing the receive buffer before the response was read.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.4.0 - 2026-09-25 (local package)
 
 - Assertion-based lifecycle providers (Githubie releases) no longer require a static `release.write` service token, fixing release publication that still failed in 1.3.3.0 before the Provider was called.

@@ -40,6 +40,35 @@ public sealed class LifecycleServiceTests
     }
 
     [Fact]
+    public async Task LegacyReleaseOutsideMigrationWindowIsRejectedWithoutToken()
+    {
+        await using var fixture = new LifecycleFixture();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        (LifecycleService service, IReadOnlyDictionary<string, RecordingProvider> providers) = await fixture.CreateAsync(
+            authentication: new Moyai.Application.Authentication.RepositoryAuthentication("legacy", now.AddDays(-8), now.AddDays(-1)));
+
+        LifecycleResult result = await service.ExecuteAsync("Moyai", LifecycleAction.ReleaseCreate, "test", "lifecycle", "1.0.0");
+
+        Assert.False(result.Ok);
+        Assert.Equal("authentication_unavailable", result.ErrorCode);
+        Assert.Null(providers["githubbie"].LastRequest);
+    }
+
+    [Fact]
+    public async Task LegacyReleaseInsideMigrationWindowUsesServiceToken()
+    {
+        await using var fixture = new LifecycleFixture();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        (LifecycleService service, IReadOnlyDictionary<string, RecordingProvider> providers) = await fixture.CreateAsync(
+            authentication: new Moyai.Application.Authentication.RepositoryAuthentication("legacy", now.AddDays(-1), now.AddDays(1)));
+
+        LifecycleResult result = await service.ExecuteAsync("Moyai", LifecycleAction.ReleaseCreate, "test", "lifecycle", "1.0.0");
+
+        Assert.True(result.Ok);
+        Assert.NotNull(providers["githubbie"].LastRequest?.ServiceToken);
+    }
+
+    [Fact]
     public async Task AssertionReleaseProviderDoesNotRequireLegacyServiceToken()
     {
         await using var fixture = new LifecycleFixture();
@@ -84,7 +113,8 @@ public sealed class LifecycleServiceTests
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-lifecycle-{Guid.NewGuid():N}.db");
 
-        public async Task<(LifecycleService Service, IReadOnlyDictionary<string, RecordingProvider> Providers)> CreateAsync(string releaseScope = "release.write")
+        public async Task<(LifecycleService Service, IReadOnlyDictionary<string, RecordingProvider> Providers)> CreateAsync(string releaseScope = "release.write",
+            Moyai.Application.Authentication.RepositoryAuthentication? authentication = null)
         {
             string connectionString = new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString();
             var options = new SqliteDatabaseOptions(connectionString);
@@ -100,7 +130,7 @@ public sealed class LifecycleServiceTests
                 ["githubbie"] = new("githubbie", releaseScope),
                 ["local"] = new("local", "deploy.write"),
             };
-            return (new LifecycleService(projects, tokens, providers.Values, new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System), providers);
+            return (new LifecycleService(projects, tokens, providers.Values, new SqliteLifecycleEventWriter(options, TimeProvider.System), TimeProvider.System, authentication), providers);
         }
 
         public async Task<(LifecycleService Service, AssertionProvider Provider)> CreateAssertionAsync()

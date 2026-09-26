@@ -4,6 +4,12 @@
 
 ## 未公開
 
+## 1.3.5.0 - 2026-09-26（ローカルパッケージ）
+
+- `mode=legacy`の移行期間外に、Assertion方式でないProviderのRelease操作が静的Service Tokenで続行できた問題を修正し、`authentication_unavailable`で拒否するようにしました。
+- Broker方式のKey Protectorで、応答を読み取る前に受信バッファを消去していた問題を修正しました。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.4.0 - 2026-09-25（ローカルパッケージ）
 
 - Assertion方式のLifecycle Provider（Githubie Release）では、静的Service Token（`release.write`）を要求しないようにしました。1.3.3.0でもTokenの事前検査によりProvider呼び出し前にRelease公開が失敗していた問題を修正します。
