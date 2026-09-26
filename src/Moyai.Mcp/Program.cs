@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -13,10 +14,9 @@ using Moyai.Application.Providers;
 using Moyai.Application.Releases;
 using Moyai.Application.WorkItems;
 using Moyai.Configuration;
+using Moyai.Infrastructure.Authentication;
 using Moyai.Infrastructure.Persistence;
 using Moyai.Infrastructure.Providers;
-using Moyai.Infrastructure.Authentication;
-using System.Security.Cryptography.X509Certificates;
 using Moyai.Mcp;
 using Moyai.Mcp.Tools;
 using Moyai.Presentation.Windows;
