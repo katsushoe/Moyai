@@ -6,8 +6,8 @@
 
 ## 集計
 
-- 適合: 43項目
-- 部分適合: 2項目
+- 適合: 44項目
+- 部分適合: 1項目
 - 未実装: 0項目
 - 全`部分適合`を検証済みにするか、明示承認された仕様訂正で解決するまでマイルストーン8は未完了です。
 
@@ -30,7 +30,7 @@
 | 13 | Repository Provider Contract経由でGithubie/Buckettieを呼び分けられる。 | 適合 | `ProviderRoutingServiceTests`で設定Providerへのroutingを検証。 | — |
 | 14 | Githubie/Buckettieが同じ共通Tool Contractを実装できる。 | 適合 | 2026-09-04、Moyaiから稼働版Githubie 1.8.6.3とBuckettie 1.3.20.0へ能力照会し、両方が`repository_diff`・`repository_commit`対応を返すことを確認しました。さらに、Moyai登録済みのGitHub Project `Moyai`とBitbucket Project `picturebooks`で、Moyai経由の`repository_diff`が成功しました。 | — |
 | 15 | Moyai自身はGit CLIを実行しない。 | 適合 | `MoyaiSourceDoesNotInvokeGitCli`。 | — |
-| 16 | Commit/Push/Tag/ReleaseをProvider経由で実行できる。 | 部分適合 | Moyaiは変更をProviderへ委譲します。2026-09-04のMoyai 1.2.1公開では、稼働版Githubieによるcommit・push・tag・releaseが成功しましたが、Moyai自身がMoyai Projectに未登録だったためGithubieを直接利用しており、Moyai経由の実績ではありません。 | Moyaiへ登録したGitHub・Bitbucket検証Projectで、明示承認済みの変更操作testを実行。 |
+| 16 | Commit/Push/Tag/ReleaseをProvider経由で実行できる。 | 適合 | Moyai経由（操作単位のProvider Assertion）で検証済み。GitHub: 2026-09-27にGithubie SelfTest Projectでcommit `9f08d89`、push、Tag `v0.0.0-ac16-20260904`、Release公開・取り下げ、Tag削除を実施し、Moyai 1.3.5.0自体もMoyai経由で公開。Bitbucket: 2026-09-27〜28にBuckettieSelftest Project（Buckettie連携モード）でcommit `56d7c84`、push、Tag `v0.0.0-ac16-20260927`、Release公開（Moyai 1.3.8.0）・取り下げ、Tag削除を実施。既存のTag・Releaseは変更していない。 | — |
 | 17 | Provider停止時に`provider_unavailable`を返せる。 | 適合 | `ExecuteAsyncReturnsUnavailableWhenProviderCannotBeReached`。 | — |
 | 18 | ProviderをMoyaiが自動起動しない。 | 適合 | `RepositoryAndLifecycleAdaptersDoNotStartProviderProcesses`。 | — |
 | 19 | Release Publishの途中失敗を記録できる。 | 適合 | `PublishFailurePersistsFailedAndAllowsRetry`。 | — |
@@ -63,4 +63,4 @@
 
 ## 次の検証単位
 
-残る完了作業は、Moyai登録済みGitHub・Bitbucket検証Projectでの承認済み変更操作test、および仕様19.5のKelpieSSH段階orchestration実装と実Provider結合検証です。
+残る完了作業は、仕様19.5のKelpieSSH段階orchestrationの実Provider結合検証（受入基準37）です。

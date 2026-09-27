@@ -64,6 +64,7 @@ Githubieは1.0.2のHash一致を確認し、隔離受け入れ8件を警告・�
 - 1.3.5.0: code-reviewerのMajor指摘2件を修正しました（Legacy移行期間外のRelease拒否、Broker応答の読み取り前消去）。PR #11をマージし（`a05b506`）、Moyai経由でGitHub Release `v1.3.5.0`を公開しました。
 - 1.3.6.0: Capabilityに含まれない`get_version`／`*_provider_capabilities`をBootstrapとして無Assertionで呼び、Providerの401／403を`provider_authentication_rejected`で返すようにしました。Buckettie向けScopeを24 Toolへ拡張しました。
 - 1.3.7.0: Lifecycle／KelpieSSHで、Assertion期限切れの再試行前にProject文脈を再確認するようにしました。テスト用の旧Validatorは非公開にしました。
+- 1.3.8.0: Buckettie Release系ToolにもTool単位のAssertionを付与し、静的`release.write` Service Tokenへの誤った依存を解消しました。
 - 実機: Githubie連携はMoyai経由のcommit／push／Tag／Release公開で成功しました。GithubieSelfTestのAC16も完了しています（2026-09-27）。Buckettieは単体モードを継続しているため、Moyai経由のBitbucket操作は未成立です。
 
 macOS KeychainとLinux Secret Serviceのネイティブ動作・ACL、3 OSでの同一Test Suite、実Broker接続は未検証です。Windows CNGは一時テスト鍵で生成・Rotation・再読込・復号・削除を検証しましたが、別サービスユーザーによる拒否は未検証です。Passphrase fallbackは未提供です。Trust配布と確認は管理操作で、Provider全台への配布を自動検証する仕組みはありません。KelpieSSH Lifecycle通信はMoyai側でProtocol v2へ移行しましたが、Provider側受け入れ完了まで実結合は未検証です。

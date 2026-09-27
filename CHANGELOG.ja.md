@@ -4,6 +4,12 @@
 
 ## 未公開
 
+## 1.3.8.0 - 2026-09-27（ローカルパッケージ）
+
+- BuckettieのRelease照会・作成・公開・取り下げにTool単位のProvider Assertionを付与し、旧方式の静的`release.write` Service Tokenを要求しないようにしました。
+- BuckettieのRelease照会と作成で、別々の検証済みAssertionを送る回帰テストを追加しました。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.7.0 - 2026-09-27（ローカルパッケージ）
 
 - Release系LifecycleとKelpieSSH Deployで、`auth_assertion_expired`の再試行前にProjectのID・Revision・Repository・Provider・Deploy方式を再確認し、変更時は`auth_project_mismatch`で再実行しないようにしました。

@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 1.3.8.0 - 2026-09-27 (local package)
+
+- Send per-tool Provider assertions for Buckettie release lookup, creation, publication and withdrawal instead of requiring the legacy static `release.write` service token.
+- Added regression coverage for distinct validated Buckettie assertions on release lookup and creation.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.7.0 - 2026-09-27 (local package)
 
 - Re-check the Project ID, revision, repository, provider and deploy mode before retrying `auth_assertion_expired` in release lifecycle and KelpieSSH deployment, returning `auth_project_mismatch` instead of retrying when they changed.

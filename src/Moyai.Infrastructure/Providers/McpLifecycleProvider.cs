@@ -109,10 +109,12 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         if (value is not null) arguments[name] = value;
     }
 
-    /// <summary>GithubieのRelease系Toolは、Capabilityが構成されている場合にTool単位のAssertionを必須とします。</summary>
-    private bool UsesToolAssertion => IsGithubie && _capability is not null;
+    /// <summary>Repository ProviderのRelease系Toolは、Capabilityが構成されている場合にTool単位のAssertionを必須とします。</summary>
+    private bool UsesToolAssertion => (IsGithubie || IsBuckettie) && _capability is not null;
 
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsBuckettie => string.Equals(_options.Name, "buckettie", StringComparison.OrdinalIgnoreCase);
 
     private bool IsKelpie => string.Equals(_options.Name, "server", StringComparison.OrdinalIgnoreCase)
         || string.Equals(_options.Name, "kelpiessh", StringComparison.OrdinalIgnoreCase);
