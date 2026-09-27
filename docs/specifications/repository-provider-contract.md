@@ -17,6 +17,7 @@ Providerは、ローカルリポジトリのGit設定（`remote.<name>.url`）�
   - 接続方式（`https`／`ssh`）、`.git`接尾辞、末尾の`/`は比較対象から除きます。ホスト名は小文字化し、既定以外のポートは残します。パスの大文字小文字は維持します。
   - 資格情報（`user:password@`）、query、fragmentを含むURLは、比較せずに拒否します。
   - 例: `https://bitbucket.org/stk2k/cupperpro.git` と `git@bitbucket.org:stk2k/cupperpro.git` は、どちらも `bitbucket.org/stk2k/cupperpro` として一致します。
+- Providerが自身のRepository登録でリモート名を保持している場合は、`gitRemoteName`の指定がないときに限り、そのリモートを最初の候補にしてよいものとします。この場合も下記3と同じ検証を行い、URLが一致しなければ`provider_remote_mismatch`、存在しなければ`provider_remote_not_found`で拒否します。自動解決や`origin`へは退避しません（2026-09-27追記、Buckettie 1.3.36.0の実装に合わせて明確化）。
 - 一致するリモートが複数ある場合は、次の順に選びます。
   1. `gitRemoteName`が指定されていれば、その名前（下記3の検証を行います）。
   2. 下記2の命名規則に合う名前が1つだけあれば、その名前。
@@ -30,7 +31,7 @@ Providerは、ローカルリポジトリのGit設定（`remote.<name>.url`）�
 
 - 例: `bitbucket-origin-https`、`bitbucket-origin-ssh`、`github-origin-https`
 - 既存リポジトリの改名は任意です。上記1の自動解決により、既存の`origin`もURLが一致すれば利用できます。
-- Providerが対応しない接続方式（例: BuckettieのSSH）のリモートは、解決候補から除外してよいものとします。除外によって候補がなくなった場合は、`provider_remote_not_found`です。
+- Providerが対応しない接続方式（例: BuckettieのSSH）のリモートは、解決候補から除外してよいものとします。除外によって候補がなくなった場合や、指定名のリモートが未対応の接続方式だった場合は、`provider_remote_not_found`です。Provider固有の詳細（例: `ssh_remote_not_supported`）は、`error.provider.code`で示してよいものとします。
 
 ### 3. `gitRemoteName`の扱い
 
