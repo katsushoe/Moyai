@@ -52,6 +52,15 @@ GithubieのGitHub Token、BuckettieのBitbucket Token、KelpieSSHのSSH資格情
 3. `Buckettie.Server.exe <config> --moyai`で起動した場合だけMoyai連携モードとし、本Contractの制約に従います。`provider_authentication`の欠落・不正時は単体モードへ退避せず、起動を拒否します。
 4. Moyaiは、Buckettieへ状態変更操作・`fetch`・`pull`を委譲する前に、`bitbucket_provider_capabilities.data.authentication.integration_mode`が`moyai`であることを確認します。`moyai`でない場合、または確認できない場合は委譲せず、`provider_integration_mode_mismatch`を返します。確認はMoyai 1.3.2.0で実装し、Bootstrapの同Toolを無Assertionで呼び出します。読み取り操作は確認しません。
 
+### 連携モードでの直接接続の許可（Buckettie・Githubie）
+
+2026-09-27のユーザー承認により、BuckettieとGithubieは、Moyai連携モードのまま直接接続を単体モード相当で扱う設定を持てます（関連CR: `CR-2026-09-27-accept-direct-standalone-mode`）。KelpieSSHの扱いは変更しません。
+
+1. 新しい`integration_mode`の値は設けません。この設定のProviderも`integration_mode`は`moyai`を返し、Moyaiの委譲判定（`moyai`なら委譲、`standalone`等なら委譲しない）は変わりません。`--moyai`の付け忘れ検知は維持します。
+2. 直接接続の扱いは、`*_provider_capabilities`の`data.authentication.direct_connection`で表明します。値は`read_only`（上記の直接接続の読み取り許可だけ。未記載時の既定）または`unrestricted`（loopback入口からのAuthorizationなしの要求に、単体モードと同じくすべてのRepository Toolを許可）とします。
+3. `Authorization`を伴う要求は、`direct_connection`の値にかかわらずMoyai Assertionとして完全に検証します。検証に失敗した要求を、直接接続の許可へ退避させてはなりません。
+4. `unrestricted`では、同じPC上の任意のプロセスがMoyaiを経由せずに変更操作を行えます。Moyaiの監査記録はMoyai経由の操作に限られます。この条件は、ユーザー要望として受け入れたものです。
+
 ## Scope
 
 Repository Toolは既存のProvider非依存Scope Mappingを使用します。Project文脈のない登録・更新・削除ToolはMapping対象外です。
