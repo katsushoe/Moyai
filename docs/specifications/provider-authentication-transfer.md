@@ -57,6 +57,15 @@ Githubieは1.0.2のHash一致を確認し、隔離受け入れ8件を警告・�
 
 2026-09-24にKotodama復旧CR `CR-2026-09-19-kotodama-provider-authentication-recovery`の手順1としてユーザー承認を受け、内部routing名`githubbie`からAssertion正規ID`githubie`への解決修正を含む1.3.1.0のWiX MSIを作成・実機インストールしました。Release全322件合格、MSI SHA-256は`ADE02681EC601B359192BD0A10247B854E34A38C5AC818A016A9278205625D0C`、終了コード0、サービス応答Versionは1.3.1.0です。設定SHA-256は更新前後で一致し、DBはintegrity_check ok・28テーブル件数一致でした。更新前の設定・DBは`data/backups/upgrade-1.3.1.0-20260924T054844Z`へ保存しました。稼働設定の`providerAuthentication`追加、署名鍵初期化、Trust配布は未実施です。公開Releaseは実行していません。
 
+2026-09-24〜27の経過（基準日2026-09-27。現在状態の正本はObsidian `F:\Workspace\Obsidian\AkatsukiSoft\Moyai\STATUS.md`、横断TODOは同`TODO.md`）:
+
+- 1.3.2.0: Buckettieへ状態変更操作を委譲する前に`integration_mode=moyai`を確認するようにしました（Contract「Buckettie単体運用」）。
+- 1.3.3.0／1.3.4.0: Githubie Release系ToolへTool単位のAssertionを付与し、Assertion方式のProviderでは静的`release.write` Tokenを要求しないようにしました。1.3.2.0〜1.3.4.0のRelease公開は、Token事前検査と`tag_target_branch: main`のGithubieポリシーで失敗し、GitHubには公開されていません。
+- 1.3.5.0: code-reviewerのMajor指摘2件を修正しました（Legacy移行期間外のRelease拒否、Broker応答の読み取り前消去）。PR #11をマージし（`a05b506`）、Moyai経由でGitHub Release `v1.3.5.0`を公開しました。
+- 1.3.6.0: Capabilityに含まれない`get_version`／`*_provider_capabilities`をBootstrapとして無Assertionで呼び、Providerの401／403を`provider_authentication_rejected`で返すようにしました。Buckettie向けScopeを24 Toolへ拡張しました。
+- 1.3.7.0: Lifecycle／KelpieSSHで、Assertion期限切れの再試行前にProject文脈を再確認するようにしました。テスト用の旧Validatorは非公開にしました。
+- 実機: Githubie連携はMoyai経由のcommit／push／Tag／Release公開で成功しました。GithubieSelfTestのAC16も完了しています（2026-09-27）。Buckettieは単体モードを継続しているため、Moyai経由のBitbucket操作は未成立です。
+
 macOS KeychainとLinux Secret Serviceのネイティブ動作・ACL、3 OSでの同一Test Suite、実Broker接続は未検証です。Windows CNGは一時テスト鍵で生成・Rotation・再読込・復号・削除を検証しましたが、別サービスユーザーによる拒否は未検証です。Passphrase fallbackは未提供です。Trust配布と確認は管理操作で、Provider全台への配布を自動検証する仕組みはありません。KelpieSSH Lifecycle通信はMoyai側でProtocol v2へ移行しましたが、Provider側受け入れ完了まで実結合は未検証です。
 
 共有CRの受け取り結果欄とObsidian側の原文・リンクは変更していません。依頼元へ本結果のパスと未実施項目を通知します。実装完了通知としては扱いません。

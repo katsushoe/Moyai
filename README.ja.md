@@ -56,6 +56,7 @@ CLIは成功時のJSONを標準出力、構造化エラーを標準エラーへ�
 
 - [Provider認証・ローカル秘密情報保護仕様](docs/specifications/Provider_Authentication_Specification.md)
 - [認証仕様の移管結果・未実施項目](docs/specifications/provider-authentication-transfer.md)
+- [Repository Provider Contract（Gitリモートの解決規則）](docs/specifications/repository-provider-contract.md)
 - [KelpieSSH Protocol v2段階Deployの設計判断（英語）](docs/adr/0009-kelpiessh-protocol-v2.md)
 - [設定](CONFIG.ja.md)
 - [コマンド](COMMANDS.ja.md)
