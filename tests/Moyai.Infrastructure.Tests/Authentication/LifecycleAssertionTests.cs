@@ -17,6 +17,12 @@ public sealed class LifecycleAssertionTests
         ["github_release_create"] = ["release.publish", "artifact.upload"],
     };
 
+    private static readonly Dictionary<string, string[]> BuckettieScopes = new(StringComparer.Ordinal)
+    {
+        ["buckettie_release_get"] = ["repository.read"],
+        ["buckettie_release_create"] = ["release.publish"],
+    };
+
     [Fact]
     public async Task GithubieReleaseCreateSendsDistinctValidatedAssertionPerTool()
     {
@@ -28,6 +34,19 @@ public sealed class LifecycleAssertionTests
         Assert.Equal(["github_release_get", "github_release_create"], handler.Tools);
         Assert.Equal(2, handler.Assertions.Distinct(StringComparer.Ordinal).Count());
         Assert.All(handler.Assertions, assertion => Assert.DoesNotContain(assertion, result.Output ?? "", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task BuckettieReleaseCreateSendsDistinctValidatedAssertionPerTool()
+    {
+        await using var f = new AssertionFixture();
+        await f.InitializeAsync();
+        using var handler = new GithubieReleaseHandler(f, BuckettieScopes, providerId: "buckettie", repository: "bitbucket.org/example/repo");
+        McpLifecycleProvider provider = Provider(f, handler, BuckettieScopes, "buckettie", "bitbucket", "buckettie");
+        LifecycleResult result = await provider.ExecuteAsync(Request(f) with { RepositoryUrl = "https://bitbucket.org/example/repo.git" });
+        Assert.True(result.Ok, result.ErrorCode);
+        Assert.Equal(["buckettie_release_get", "buckettie_release_create"], handler.Tools);
+        Assert.Equal(2, handler.Assertions.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
@@ -55,9 +74,29 @@ public sealed class LifecycleAssertionTests
         Assert.Empty(handler.Tools);
     }
 
-    private static McpLifecycleProvider Provider(AssertionFixture f, HttpMessageHandler handler, Dictionary<string, string[]> scopes) =>
-        new(new McpRepositoryProviderOptions("githubbie", new Uri("http://127.0.0.1:54321/mcp"), "github"), new TestClientFactory(handler), f.Issuer,
-            new SqliteAssertionAudit(f.Database, f.Clock), new AssertionCapability("githubie", "githubie", "1", "ES256", true, scopes));
+    [Theory]
+    [InlineData(false, 1, "auth_project_mismatch")]
+    [InlineData(true, 2, null)]
+    public async Task ExpiredAssertionIsRetriedOnceOnlyWhenContextIsUnchanged(bool unchanged, int calls, string? expectedError)
+    {
+        await using var f = new AssertionFixture();
+        await f.InitializeAsync();
+        using var handler = new GithubieReleaseHandler(f, GithubieScopes, expireFirstCall: true);
+        int revalidations = 0;
+        LifecycleResult result = await Provider(f, handler, GithubieScopes).ExecuteAsync(Request(f) with
+        {
+            RevalidateContext = _ => { revalidations++; return Task.FromResult(unchanged); },
+        });
+        Assert.Equal(1, revalidations);
+        Assert.Equal(calls, handler.Tools.Count(tool => tool == "github_release_get"));
+        if (expectedError is null) Assert.True(result.Ok, result.ErrorCode);
+        else Assert.Equal(expectedError, result.ErrorCode);
+    }
+
+    private static McpLifecycleProvider Provider(AssertionFixture f, HttpMessageHandler handler, Dictionary<string, string[]> scopes,
+        string name = "githubbie", string toolPrefix = "github", string providerId = "githubie") =>
+        new(new McpRepositoryProviderOptions(name, new Uri("http://127.0.0.1:54321/mcp"), toolPrefix), new TestClientFactory(handler), f.Issuer,
+            new SqliteAssertionAudit(f.Database, f.Clock), new AssertionCapability(providerId, providerId, "1", "ES256", true, scopes));
 
     private static LifecycleRequest Request(AssertionFixture f) =>
         new("Test", "unused", null, LifecycleAction.ReleaseCreate, "1.0.0", null, "notes", null, ProjectId: f.Context.Project, RepositoryUrl: "https://github.com/example/repo.git");
@@ -67,8 +106,10 @@ public sealed class LifecycleAssertionTests
         public HttpClient CreateClient(string name) => new(handler, false);
     }
 
-    private sealed class GithubieReleaseHandler(AssertionFixture fixture, IReadOnlyDictionary<string, string[]> scopes) : HttpMessageHandler
+    private sealed class GithubieReleaseHandler(AssertionFixture fixture, IReadOnlyDictionary<string, string[]> scopes, bool expireFirstCall = false,
+        string providerId = "githubie", string repository = "github.com/example/repo") : HttpMessageHandler
     {
+        private bool _expired;
         public List<string> Tools { get; } = [];
         public List<string> Assertions { get; } = [];
 
@@ -86,11 +127,15 @@ public sealed class LifecycleAssertionTests
                 string tool = root.GetProperty("params").GetProperty("name").GetString()!;
                 string assertion = request.Headers.Authorization!.Parameter!;
                 string operationId = request.Headers.GetValues("X-Moyai-Operation-Id").Single();
-                var context = new AssertionContext("githubie", fixture.Context.Project, "github.com/example/repo", tool, scopes[tool], operationId);
+                var context = new AssertionContext(providerId, fixture.Context.Project, repository, tool, scopes[tool], operationId);
                 await fixture.Validator(context).ValidateAsync(assertion, context, cancellationToken);
                 Tools.Add(tool);
                 Assertions.Add(assertion);
-                object structured = tool == "github_release_get"
+                bool expire = expireFirstCall && !_expired;
+                _expired = true;
+                object structured = expire
+                    ? new { ok = false, error = new { code = "auth_assertion_expired" } }
+                    : tool.EndsWith("_release_get", StringComparison.Ordinal)
                     ? new { ok = false, error = new { code = "release_not_found" } }
                     : new { ok = true, data = new { id = 1, draft = true } };
                 result = new { isError = false, content = Array.Empty<object>(), structuredContent = structured };

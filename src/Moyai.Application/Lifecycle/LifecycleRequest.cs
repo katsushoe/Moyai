@@ -19,4 +19,5 @@ public sealed record LifecycleRequest(
     string? KelpieTarget = null,
     string? DestinationPath = null,
     string? ArtifactSha256 = null,
-    string? RepositoryUrl = null);
+    string? RepositoryUrl = null,
+    Func<CancellationToken, Task<bool>>? RevalidateContext = null);

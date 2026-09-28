@@ -7,6 +7,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Moyai.Infrastructure.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Moyai.Application\Moyai.Application.csproj" />
     <ProjectReference Include="..\Moyai.Domain\Moyai.Domain.csproj" />
   </ItemGroup>

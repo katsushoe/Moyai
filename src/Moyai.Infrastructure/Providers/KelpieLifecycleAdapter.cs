@@ -191,6 +191,11 @@ internal sealed class KelpieLifecycleAdapter
         KelpieCallResult result = await CallOnceAsync(request, tool, arguments, cancellationToken).ConfigureAwait(false);
         if (string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal))
         {
+            if (request.RevalidateContext is not null && !await request.RevalidateContext(cancellationToken).ConfigureAwait(false))
+            {
+                return new KelpieCallResult(false, null, "auth_project_mismatch", "Authorization context changed.", null, false);
+            }
+
             result = await CallOnceAsync(request, tool, arguments, cancellationToken).ConfigureAwait(false);
         }
 
@@ -228,7 +233,7 @@ internal sealed class KelpieLifecycleAdapter
             };
             using HttpClient providerClient = _httpClientFactory.CreateClient(_options.Name);
             using var assertionHandler = new AssertionHttpHandler(providerClient, _issuer, context, _audit);
-            using var httpClient = new HttpClient(assertionHandler);
+            using var httpClient = new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(
                 transport,

@@ -89,6 +89,15 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         {
             return new LifecycleResult(false, OperationName(request.Action), null, exception.Code, exception.Code);
         }
+        catch (HttpRequestException exception) when (McpRepositoryProvider.IsAuthenticationRejection(exception))
+        {
+            return new LifecycleResult(false, OperationName(request.Action), null, "provider_authentication_rejected",
+                $"Provider rejected authentication (HTTP {(int)exception.StatusCode!}); the operation was not executed.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new LifecycleResult(false, OperationName(request.Action), null, "provider_unavailable", "Provider request timed out; operation outcome may be unknown.");
+        }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
         {
             return new LifecycleResult(false, OperationName(request.Action), null, "provider_auth_unavailable", exception.Message);
@@ -100,10 +109,12 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         if (value is not null) arguments[name] = value;
     }
 
-    /// <summary>GithubieのRelease系Toolは、Capabilityが構成されている場合にTool単位のAssertionを必須とします。</summary>
-    private bool UsesToolAssertion => IsGithubie && _capability is not null;
+    /// <summary>Repository ProviderのRelease系Toolは、Capabilityが構成されている場合にTool単位のAssertionを必須とします。</summary>
+    private bool UsesToolAssertion => (IsGithubie || IsBuckettie) && _capability is not null;
 
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsBuckettie => string.Equals(_options.Name, "buckettie", StringComparison.OrdinalIgnoreCase);
 
     private bool IsKelpie => string.Equals(_options.Name, "server", StringComparison.OrdinalIgnoreCase)
         || string.Equals(_options.Name, "kelpiessh", StringComparison.OrdinalIgnoreCase);
@@ -295,9 +306,10 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         public override async Task<LifecycleResult> CallAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
         {
             LifecycleResult result = await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false);
-            return string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal)
-                ? await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false)
-                : result;
+            if (!string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal)) return result;
+            if (request.RevalidateContext is not null && !await request.RevalidateContext(cancellationToken).ConfigureAwait(false))
+                return new LifecycleResult(false, operation, null, "auth_project_mismatch", "Authorization context changed.");
+            return await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<LifecycleResult> CallOnceAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
@@ -314,7 +326,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             var transportOptions = new HttpClientTransportOptions { Endpoint = owner._options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp };
             using HttpClient providerClient = owner._httpClientFactory.CreateClient(owner.Name);
             using var assertionHandler = new AssertionHttpHandler(providerClient, issuer, context, owner._audit);
-            using var httpClient = new HttpClient(assertionHandler);
+            using var httpClient = new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
             CallToolResult response = await client.CallToolAsync(tool, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);

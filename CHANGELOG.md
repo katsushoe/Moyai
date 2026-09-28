@@ -4,6 +4,25 @@
 
 ## Unreleased
 
+## 1.3.8.0 - 2026-09-27 (local package)
+
+- Send per-tool Provider assertions for Buckettie release lookup, creation, publication and withdrawal instead of requiring the legacy static `release.write` service token.
+- Added regression coverage for distinct validated Buckettie assertions on release lookup and creation.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.7.0 - 2026-09-27 (local package)
+
+- Re-check the Project ID, revision, repository, provider and deploy mode before retrying `auth_assertion_expired` in release lifecycle and KelpieSSH deployment, returning `auth_project_mismatch` instead of retrying when they changed.
+- Made the legacy test-only `Es256AssertionValidator` internal; production validation uses the shared Moyai.ProviderAuthentication validator.
+- This entry describes a local installation package, not a public release.
+
+## 1.3.6.0 - 2026-09-26 (local package)
+
+- Call `get_version` and `*_provider_capabilities` without an assertion as bootstrap operations when the Provider capability does not list them, enabling Buckettie capability queries.
+- Report Provider HTTP 401/403 authentication rejections as `provider_authentication_rejected` instead of `provider_unavailable`.
+- Stop assertion-path HTTP clients from being cut off at the default 100 seconds instead of the configured request timeout.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.5.0 - 2026-09-26 (local package)
 
 - Reject release operations of non-assertion providers with `authentication_unavailable` outside the `mode=legacy` migration window instead of continuing with a static service token.

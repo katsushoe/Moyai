@@ -6,8 +6,8 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 
 ## Summary
 
-- Verified: 43
-- Partial: 2
+- Verified: 44
+- Partial: 1
 - Not implemented: 0
 - Milestone 8 remains incomplete until every `Partial` row is verified or resolved by an explicitly approved specification correction.
 
@@ -30,7 +30,7 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 | 13 | Githubie and Buckettie can be selected through the Repository Provider Contract. | Verified | `ProviderRoutingServiceTests` covers configured provider routing. | — |
 | 14 | Githubie and Buckettie can implement one common Tool Contract. | Verified | On 2026-09-04, Moyai queried the running Githubie 1.8.6.3 and Buckettie 1.3.20.0 servers and both reported support for `repository_diff` and `repository_commit`. Moyai-routed `repository_diff` also succeeded for the registered GitHub project `Moyai` and Bitbucket project `picturebooks`. | — |
 | 15 | Moyai does not execute Git CLI. | Verified | `ArchitectureBoundaryTests.MoyaiSourceDoesNotInvokeGitCli`. | — |
-| 16 | Commit, push, tag, and release run through providers. | Partial | Moyai routes mutations through providers. The running Githubie server successfully performed commit, push, tag, and release for Moyai 1.2.1 on 2026-09-04, but Githubie was called directly because Moyai itself was not registered as a Moyai Project; this is not evidence of the Moyai routing path. | Run explicitly approved mutation tests on Moyai-registered GitHub and Bitbucket test projects. |
+| 16 | Commit, push, tag, and release run through providers. | Verified | Verified through Moyai with per-operation Provider assertions. GitHub: on 2026-09-27 the Githubie SelfTest project ran commit `9f08d89`, push, tag `v0.0.0-ac16-20260904`, release publication and withdrawal, and tag deletion; Moyai 1.3.5.0 itself was published through Moyai. Bitbucket: on 2026-09-27/28 the BuckettieSelftest project (Buckettie in Moyai integration mode) ran commit `56d7c84`, push, tag `v0.0.0-ac16-20260927`, release publication (Moyai 1.3.8.0) and withdrawal, and tag deletion. Existing tags and releases were left untouched. | — |
 | 17 | Provider outage returns `provider_unavailable`. | Verified | `McpRepositoryProviderTests.ExecuteAsyncReturnsUnavailableWhenProviderCannotBeReached`. | — |
 | 18 | Moyai does not automatically start providers. | Verified | `ArchitectureBoundaryTests.RepositoryAndLifecycleAdaptersDoNotStartProviderProcesses`. | — |
 | 19 | Partial Release Publish failure is recorded. | Verified | `ReleaseOrchestrationServiceTests.PublishFailurePersistsFailedAndAllowsRetry`. | — |
@@ -63,4 +63,4 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 
 ## Next Verification Batch
 
-Remaining closure work: run approved mutations on Moyai-registered GitHub and Bitbucket test projects; implement section 19.5 staged KelpieSSH orchestration and complete real-provider integration.
+Remaining closure work: complete real KelpieSSH integration for the section 19.5 staged orchestration (acceptance criterion 37).

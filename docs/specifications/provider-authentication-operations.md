@@ -66,7 +66,7 @@ Broker APIは`POST /wrap`（`dek`,`context`→`wrapped_dek`,`key_version`）、`
 
 旧Tokenが必要な期間は`mode=legacy`と`legacyStartedAt`,`legacyUntil`を明示します。両日時の差は最大7日で、期間外は拒否します。期限の自動延長はありません。Providerのdual-accept導入後、Moyaiをassertionへ切り替え、動作確認後にProviderの旧受付を停止し、既存`token_revoke`で旧Tokenを削除してください。Providerの移行実装は各担当CRで追跡します。
 
-MCP bootstrapにAuthorizationを付与せず、実Tool呼び出しだけに新しいJWTを付与します。同一TransportでのTool再送は拒否します。`auth_assertion_expired`という明示的な業務応答だけを最大1回再試行し、その前にProjectのID・Revision・Provider・Repositoryを再確認します。結果不明、Replay、鍵失効、Policy拒否は自動再実行しません。
+MCP bootstrapにAuthorizationを付与せず、実Tool呼び出しだけに新しいJWTを付与します。同一TransportでのTool再送は拒否します。ProviderのCapabilityに含まれない`get_version`と`*_provider_capabilities`はBootstrapとして無Assertionで呼び出します。ProviderがHTTP 401／403で認証を拒否した場合は、通信障害の`provider_unavailable`と区別して`provider_authentication_rejected`を返します（Moyai 1.3.6.0以降）。`auth_assertion_expired`という明示的な業務応答だけを最大1回再試行し、その前にProjectのID・Revision・Provider・Repositoryを再確認します。結果不明、Replay、鍵失効、Policy拒否は自動再実行しません。
 
 認証監査は`assertion_audit`へ操作ID、Provider、Project UUID、Repository ID、Scope、鍵ID、結果Code、UTCだけを保存します。JWTは非公開の一時値で、要求DTOのJSON、ToString、MCP引数へ含めません。ProviderがJWTを応答へそのまま反射した場合も除去します。
 

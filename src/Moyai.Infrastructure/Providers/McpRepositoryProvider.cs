@@ -39,7 +39,7 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             if (!request.UseAssertion && request.ServiceToken is not null) headers["Authorization"] = $"Bearer {request.ServiceToken}";
             string toolName = RepositoryProviderContract.ToolName(_options.ToolPrefix, request.Operation);
             AssertionContext? context = null;
-            if (request.UseAssertion)
+            if (request.UseAssertion && !IsBootstrapWithoutAssertion(request.Operation, toolName))
             {
                 if (_issuer is null || _capability is null) throw new ProviderAuthenticationException("authentication_unavailable");
                 context = new AssertionContext(_capability.ProviderId, request.ProjectId, RepositoryAssertionPolicy.NormalizeRepository(request.RepositoryUrl), toolName,
@@ -53,7 +53,7 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             var transportOptions = new HttpClientTransportOptions { Endpoint = _options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
             using HttpClient providerClient = _httpClientFactory.CreateClient(Name);
             using AssertionHttpHandler? assertionHandler = context is null ? null : new AssertionHttpHandler(providerClient, _issuer!, context, _audit);
-            using HttpClient httpClient = assertionHandler is null ? providerClient : new HttpClient(assertionHandler);
+            using HttpClient httpClient = assertionHandler is null ? providerClient : new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
             IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(_options.ToolPrefix, request);
@@ -70,7 +70,13 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
         {
             return new RepositoryProviderResult(false, request.Operation.ContractName(), null, exception.Code, exception.Code);
         }
-        catch (Exception exception) when (exception is HttpRequestException or TimeoutException)
+        catch (HttpRequestException exception) when (IsAuthenticationRejection(exception))
+        {
+            return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(request.Operation), null, "provider_authentication_rejected",
+                $"Provider rejected authentication (HTTP {(int)exception.StatusCode!}); the operation was not executed.");
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TimeoutException
+            || (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(request.Operation), null, "provider_unavailable", request.UseAssertion ? "Provider transport failed; operation outcome may be unknown." : exception.Message);
         }
@@ -79,6 +85,15 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             return request.UseAssertion ? new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_operation_failed", "Provider protocol failure; operation outcome may be unknown.") : Failure(request.Operation, exception.Message);
         }
     }
+
+    /// <summary>ProviderのCapabilityに含まれないversion／capability照会は、Bootstrapとして無Assertionで呼び出します。</summary>
+    private bool IsBootstrapWithoutAssertion(RepositoryOperation operation, string toolName) =>
+        operation is RepositoryOperation.ProviderVersion or RepositoryOperation.ProviderCapabilities
+        && (_capability is null || !_capability.ToolScopes.ContainsKey(toolName));
+
+    /// <summary>Providerが認証を拒否したHTTP応答かを返します。</summary>
+    public static bool IsAuthenticationRejection(HttpRequestException exception) =>
+        exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden;
 
     /// <summary>Buckettieへ状態変更操作を委譲する前に連携モードの確認が必要かを返します。</summary>
     public static bool RequiresIntegrationModeCheck(string toolPrefix, RepositoryOperation operation) =>
