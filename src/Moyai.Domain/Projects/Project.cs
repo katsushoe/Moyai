@@ -27,14 +27,14 @@ public sealed class Project
         RepositoryProvider = repositoryProvider;
         BuildProvider = buildProvider;
         DeployMode = deployMode;
-        GitRemoteName = "origin";
+        GitRemoteName = null;
         CreatedAt = now;
         UpdatedAt = now;
         Revision = 1;
     }
 
     /// <summary>永続化されたProjectを復元します。</summary>
-    public static Project RestoreState(Guid id, string name, string? description, string sourcePath, string? installPath, string repositoryUrl, string repositoryProvider, string buildProvider, string? buildConfigJson, string deployMode, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, DateTimeOffset createdAt, DateTimeOffset updatedAt, DateTimeOffset? archivedAt, long revision)
+    public static Project RestoreState(Guid id, string name, string? description, string sourcePath, string? installPath, string repositoryUrl, string repositoryProvider, string buildProvider, string? buildConfigJson, string deployMode, string? gitUserName, string? gitUserEmail, string? gitRemoteName, string? gitDefaultBranch, DateTimeOffset createdAt, DateTimeOffset updatedAt, DateTimeOffset? archivedAt, long revision)
     {
         var project = new Project(id, name, sourcePath, installPath, repositoryUrl, repositoryProvider, buildProvider, deployMode, createdAt)
         {
@@ -63,7 +63,7 @@ public sealed class Project
     public string DeployMode { get; private set; }
     public string? GitUserName { get; private set; }
     public string? GitUserEmail { get; private set; }
-    public string GitRemoteName { get; private set; }
+    public string? GitRemoteName { get; private set; }
     public string? GitDefaultBranch { get; private set; }
     public DateTimeOffset CreatedAt { get; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -112,10 +112,10 @@ public sealed class Project
     }
 
     /// <summary>Projectの編集可能な基本情報を更新します。</summary>
-    public void Update(string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, TimeProvider timeProvider)
+    public void Update(string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string? gitRemoteName, string? gitDefaultBranch, TimeProvider timeProvider)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(gitRemoteName);
+        if (gitRemoteName is not null) ArgumentException.ThrowIfNullOrWhiteSpace(gitRemoteName);
         ArgumentNullException.ThrowIfNull(timeProvider);
         if (repositoryUrl is not null)
         {

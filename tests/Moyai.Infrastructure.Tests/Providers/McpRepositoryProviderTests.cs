@@ -10,7 +10,7 @@ public sealed class McpRepositoryProviderTests
     {
         using var httpClient = new HttpClient(new FailingHandler());
         var provider = new McpRepositoryProvider(new McpRepositoryProviderOptions("githubbie", new Uri("http://127.0.0.1:43199/mcp"), "github"), new TestHttpClientFactory(httpClient));
-        var request = new RepositoryProviderRequest("Moyai", "source", "https://github.com/example/moyai", "origin", RepositoryOperation.Status, null, null);
+        var request = new RepositoryProviderRequest("Moyai", "source", "https://github.com/example/moyai", null, RepositoryOperation.Status, null, null);
 
         RepositoryProviderResult result = await provider.ExecuteAsync(request);
 
@@ -54,6 +54,15 @@ public sealed class McpRepositoryProviderTests
         Assert.Equal(expected, RepositoryProviderContract.NormalizeErrorCode(detail));
     }
 
+    [Theory]
+    [InlineData("provider_remote_not_found")]
+    [InlineData("provider_remote_ambiguous")]
+    [InlineData("provider_remote_mismatch")]
+    public void CommonContractPreservesRemoteResolutionErrors(string errorCode)
+    {
+        Assert.Equal(errorCode, RepositoryProviderContract.NormalizeErrorCode($"{{\"error\":{{\"code\":\"{errorCode}\"}}}}"));
+    }
+
     [Fact]
     public void CommonContractMapsBranchAndTagArguments()
     {
@@ -67,6 +76,91 @@ public sealed class McpRepositoryProviderTests
         Assert.Equal("main", RepositoryProviderContract.Arguments("github", createTag)["source"]);
         Assert.Null(RepositoryProviderContract.Arguments("github", createTag)["message"]);
         Assert.Equal("main", RepositoryProviderContract.Arguments("bitbucket", createTag)["source"]);
+    }
+
+    [Fact]
+    public void CommonContractMapsConfiguredRemoteForStatus()
+    {
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", "github-origin-https", RepositoryOperation.Status, null, null);
+
+        IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments("github", request, supportsRemoteResolution: true);
+
+        Assert.Equal("github-origin-https", arguments["remote"]);
+    }
+
+    [Fact]
+    public void CommonContractOmitsRemoteWhenNotConfigured()
+    {
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", "", RepositoryOperation.Status, null, null);
+
+        IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments("github", request);
+
+        Assert.DoesNotContain("remote", arguments.Keys);
+    }
+
+    [Fact]
+    public void CommonContractDoesNotMapRemoteToOperationsWithoutRemoteParameter()
+    {
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", "github-origin-https", RepositoryOperation.BranchList, null, null);
+
+        IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments("github", request);
+
+        Assert.DoesNotContain("remote", arguments.Keys);
+    }
+
+    [Fact]
+    public void CommonContractOmitsRemoteWhenProviderDoesNotAdvertiseSupport()
+    {
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", "github-origin-https", RepositoryOperation.Status, null, null);
+
+        IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments("github", request);
+
+        Assert.DoesNotContain("remote", arguments.Keys);
+    }
+
+    [Theory]
+    [InlineData("{\"data\":{\"remote_resolution\":{\"version\":1,\"mode\":\"repository_url\"}}}", true)]
+    [InlineData("{\"data\":{\"remote_resolution\":{\"version\":2,\"mode\":\"repository_url\"}}}", false)]
+    [InlineData("{\"data\":{\"remote_resolution\":{\"version\":1,\"mode\":\"other\"}}}", false)]
+    [InlineData("{\"data\":{}}", false)]
+    [InlineData("invalid", false)]
+    public void CommonContractReadsRemoteResolutionCapability(string output, bool expected)
+    {
+        Assert.Equal(expected, RepositoryProviderContract.SupportsRemoteResolution(output));
+    }
+
+    [Theory]
+    [InlineData("bitbucket", RepositoryOperation.Commit, true)]
+    [InlineData("BITBUCKET", RepositoryOperation.Commit, true)]
+    [InlineData("github", RepositoryOperation.Commit, false)]
+    [InlineData("other", RepositoryOperation.Commit, false)]
+    [InlineData("bitbucket", RepositoryOperation.Status, true)]
+    [InlineData("github", RepositoryOperation.Status, true)]
+    [InlineData("bitbucket", RepositoryOperation.Push, false)]
+    [InlineData("bitbucket", RepositoryOperation.Pull, false)]
+    [InlineData("bitbucket", RepositoryOperation.Diff, false)]
+    [InlineData("bitbucket", RepositoryOperation.BranchList, false)]
+    public void CommonContractLimitsRemoteToSupportedOperations(string prefix, RepositoryOperation operation, bool expected)
+    {
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", "non-origin", operation, "message", null);
+        IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(prefix, request, supportsRemoteResolution: true);
+
+        Assert.Equal(expected, RepositoryProviderContract.SupportsRemoteArgument(prefix, operation));
+        Assert.Equal(expected, arguments.ContainsKey("remote"));
+        Assert.Equal("Moyai", arguments["repository"]);
+        if (expected) Assert.Equal("non-origin", arguments["remote"]);
+        if (operation == RepositoryOperation.Commit) Assert.Equal("message", arguments["message"]);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData(" ", true)]
+    [InlineData("non-origin", false)]
+    public void CommonContractOmitsCommitRemoteWhenMissingOrUnsupported(string? remote, bool supported)
+    {
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", remote, RepositoryOperation.Commit, "message", null);
+        Assert.DoesNotContain("remote", RepositoryProviderContract.Arguments("bitbucket", request, supported).Keys);
     }
 
     private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory

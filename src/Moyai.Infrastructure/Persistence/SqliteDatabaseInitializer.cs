@@ -35,6 +35,7 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
             new SqliteMigration(3, StateFoundationMigrationSql),
             new SqliteMigration(4, WorkItemSearchMigrationSql),
             new SqliteMigration(5, AssertionSchemaSql),
+            new SqliteMigration(6, GitRemoteNameMigrationSql, DisableForeignKeys: true),
         ]);
         await migrationRunner.MigrateAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -82,7 +83,7 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
             repository_url TEXT NOT NULL, repository_provider TEXT NOT NULL,
             build_provider TEXT NOT NULL, build_config_json TEXT NULL,
             deploy_mode TEXT NOT NULL, git_user_name TEXT NULL, git_user_email TEXT NULL,
-            git_remote_name TEXT NOT NULL DEFAULT 'origin', git_default_branch TEXT NULL,
+            git_remote_name TEXT NULL, git_default_branch TEXT NULL,
             created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT NULL,
             revision INTEGER NOT NULL DEFAULT 1
         );
@@ -319,5 +320,26 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
                 SELECT COALESCE(group_concat(body, char(10)),'') FROM work_item_comments WHERE work_item_id=new.work_item_id
             ) WHERE work_item_id=new.work_item_id;
         END;
+        """;
+
+    private const string GitRemoteNameMigrationSql = """
+        CREATE TABLE projects_new (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            description TEXT NULL, source_path TEXT NOT NULL, install_path TEXT NULL,
+            repository_url TEXT NOT NULL, repository_provider TEXT NOT NULL,
+            build_provider TEXT NOT NULL, build_config_json TEXT NULL,
+            deploy_mode TEXT NOT NULL, git_user_name TEXT NULL, git_user_email TEXT NULL,
+            git_remote_name TEXT NULL, git_default_branch TEXT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT NULL,
+            revision INTEGER NOT NULL DEFAULT 1
+        );
+        INSERT INTO projects_new
+        SELECT id,name,description,source_path,install_path,repository_url,repository_provider,
+            build_provider,build_config_json,deploy_mode,git_user_name,git_user_email,
+            CASE WHEN git_remote_name='origin' THEN NULL ELSE git_remote_name END,
+            git_default_branch,created_at,updated_at,archived_at,revision
+        FROM projects;
+        DROP TABLE projects;
+        ALTER TABLE projects_new RENAME TO projects;
         """;
 }

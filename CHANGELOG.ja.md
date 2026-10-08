@@ -4,6 +4,15 @@
 
 ## 未公開
 
+## 1.3.9.0 - 2026-10-08（ローカルパッケージ）
+
+- `Project.GitRemoteName`を省略可能にしました。schema v6で`projects`表を再構築し、保存済みの`origin`を`null`（自動解決）へ変換し、それ以外の名前は明示指定として保持します。
+- Providerが`remote_resolution` version 1／`repository_url`を表明した場合だけ、`gitRemoteName`をProviderの`remote`引数として転送します。対象はGithubie・Buckettieの`repository_status`とBuckettieの`repository_commit`です。Githubieのcommitとその他の操作には`remote`を送りません。
+- Providerのエラーコード`provider_remote_not_found`、`provider_remote_ambiguous`、`provider_remote_mismatch`をそのまま返します。
+- Build開始時に`local_head`をSource Commitとして読み取り、`dirty`／`is_dirty`がない場合は`working_tree_clean=false`をDirtyとして扱います。
+- 隔離AC37 runtime（2026-10-07／08）は、表示版1.3.8.0のままこのコードを実行していました。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.8.0 - 2026-09-27（ローカルパッケージ）
 
 - BuckettieのRelease照会・作成・公開・取り下げにTool単位のProvider Assertionを付与し、旧方式の静的`release.write` Service Tokenを要求しないようにしました。

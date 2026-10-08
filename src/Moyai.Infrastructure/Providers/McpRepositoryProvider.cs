@@ -50,13 +50,16 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
                 && !await IsMoyaiIntegrationModeAsync(cancellationToken).ConfigureAwait(false))
                 return new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_integration_mode_mismatch",
                     "Buckettie is not running in Moyai integration mode; state-changing operations are not delegated.");
+            bool supportsRemoteResolution = RepositoryProviderContract.SupportsRemoteArgument(_options.ToolPrefix, request.Operation)
+                && !string.IsNullOrWhiteSpace(request.RemoteName)
+                && await IsRemoteResolutionSupportedAsync(request, cancellationToken).ConfigureAwait(false);
             var transportOptions = new HttpClientTransportOptions { Endpoint = _options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
             using HttpClient providerClient = _httpClientFactory.CreateClient(Name);
             using AssertionHttpHandler? assertionHandler = context is null ? null : new AssertionHttpHandler(providerClient, _issuer!, context, _audit);
             using HttpClient httpClient = assertionHandler is null ? providerClient : new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
-            IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(_options.ToolPrefix, request);
+            IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(_options.ToolPrefix, request, supportsRemoteResolution);
             CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
             RepositoryProviderResult parsed = RepositoryProviderResponse.Parse(request.Operation, result);
             if (assertionHandler is not null)
@@ -111,6 +114,20 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             new Dictionary<string, object?>(), cancellationToken: cancellationToken).ConfigureAwait(false);
         RepositoryProviderResult parsed = RepositoryProviderResponse.Parse(RepositoryOperation.ProviderCapabilities, result);
         return parsed.Ok && string.Equals(ReadIntegrationMode(parsed.Output), "moyai", StringComparison.Ordinal);
+    }
+
+    private async Task<bool> IsRemoteResolutionSupportedAsync(RepositoryProviderRequest request, CancellationToken cancellationToken)
+    {
+        RepositoryProviderResult result = await ExecuteAsync(request with
+        {
+            Operation = RepositoryOperation.ProviderCapabilities,
+            RemoteName = null,
+            Message = null,
+            Branch = null,
+            Tag = null,
+            BranchSource = null,
+        }, cancellationToken).ConfigureAwait(false);
+        return result.Ok && RepositoryProviderContract.SupportsRemoteResolution(result.Output);
     }
 
     private static string? ReadIntegrationMode(string? output)

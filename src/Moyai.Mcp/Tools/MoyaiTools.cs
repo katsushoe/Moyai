@@ -70,7 +70,7 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
         projects.RenameAsync(currentName, name, expectedRevision, actorType, actorName, cancellationToken);
 
     [McpServerTool(Name = "project_update"), Description("Updates a Moyai project using optimistic concurrency and records an audit event.")]
-    public Task<Project> ProjectUpdate(string currentName, string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
+    public Task<Project> ProjectUpdate(string currentName, string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string? gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
         projects.UpdateAsync(new UpdateProjectCommand(currentName, name, repositoryUrl, repositoryProvider, description, buildConfigJson, gitUserName, gitUserEmail, gitRemoteName, gitDefaultBranch, expectedRevision, actorType, actorName), cancellationToken);
 
     [McpServerTool(Name = "project_set_archived"), Description("Archives or restores a Moyai project using optimistic concurrency.")]

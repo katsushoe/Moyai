@@ -12,11 +12,12 @@ public static class RepositoryProviderContract
         _ => $"{toolPrefix}_{OperationName(operation)}",
     };
 
-    public static IReadOnlyDictionary<string, object?> Arguments(string toolPrefix, RepositoryProviderRequest request)
+    public static IReadOnlyDictionary<string, object?> Arguments(string toolPrefix, RepositoryProviderRequest request, bool supportsRemoteResolution = false)
     {
         ArgumentNullException.ThrowIfNull(request);
         var arguments = new Dictionary<string, object?> { ["repository"] = request.Project };
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
+        if (supportsRemoteResolution && SupportsRemoteArgument(toolPrefix, request.Operation) && !string.IsNullOrWhiteSpace(request.RemoteName)) arguments["remote"] = request.RemoteName;
         if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message;
         if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) arguments["branch"] = request.Branch;
         if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
@@ -30,6 +31,30 @@ public static class RepositoryProviderContract
     }
 
     public static string OperationName(RepositoryOperation operation) => operation.ContractName();
+
+    /// <summary>remote引数を受け取る既存のProvider操作かを返します。</summary>
+    public static bool SupportsRemoteArgument(string toolPrefix, RepositoryOperation operation) =>
+        operation == RepositoryOperation.Status
+        || (operation == RepositoryOperation.Commit && string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase));
+
+    public static bool SupportsRemoteResolution(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output)) return false;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("data", out JsonElement data) && data.ValueKind == JsonValueKind.Object
+                && data.TryGetProperty("remote_resolution", out JsonElement resolution) && resolution.ValueKind == JsonValueKind.Object
+                && resolution.TryGetProperty("version", out JsonElement version) && version.TryGetInt32(out int versionNumber) && versionNumber == 1
+                && resolution.TryGetProperty("mode", out JsonElement mode) && mode.ValueKind == JsonValueKind.String
+                && string.Equals(mode.GetString(), "repository_url", StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
     public static string NormalizeErrorCode(string? detail)
     {
@@ -72,6 +97,7 @@ public static class RepositoryProviderContract
             or "auth_key_provider_unavailable" or "auth_secret_decryption_failed" or "auth_protocol_unsupported"
             or "provider_capability_missing" => code,
         "provider_unavailable" => "provider_unavailable",
+        "provider_remote_not_found" or "provider_remote_ambiguous" or "provider_remote_mismatch" => code,
         "unauthorized" or "invalid_service_token" or "service_token_expired" or "service_token_scope_missing" => "provider_authentication_failed",
         "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" => "provider_policy_rejected",
         "retryable" or "rate_limited" or "temporarily_unavailable" => "provider_retryable_failure",

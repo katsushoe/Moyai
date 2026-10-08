@@ -9,7 +9,7 @@ public sealed record UpdateProjectCommand(
     string? BuildConfigJson,
     string? GitUserName,
     string? GitUserEmail,
-    string GitRemoteName,
+    string? GitRemoteName,
     string? GitDefaultBranch,
     long ExpectedRevision,
     string ActorType,

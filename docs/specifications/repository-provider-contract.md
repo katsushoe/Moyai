@@ -57,11 +57,18 @@ Providerは、ローカルリポジトリのGit設定（`remote.<name>.url`）�
 | `provider_remote_ambiguous` | 一致するリモートが複数あり、命名規則でも一意に決まらない |
 | `provider_remote_mismatch` | 指定された`gitRemoteName`のURLが`repositoryUrl`と一致しない |
 
+## Build開始時のstatus読取
+
+MoyaiのBuild状態読取は、Source Commitとして従来の`commit`／`head_sha`／`head`に加えて`local_head`を認識します。作業ツリー判定は`dirty`／`is_dirty`を優先し、これらがない場合は`working_tree_clean`の真偽を反転してDirtyを判定します。Provider応答の`data`内の値も対象です。これはMoyaiの既存応答への対応であり、Providerへ新しい応答形式を要求するものではありません。
+
+Dirtyの場合、またはSource Commitが欠落・空の場合は、Build Provider呼出しとBuild記録の作成より前に拒否します。
+
 ## Moyai側の実装方針
 
-- 現行のMoyaiは`gitRemoteName`を保持していますが、Provider呼び出しの引数には含めていません（Providerへ渡すのはRepository IDのみ）。リモートの選択は、現状も各ProviderがRepository登録に基づいて行っています。
-- `Project.GitRemoteName`を省略可能（`null`許容）に変更し、新規Projectの既定値`origin`を廃止します。
-- 既存Projectの`git_remote_name='origin'`は、利用者が明示した値と区別できないため、移行時に`null`（自動解決）へ変更します。`origin`以外の値は、明示指定として保持します。
-- `gitRemoteName`が設定されている場合だけ、Provider呼び出しの引数`remote`として渡します。未対応Providerには送りません（`remote_resolution`で判定します）。
-- 共通エラーコード3種を、`RepositoryProviderContract`の既知コードへ追加し、そのまま利用者へ返します。
-- 実装はMoyaiの次版で行います（2026-09-27時点で未実装）。
+- Moyaiは`gitRemoteName`を保持し、下記の条件を満たす操作ではProviderの`remote`引数へ転送します。未指定の場合はProvider側の解決規則に委ねます。
+- `Project.GitRemoteName`は省略可能（`null`許容）とし、新規Projectの既定値`origin`は使用しません。
+- 既存Projectの`git_remote_name='origin'`は、利用者が明示した値と区別できないため、DB schema v6への移行で`null`（自動解決）へ変更します。`origin`以外の値は明示指定として保持します。
+- `gitRemoteName`が設定され、Providerが`remote_resolution` version 1 / `repository_url` modeを表明した場合だけ、remote引数を渡します。対象はGithubie／Buckettieの`repository_status`と、既存Toolがremote引数を受け取るBuckettieの`commit`です。Githubieの`commit`およびその他の操作にはremoteを送りません。未対応または能力を取得できないProviderにもremoteを送りません。
+- Buckettieの`commit`では、従来どおり`integration_mode=moyai`を確認してから委譲します。Assertionのscope／Repository Claim、ProviderのURL照合・ブランチ保護は変更しません。登録remoteや認証情報を変更せず、明示されたremoteをProviderの既存検証へ渡します（2026-10-08追記）。
+- Providerが返す共通エラーコード3種は、`RepositoryProviderContract`で正規化後も同じコードを利用者へ返します。
+- Moyai側の基本実装とunit testsは2026-10-03に追加しました。2026-10-07に、非`origin` remoteを持つ隔離ProjectでMoyai経由のGithubie capabilities・statusの成功を確認しました（`artifacts/nonorigin-integration/e2e-20261007.json`）。

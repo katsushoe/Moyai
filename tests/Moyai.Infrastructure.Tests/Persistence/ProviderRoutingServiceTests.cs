@@ -76,7 +76,7 @@ public sealed class ProviderRoutingServiceTests
         Assert.Equal("main", request.BranchSource);
         Assert.Equal("source", request.SourcePath);
         Assert.Equal("https://github.com/example/moyai", request.RepositoryUrl);
-        Assert.Equal("origin", request.RemoteName);
+        Assert.Null(request.RemoteName);
         Assert.NotNull(request.ServiceToken);
     }
 

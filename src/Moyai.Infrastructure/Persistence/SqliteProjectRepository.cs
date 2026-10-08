@@ -150,7 +150,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
         command.Parameters.AddWithValue("$build_config", Value(project.BuildConfigJson));
         command.Parameters.AddWithValue("$git_name", Value(project.GitUserName));
         command.Parameters.AddWithValue("$git_email", Value(project.GitUserEmail));
-        command.Parameters.AddWithValue("$remote", project.GitRemoteName);
+        command.Parameters.AddWithValue("$remote", Value(project.GitRemoteName));
         command.Parameters.AddWithValue("$default_branch", Value(project.GitDefaultBranch));
         command.Parameters.AddWithValue("$updated", Format(project.UpdatedAt));
         command.Parameters.AddWithValue("$archived", project.ArchivedAt is null ? DBNull.Value : Format(project.ArchivedAt.Value));
@@ -177,7 +177,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
     }
 
     private static Project Read(SqliteDataReader reader) => Project.RestoreState(
-        Guid.Parse(reader.GetString(0), CultureInfo.InvariantCulture), reader.GetString(1), Optional(reader, 2), reader.GetString(3), Optional(reader, 4), reader.GetString(5), reader.GetString(6), reader.GetString(7), Optional(reader, 8), reader.GetString(9), Optional(reader, 10), Optional(reader, 11), reader.GetString(12), Optional(reader, 13), Parse(reader.GetString(14)), Parse(reader.GetString(15)), reader.IsDBNull(16) ? null : Parse(reader.GetString(16)), reader.GetInt64(17));
+        Guid.Parse(reader.GetString(0), CultureInfo.InvariantCulture), reader.GetString(1), Optional(reader, 2), reader.GetString(3), Optional(reader, 4), reader.GetString(5), reader.GetString(6), reader.GetString(7), Optional(reader, 8), reader.GetString(9), Optional(reader, 10), Optional(reader, 11), Optional(reader, 12), Optional(reader, 13), Parse(reader.GetString(14)), Parse(reader.GetString(15)), reader.IsDBNull(16) ? null : Parse(reader.GetString(16)), reader.GetInt64(17));
 
     private static object Value(string? value) => value is null ? DBNull.Value : value;
     private static string? Optional(SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);

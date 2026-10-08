@@ -5,7 +5,7 @@ public sealed record RepositoryProviderRequest(
     string Project,
     string SourcePath,
     string RepositoryUrl,
-    string RemoteName,
+    string? RemoteName,
     RepositoryOperation Operation,
     string? Message,
     [property: System.Text.Json.Serialization.JsonIgnore] string? ServiceToken,

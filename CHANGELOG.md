@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+## 1.3.9.0 - 2026-10-08 (local package)
+
+- Made `Project.GitRemoteName` optional; schema v6 rebuilds the `projects` table, converting stored `origin` to `null` (automatic resolution) and keeping other names as explicit values.
+- Forward `gitRemoteName` as the Provider `remote` argument only when the Provider advertises `remote_resolution` version 1 / `repository_url`: for `repository_status` on Githubie and Buckettie, and for Buckettie `repository_commit`. Githubie commit and other operations do not receive `remote`.
+- Preserve the Provider error codes `provider_remote_not_found`, `provider_remote_ambiguous` and `provider_remote_mismatch`.
+- Build start now reads `local_head` as the source commit and treats `working_tree_clean=false` as dirty when `dirty`/`is_dirty` are absent.
+- The isolated AC37 runtime (2026-10-07/08) ran this code while still labelled 1.3.8.0.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.8.0 - 2026-09-27 (local package)
 
 - Send per-tool Provider assertions for Buckettie release lookup, creation, publication and withdrawal instead of requiring the legacy static `release.write` service token.

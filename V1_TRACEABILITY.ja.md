@@ -51,7 +51,7 @@
 | 34 | BuildArtifactがimmutableで、File HashまたはDirectory Manifest Hashを保持できる。 | 適合 | Schema不変性、file SHA-256、決定的なDirectory Manifest SHA-256を検証。 | — |
 | 35 | Projectごとに`local`/`server`のDeploy Modeを設定できる。 | 適合 | Project domain validationとDeployment Service routing。 | — |
 | 36 | Local Deployが`install_path`へBuildArtifactを配置できる。 | 適合 | `LocalDeployVerifiesArtifactAndRollbackRestoresPreviousContent`。 | — |
-| 37 | Server DeployがStreamable HTTP経由でKelpieSSHを利用できる。 | 部分適合 | Streamable HTTP transportは実装済みですが、現行adapterは単一Tool呼出しです。KelpieSSH側task `kelpiessh-moyai-deploy-contract-20260830`は、Moyaiへのintegration test依頼送信まで進んだ95%時点で、DB保守により`Expired`となっています。 | KelpieSSHの正式contractと結合環境を再確認し、段階orchestrationの実装およびintegration testを完了。 |
+| 37 | Server DeployがStreamable HTTP経由でKelpieSSHを利用できる。 | 部分適合 | MoyaiのProtocol v2段階adapterを実装済みで、対象テスト7件が成功しました。2026-10-08時点で、隔離Moyai（署名付きProvider認証は受理）、Buckettie、KelpieSSH（health HTTP 200）に到達できます。Project Aのremoteは`bitbucket-origin-https`、署名付き`repository_status`はcleanで、Moyai経由でfixtureのBuild用commit `82a1b52`を作成しました。Project AのBuild/Deployment記録はまだなく、実Deployは未実施です。 | 同一HEADのexportを受け渡し、sourcePath・node Buildを設定して管理BuildArtifactを作成した後、署名付き`target_status`の単独確認、通常の段階Deploy、cleanup前rollback／cleanupの別配備をEnd-to-Endで検証します。 |
 | 38 | MoyaiがSSH Password/Private Keyを保存しない。 | 適合 | DeploymentTargetはProvider target参照のみを持ち資格情報fieldなし。ADRにも分離を明記。 | — |
 | 39 | DeploymentTargetを独立Entityとして保持できる。 | 適合 | Domain、SQLite table、repository、CLI、MCPを実装。 | — |
 | 40 | v1で1 Project = 1 DeploymentTargetを保証する。 | 適合 | SQLiteの`project_id`一意制約とinitializer constraint test。 | — |
