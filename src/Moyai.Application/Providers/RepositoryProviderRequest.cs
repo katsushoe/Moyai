@@ -21,7 +21,10 @@ public sealed record RepositoryProviderRequest(
     string[]? Paths = null,
     string? StashId = null,
     string? ExpectedHead = null,
-    string? Patch = null)
+    string? Patch = null,
+    string? ProviderRepositoryId = null)
 {
+    /// <summary>Providerの登録IDを返します。未設定時は従来のProject名です。</summary>
+    public string RepositoryId => ProviderRepositoryId ?? Project;
     public override string ToString() => $"Repository request: {Operation}";
 }

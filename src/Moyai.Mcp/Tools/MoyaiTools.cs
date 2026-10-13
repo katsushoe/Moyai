@@ -69,6 +69,11 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<Project> ProjectRename(string currentName, string name, long expectedRevision, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
         projects.RenameAsync(currentName, name, expectedRevision, actorType, actorName, cancellationToken);
 
+    /// <summary>Project名を保持したままProvider登録IDを設定または解除します。</summary>
+    [McpServerTool(Name = "project_provider_repository_set"), Description("Sets or clears the Provider Repository ID mapping without renaming the Project. Requires expectedRevision and records an audit event. Specify providerRepositoryId or clearMapping=true.")]
+    public Task<Project> ProjectProviderRepositorySet(string project, long expectedRevision, string? providerRepositoryId = null, bool clearMapping = false, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
+        projects.SetProviderRepositoryAsync(project, expectedRevision, providerRepositoryId, clearMapping, actorType, actorName, cancellationToken);
+
     [McpServerTool(Name = "project_update"), Description("Updates a Moyai project using optimistic concurrency and records an audit event.")]
     public Task<Project> ProjectUpdate(string currentName, string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string? gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
         projects.UpdateAsync(new UpdateProjectCommand(currentName, name, repositoryUrl, repositoryProvider, description, buildConfigJson, gitUserName, gitUserEmail, gitRemoteName, gitDefaultBranch, expectedRevision, actorType, actorName), cancellationToken);

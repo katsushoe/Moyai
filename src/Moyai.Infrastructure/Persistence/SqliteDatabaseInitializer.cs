@@ -36,6 +36,7 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
             new SqliteMigration(4, WorkItemSearchMigrationSql),
             new SqliteMigration(5, AssertionSchemaSql),
             new SqliteMigration(6, GitRemoteNameMigrationSql, DisableForeignKeys: true),
+            new SqliteMigration(7, "ALTER TABLE projects ADD COLUMN provider_repository_id TEXT NULL;"),
         ]);
         await migrationRunner.MigrateAsync(cancellationToken).ConfigureAwait(false);
     }

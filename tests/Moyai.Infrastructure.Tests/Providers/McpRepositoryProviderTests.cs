@@ -229,6 +229,19 @@ public sealed class McpRepositoryProviderTests
         public HttpClient CreateClient(string name) => client;
     }
 
+    [Theory]
+    [InlineData("github", null, "Display_Project")]
+    [InlineData("bitbucket", null, "Display_Project")]
+    [InlineData("github", "provider-id", "provider-id")]
+    [InlineData("bitbucket", "neonsdk", "neonsdk")]
+    public void RepositoryArgumentUsesExplicitMappingOrLegacyProjectName(string prefix, string? mapping, string expected)
+    {
+        var request = new RepositoryProviderRequest("Display_Project", "source", "url", null, RepositoryOperation.Status, null, null, ProviderRepositoryId: mapping);
+        Assert.Equal(expected, RepositoryProviderContract.Arguments(prefix, request)["repository"]);
+        Assert.Equal("Display_Project", request.Project);
+        Assert.Empty(RepositoryProviderContract.Arguments(prefix, request with { Operation = RepositoryOperation.ProviderVersion }));
+    }
+
     private sealed class FailingHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>

@@ -33,6 +33,66 @@ public sealed class SqliteProjectRepositoryTests
     }
 
     [Fact]
+    public async Task ProviderMappingPersistsAcrossReloadAndProjectRename()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        Project original = await service.CreateAsync(new CreateProjectCommand("Neon_SDK", "source", null, "https://bitbucket.org/example/neon_sdk.git", "bitbucket"));
+        Project mapped = await service.SetProviderRepositoryAsync(original.Name, original.Revision, "neonsdk", false, "test", "mapper");
+        ProjectService restarted = await fixture.CreateServiceAsync();
+        Project loaded = await restarted.GetAsync("Neon_SDK");
+        Assert.Equal(original.Id, loaded.Id);
+        Assert.Equal("Neon_SDK", loaded.Name);
+        Assert.Equal("neonsdk", loaded.ProviderRepositoryId);
+        Assert.Equal(original.RepositoryUrl, loaded.RepositoryUrl);
+        Assert.Equal(original.Revision + 1, loaded.Revision);
+        Assert.Equal("neonsdk", Assert.Single(await restarted.ListAsync(false)).ProviderRepositoryId);
+        Assert.Equal(1L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events WHERE event_type='project_provider_repository_set' AND actor_name='mapper' AND after_json LIKE '%neonsdk%';"));
+        await restarted.RenameAsync(loaded.Name, "Renamed_Project", loaded.Revision);
+        loaded = await restarted.GetAsync("Renamed_Project");
+        Assert.Equal(mapped.Id, loaded.Id);
+        Assert.Equal("neonsdk", loaded.ProviderRepositoryId);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("repo/other")]
+    [InlineData("https://example.test/repo")]
+    [InlineData("../repo")]
+    [InlineData("-repo")]
+    [InlineData("repo\nother")]
+    public async Task InvalidProviderMappingDoesNotWriteDataOrAudit(string invalid)
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        await service.CreateAsync(new CreateProjectCommand("Test"));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SetProviderRepositoryAsync("Test", 1, invalid, false, "test", "mapper"));
+        Project loaded = await service.GetAsync("Test");
+        Assert.Null(loaded.ProviderRepositoryId);
+        Assert.Equal(1, loaded.Revision);
+        Assert.Equal(1L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+    }
+
+    [Fact]
+    public async Task ProviderMappingSupportsExplicitClearAndRejectsStaleRevision()
+    {
+        using var fixture = new ProjectFixture();
+        ProjectService service = await fixture.CreateServiceAsync();
+        Project created = await service.CreateAsync(new CreateProjectCommand("Test"));
+        await service.SetProviderRepositoryAsync("Test", 1, "provider-id", false, "test", "mapper");
+        await Assert.ThrowsAsync<RevisionConflictException>(() => service.SetProviderRepositoryAsync("Test", 1, "other", false, "test", "mapper"));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SetProviderRepositoryAsync("Test", 2, "other", true, "test", "mapper"));
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => service.SetProviderRepositoryAsync("Test", 2, null, false, "test", "mapper"));
+        Assert.Equal("provider-id", (await service.GetAsync("Test")).ProviderRepositoryId);
+        Assert.Equal(2L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+        Project cleared = await service.SetProviderRepositoryAsync("Test", 2, null, true, "test", "mapper");
+        Assert.Equal(created.Id, cleared.Id);
+        Assert.Null((await service.GetAsync("Test")).ProviderRepositoryId);
+        Assert.Equal(3L, await fixture.ScalarAsync("SELECT COUNT(*) FROM events;"));
+    }
+
+    [Fact]
     public async Task RenameAsyncRejectsConflictsAndInvalidNamesWithoutChanges()
     {
         using var fixture = new ProjectFixture();

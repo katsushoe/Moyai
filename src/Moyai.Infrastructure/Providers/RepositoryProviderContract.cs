@@ -15,7 +15,7 @@ public static class RepositoryProviderContract
     public static IReadOnlyDictionary<string, object?> Arguments(string toolPrefix, RepositoryProviderRequest request, bool supportsRemoteResolution = false)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var arguments = new Dictionary<string, object?> { ["repository"] = request.Project };
+        var arguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId };
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
         if (supportsRemoteResolution && SupportsRemoteArgument(toolPrefix, request.Operation) && !string.IsNullOrWhiteSpace(request.RemoteName)) arguments["remote"] = request.RemoteName;
         if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message;

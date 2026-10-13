@@ -4,6 +4,13 @@
 
 ## 未公開
 
+## 1.3.10.0 - 2026-10-14（開発ビルド）
+
+- schema v7でProject単位のnullable Provider Repository IDを保存します。未設定時は従来のProject名を使い、UUIDと関連データを維持します。
+- 楽観的排他制御と監査を使う `project_provider_repository_set`／`project-provider-repository-set` を追加し、対応付けの登録・更新・明示解除を提供します。
+- RepositoryとRepositoryを使うRelease Toolへ登録IDを転送し、Project名と署名付きUUID・正規化Repository URL・audience・scopeを維持します。
+- 開発ビルドの記録であり、稼働環境への導入や公開Releaseではありません。
+
 ## 1.3.9.0 - 2026-10-08（ローカルパッケージ）
 
 - `Project.GitRemoteName`を省略可能にしました。schema v6で`projects`表を再構築し、保存済みの`origin`を`null`（自動解決）へ変換し、それ以外の名前は明示指定として保持します。

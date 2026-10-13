@@ -35,6 +35,7 @@ try
             "project-create --name <name>: create using only a name. project-ensure --name <name>: create only when missing.\n" +
             "project-configure --name <name> --expected-revision <revision> [settings]: associate execution settings later.\n" +
             "project-rename --current-name <old> --name <new> --expected-revision <revision>: rename while preserving settings.\n" +
+            "project-provider-repository-set --project <name> --expected-revision <revision> (--provider-repository-id <id>|--clear-mapping): set/clear the Provider registration mapping.\n" +
             "commands: list service business commands and schemas. version: query service version.\n" +
             "Business commands always connect to the service. Management commands target the Moyai Windows service.\n" +
             "Business failures (ok=false) return exit code 1 and structured errors on standard error.");

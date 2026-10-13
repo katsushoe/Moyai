@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 1.3.10.0 - 2026-10-14 (development build)
+
+- Store a nullable Provider Repository ID per Project in schema v7; unset mappings retain the legacy Project-name fallback without changing UUIDs or linked data.
+- Add audited `project_provider_repository_set` / `project-provider-repository-set` for explicit mapping updates and clears using optimistic concurrency.
+- Forward the registered ID to Repository and Repository-backed release tools while preserving Project labels and the signed UUID, canonical Repository URL, audience, and scopes.
+- This entry describes a development build, not an installed or public release.
+
 ## 1.3.9.0 - 2026-10-08 (local package)
 
 - Made `Project.GitRemoteName` optional; schema v6 rebuilds the `projects` table, converting stored `origin` to `null` (automatic resolution) and keeping other names as explicit values.

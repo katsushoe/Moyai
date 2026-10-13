@@ -75,6 +75,20 @@ public sealed class ProjectService
         return project;
     }
 
+    /// <summary>Provider登録IDの対応付けをrevision検証と監査イベント付きで保存します。</summary>
+    public async Task<Project> SetProviderRepositoryAsync(string name, long expectedRevision, string? providerRepositoryId, bool clearMapping, string actorType, string actorName, CancellationToken cancellationToken = default)
+    {
+        if (clearMapping && providerRepositoryId is not null)
+            throw new ArgumentException("Specify either a Provider Repository ID or clearMapping, not both.");
+        if (!clearMapping) ArgumentException.ThrowIfNullOrWhiteSpace(providerRepositoryId);
+        Project project = await GetAsync(name, cancellationToken).ConfigureAwait(false);
+        string beforeJson = JsonSerializer.Serialize(project);
+        project.SetProviderRepository(clearMapping ? null : providerRepositoryId, _timeProvider);
+        await _repository.UpdateAsync(project, expectedRevision,
+            CreateEvent(project, "project_provider_repository_set", actorType, actorName, beforeJson, JsonSerializer.Serialize(project)), cancellationToken).ConfigureAwait(false);
+        return project;
+    }
+
     public async Task<Project> SetArchivedAsync(string name, long expectedRevision, bool archived, string actorType, string actorName, CancellationToken cancellationToken = default)
     {
         Project project = await GetAsync(name, cancellationToken).ConfigureAwait(false);

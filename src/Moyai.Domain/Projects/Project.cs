@@ -34,7 +34,7 @@ public sealed class Project
     }
 
     /// <summary>永続化されたProjectを復元します。</summary>
-    public static Project RestoreState(Guid id, string name, string? description, string sourcePath, string? installPath, string repositoryUrl, string repositoryProvider, string buildProvider, string? buildConfigJson, string deployMode, string? gitUserName, string? gitUserEmail, string? gitRemoteName, string? gitDefaultBranch, DateTimeOffset createdAt, DateTimeOffset updatedAt, DateTimeOffset? archivedAt, long revision)
+    public static Project RestoreState(Guid id, string name, string? description, string sourcePath, string? installPath, string repositoryUrl, string repositoryProvider, string buildProvider, string? buildConfigJson, string deployMode, string? gitUserName, string? gitUserEmail, string? gitRemoteName, string? gitDefaultBranch, DateTimeOffset createdAt, DateTimeOffset updatedAt, DateTimeOffset? archivedAt, long revision, string? providerRepositoryId = null)
     {
         var project = new Project(id, name, sourcePath, installPath, repositoryUrl, repositoryProvider, buildProvider, deployMode, createdAt)
         {
@@ -44,6 +44,7 @@ public sealed class Project
             GitUserEmail = gitUserEmail,
             GitRemoteName = gitRemoteName,
             GitDefaultBranch = gitDefaultBranch,
+            ProviderRepositoryId = providerRepositoryId,
             UpdatedAt = updatedAt,
             ArchivedAt = archivedAt,
             Revision = revision,
@@ -65,6 +66,8 @@ public sealed class Project
     public string? GitUserEmail { get; private set; }
     public string? GitRemoteName { get; private set; }
     public string? GitDefaultBranch { get; private set; }
+    /// <summary>Providerに登録されたRepository IDです。未設定の場合はProject名を使用します。</summary>
+    public string? ProviderRepositoryId { get; private set; }
     public DateTimeOffset CreatedAt { get; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ArchivedAt { get; private set; }
@@ -107,6 +110,22 @@ public sealed class Project
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(timeProvider);
         Name = name;
+        UpdatedAt = timeProvider.GetUtcNow();
+        Revision++;
+    }
+
+    /// <summary>Provider登録IDだけを変更し、Project名と認証文脈を保持します。nullは対応付けを解除します。</summary>
+    public void SetProviderRepository(string? providerRepositoryId, TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        if (providerRepositoryId is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(providerRepositoryId);
+            if (providerRepositoryId.Length > 128 || !char.IsAsciiLetterOrDigit(providerRepositoryId[0])
+                || providerRepositoryId.Any(static character => !char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-' or '.')))
+                throw new ArgumentException("Provider Repository ID must start with an ASCII letter or digit and contain only ASCII letters, digits, underscores, hyphens or dots (maximum 128 characters).", nameof(providerRepositoryId));
+        }
+        ProviderRepositoryId = providerRepositoryId;
         UpdatedAt = timeProvider.GetUtcNow();
         Revision++;
     }

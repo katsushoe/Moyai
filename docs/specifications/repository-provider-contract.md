@@ -57,6 +57,14 @@ Providerは、ローカルリポジトリのGit設定（`remote.<name>.url`）�
 | `provider_remote_ambiguous` | 一致するリモートが複数あり、命名規則でも一意に決まらない |
 | `provider_remote_mismatch` | 指定された`gitRemoteName`のURLが`repositoryUrl`と一致しない |
 
+## Provider Repository登録ID
+
+Moyai Projectの `providerRepositoryId` は、Providerの登録IDをProject名とは別に保持します。未設定なら従来どおりProject名を `repository` 引数として渡し、明示設定した場合は登録IDを使います。Project名、UUID、正規化Repository URL、audience、scopeは変更しません。Project名変更時にも明示した登録IDは維持します。
+
+登録・更新・解除は `project_provider_repository_set` を使い、現在revisionと監査を適用します。`clearMapping=true` で解除し、Project名へのfallbackを戻します。設定形式・schema v7・運用条件は[ADR 0011](../adr/0011-provider-repository-id.md)を正本とします。Provider自身の登録・対応付け検証は維持され、Moyai側の設定保存だけで認可を成立させません。
+
+この対応はMoyai 1.3.10.0のソース実装です。稼働環境への導入とNeon_SDKの読取結合確認は別の完了条件です。
+
 ## Build開始時のstatus読取
 
 MoyaiのBuild状態読取は、Source Commitとして従来の`commit`／`head_sha`／`head`に加えて`local_head`を認識します。作業ツリー判定は`dirty`／`is_dirty`を優先し、これらがない場合は`working_tree_clean`の真偽を反転してDirtyを判定します。Provider応答の`data`内の値も対象です。これはMoyaiの既存応答への対応であり、Providerへ新しい応答形式を要求するものではありません。

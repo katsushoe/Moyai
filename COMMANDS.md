@@ -18,7 +18,7 @@ Provider authentication administration: `assertion-key-prepare`, `assertion-key-
 
 | Group | Commands | Purpose |
 | :--- | :--- | :--- |
-| Project | `project-list`, `project-get`, `project-create`, `project-ensure`, `project-configure`, `project-rename`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
+| Project | `project-list`, `project-get`, `project-create`, `project-ensure`, `project-configure`, `project-rename`, `project-provider-repository-set`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
 | Work item | `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, `work-item-transition`, `work-item-history`, `item-search` | Work tracking, history, and FTS5 search |
 | Collaboration | `relation-add/remove/list`, `comment-add/list`, `task-link-add/remove/list`, `commit-link-add/remove/list` | Persistent WorkItem collaboration records |
 | Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
@@ -51,6 +51,20 @@ Each command below has the syntax, processing rule, and result contract. Returne
 - `project-set-archived`: requires `--name --expected-revision --archived --actor-type --actor-name`; archives or restores and returns the project.
 - `project-overview`: requires `--project`; optional `--recent-limit` defaults to `10` and must be `1..100`; returns open WorkItem counts, blockers, latest stable release, planned release, and recent events.
 - `project-changes-since`: requires `--project --since`; optional `--offset --limit` default to `0` and `50`; returns events strictly after the ISO 8601 timestamp in deterministic chronological order.
+
+#### `project-provider-repository-set`
+
+Purpose: set, update, or explicitly clear a Provider registration ID without renaming the Moyai Project. MCP tool: `project_provider_repository_set`.
+
+Syntax: `moyaictl project-provider-repository-set --project <name> --expected-revision <revision> (--provider-repository-id <id> | --clear-mapping) [--actor-type <type>] [--actor-name <name>]`.
+
+`project` selects an existing Project; `expectedRevision` is its current revision. `providerRepositoryId` must be a valid registration ID (see CONFIG). `clearMapping` defaults to false. Specify an ID or clear, never both. Optional actors default to `client` / `unspecified`, providing audit attribution rather than authentication.
+
+Example: `moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 1 --provider-repository-id neonsdk`. Read the actual revision from `project-get` before using this example; do not assume revision 1 for an existing Project. To clear the mapping: `moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 2 --clear-mapping`.
+
+The service saves the mapping and `project_provider_repository_set` audit event atomically, increments revision, and preserves UUID, name, other settings, archive state, and linked data. Results return the persisted Project with `providerRepositoryId` and the new revision; an explicit clear stores null and restores the legacy Project-name fallback. Example result fields: `{"name":"Neon_SDK","providerRepositoryId":"neonsdk","revision":2}` (the real result also includes the other Project fields).
+
+Missing Project, stale revision, invalid ID, omitted ID without clear, or simultaneous ID/clear fails without persistence (CLI exit 1). The CLI connects to the service; it never modifies SQLite directly. The mapping does not create a Provider registration, alter credentials, or bypass Provider UUID/Repository URL validation. Live commit/push is not needed to verify this configuration operation.
 
 ### Work item commands
 

@@ -61,7 +61,7 @@ public sealed class ProviderRoutingService
         }
 
         ValidateArguments(operation, message, branch, tag, source, paths, stashId, expectedHead, patch);
-        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source, project.Id, Guid.NewGuid().ToString("N"), !legacy, paths, stashId, expectedHead, patch);
+        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source, project.Id, Guid.NewGuid().ToString("N"), !legacy, paths, stashId, expectedHead, patch, project.ProviderRepositoryId);
         RepositoryProviderResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         if (!legacy && result.ErrorCode == "auth_assertion_expired")
         {

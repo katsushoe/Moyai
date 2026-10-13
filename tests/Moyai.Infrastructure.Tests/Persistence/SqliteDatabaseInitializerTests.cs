@@ -25,7 +25,7 @@ public sealed class SqliteDatabaseInitializerTests
             object? count = await command.ExecuteScalarAsync(CancellationToken.None);
             Assert.Equal(15L, count);
             command.CommandText = "SELECT version FROM schema_version;";
-            Assert.Equal(6L, await command.ExecuteScalarAsync(CancellationToken.None));
+            Assert.Equal(7L, await command.ExecuteScalarAsync(CancellationToken.None));
         }
         finally
         {
@@ -163,7 +163,7 @@ public sealed class SqliteDatabaseInitializerTests
             await upgraded.OpenAsync(CancellationToken.None);
             await using SqliteCommand command = upgraded.CreateCommand();
             command.CommandText = "SELECT version FROM schema_version;";
-            Assert.Equal(6L, await command.ExecuteScalarAsync(CancellationToken.None));
+            Assert.Equal(7L, await command.ExecuteScalarAsync(CancellationToken.None));
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='deployments';";
             Assert.Equal(1L, await command.ExecuteScalarAsync(CancellationToken.None));
         }
@@ -221,7 +221,7 @@ public sealed class SqliteDatabaseInitializerTests
             await using (SqliteDataReader reader = await command.ExecuteReaderAsync()) Assert.False(await reader.ReadAsync());
             command.Parameters.Clear();
             command.CommandText = "SELECT version FROM schema_version;";
-            Assert.Equal(6L, await command.ExecuteScalarAsync());
+            Assert.Equal(7L, await command.ExecuteScalarAsync());
         }
         finally
         {

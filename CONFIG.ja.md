@@ -36,6 +36,14 @@ Server配備Targetの`kelpieTarget`にはKelpieSSHの不変Target IDを設定し
 
 Projectの`build_config_json`では`configuration`と`artifacts`配列（`name`、`artifact_type`、Project相対の`file_path`）を指定します。配備先は既存のProject設定を使用します。
 
+## ProjectのProvider Repository対応付け
+
+Projectの `providerRepositoryId` はサービスJSONではなく `projects.provider_repository_id` に保存します。Moyai Project名とは別に、既存のProvider登録IDを指定します。現在のProject revisionを指定して `project_provider_repository_set` または `moyaictl project-provider-repository-set` で登録・更新し、`project_get`／Project一覧で照会します。[ADR 0011](docs/adr/0011-provider-repository-id.md)を参照してください。
+
+未設定の場合は互換性のためProviderの `repository` 引数へ従来どおりProject名を渡します。IDの大文字小文字を保持し、1～128文字のASCII英数字・アンダースコア・ハイフン・ドットだけを使い、先頭は英数字とします。`clearMapping=true` で明示解除できます。IDの省略／nullだけでは解除しません。通常のProject更新・configure・rename・archiveは対応付けを保持します。
+
+schema v7でnullable列を追加し、Project UUID・名前・revision・関連WorkItemを変更しません。既存の移行バックアップとトランザクション規則を使います。Repository操作とRepositoryを使うRelease操作は登録IDを使い、AssertionのUUID・正規化Repository URL・audience・scopeを維持します。対応付けの保存だけでProvider登録や別Repositoryへの認可を行わず、誤ったProvider対応付けは委譲時に拒否します。
+
 ## インストール・移行
 
 MSIはサービス起動前にCLIの`config-init`を実行します。JSONがない場合だけ初期設定を生成し、以前のレジストリ`McpUrl`があれば取り込みます。既存JSONは検証して保持します。管理者がJSONを編集し、`service stop`、`service start`で反映します。既存JSONを旧MSIプロパティやレジストリで上書きしません。

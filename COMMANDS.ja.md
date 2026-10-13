@@ -18,7 +18,7 @@ Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`�
 
 | Group | Commands | 用途 |
 | :--- | :--- | :--- |
-| Project | `project-list`、`project-get`、`project-create`、`project-ensure`、`project-configure`、`project-rename`、`project-update`、`project-set-archived`、`project-overview`、`project-changes-since` | Project状態・集約表示 |
+| Project | `project-list`、`project-get`、`project-create`、`project-ensure`、`project-configure`、`project-rename`、`project-provider-repository-set`、`project-update`、`project-set-archived`、`project-overview`、`project-changes-since` | Project状態・集約表示 |
 | Work item | `work-item-list`、`work-item-get`、`work-item-create`、`work-item-update`、`work-item-set-deleted`、`work-item-transition`、`work-item-history`、`item-search` | 作業管理・履歴・FTS5検索 |
 | Collaboration | `relation-add/remove/list`、`comment-add/list`、`task-link-add/remove/list`、`commit-link-add/remove/list` | WorkItem連携記録 |
 | Repository | `repository-status`、`repository-diff`、`repository-commit`、`repository-push`、`repository-pull` | Provider経由Git操作 |
@@ -49,6 +49,20 @@ Project名の検索、重複登録判定、変更対象の解決にはOrdinalな
 - `project-set-archived`: `--name --expected-revision --archived --actor-type --actor-name`が必須です。
 - `project-overview --project`はOpen WorkItem件数、blocker、最新stable Release、予定Release、直近Eventを返します。`--recent-limit`は既定`10`、範囲`1..100`です。
 - `project-changes-since`は`--project --since`が必須で、指定したISO 8601日時より後のEventを時系列順に返します。`--offset --limit`の既定値は`0`と`50`です。
+
+#### `project-provider-repository-set`
+
+目的：Moyai Project名を変えず、Provider登録IDを設定・更新・明示解除します。MCP Toolは `project_provider_repository_set` です。
+
+構文：`moyaictl project-provider-repository-set --project <name> --expected-revision <revision> (--provider-repository-id <id> | --clear-mapping) [--actor-type <type>] [--actor-name <name>]`。
+
+`project` は既存Project、`expectedRevision` は現在のrevisionです。`providerRepositoryId` はCONFIG記載の形式に従う登録ID、`clearMapping` の既定値はfalseです。ID指定か解除のどちらか一方だけを指定します。任意actorの既定は `client`／`unspecified` で、監査上の記録であり認証ではありません。
+
+例：`moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 1 --provider-repository-id neonsdk`。実際のrevisionは事前に `project-get` で確認し、既存Projectで1と仮定しません。解除例：`moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 2 --clear-mapping`。
+
+サービスが対応付けと `project_provider_repository_set` 監査Eventを同じトランザクションで保存し、revisionを増やします。UUID・名前・他設定・archive状態・関連データは保持します。結果は保存済みProjectを返し、`providerRepositoryId` と新revisionを含みます。明示解除はnullを保存し、従来のProject名へのfallbackを戻します。結果項目の例：`{"name":"Neon_SDK","providerRepositoryId":"neonsdk","revision":2}`（実際の応答には他のProject項目も含みます）。
+
+対象なし、古いrevision、不正ID、解除なしのID省略、IDと解除の同時指定では保存せず失敗します（CLI終了コード1）。CLIはサービスに接続し、SQLiteを直接変更しません。Provider登録の作成、資格情報変更、UUID／Repository URL検証の回避は行いません。この設定操作の確認に実commit／pushは不要です。
 
 ### Work item commands
 

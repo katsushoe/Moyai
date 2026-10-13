@@ -20,4 +20,9 @@ public sealed record LifecycleRequest(
     string? DestinationPath = null,
     string? ArtifactSha256 = null,
     string? RepositoryUrl = null,
-    Func<CancellationToken, Task<bool>>? RevalidateContext = null);
+    Func<CancellationToken, Task<bool>>? RevalidateContext = null,
+    string? ProviderRepositoryId = null)
+{
+    /// <summary>Repository Provider登録IDです。未設定時は従来のProject名です。</summary>
+    public string RepositoryId => ProviderRepositoryId ?? Project;
+}
