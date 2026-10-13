@@ -164,6 +164,16 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
 
     [McpServerTool(Name = "repository_commit"), Description("Commits a Moyai-managed repository through its configured Provider using internal service authentication.")]
     public Task<RepositoryProviderResult> RepositoryCommit(string project, string message, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Commit, message, cancellationToken: cancellationToken));
+    [McpServerTool(Name = "repository_commit_selected"), Description("Commits only a selected unified diff patch using the configured repository Provider.")]
+    public Task<RepositoryProviderResult> RepositoryCommitSelected(string project, string message, string expectedHead, string patch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.CommitSelected, message, expectedHead: expectedHead, patch: patch, cancellationToken: cancellationToken));
+    [McpServerTool(Name = "repository_stash_push"), Description("Stashes all changes or changes under the selected repository-relative paths.")]
+    public Task<RepositoryProviderResult> RepositoryStashPush(string project, string message, string[]? paths = null, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashPush, message: message, cancellationToken: cancellationToken, paths: paths));
+    [McpServerTool(Name = "repository_stash_list", ReadOnly = true), Description("Lists saved repository stashes.")]
+    public Task<RepositoryProviderResult> RepositoryStashList(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashList, cancellationToken: cancellationToken));
+    [McpServerTool(Name = "repository_stash_apply"), Description("Applies a stash identified by its full object ID.")]
+    public Task<RepositoryProviderResult> RepositoryStashApply(string project, string stashId, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashApply, cancellationToken: cancellationToken, stashId: stashId));
+    [McpServerTool(Name = "repository_stash_drop"), Description("Drops a stash identified by its full object ID.")]
+    public Task<RepositoryProviderResult> RepositoryStashDrop(string project, string stashId, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashDrop, cancellationToken: cancellationToken, stashId: stashId));
 
     [McpServerTool(Name = "repository_push"), Description("Pushes a Moyai-managed repository through its configured Provider using internal service authentication.")]
     public Task<RepositoryProviderResult> RepositoryPush(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Push, cancellationToken: cancellationToken));

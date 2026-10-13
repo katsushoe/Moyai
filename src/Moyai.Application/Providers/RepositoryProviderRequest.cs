@@ -17,7 +17,11 @@ public sealed record RepositoryProviderRequest(
     string? BranchSource = null,
     Guid ProjectId = default,
     string? OperationId = null,
-    bool UseAssertion = false)
+    bool UseAssertion = false,
+    string[]? Paths = null,
+    string? StashId = null,
+    string? ExpectedHead = null,
+    string? Patch = null)
 {
     public override string ToString() => $"Repository request: {Operation}";
 }

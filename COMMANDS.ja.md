@@ -105,3 +105,10 @@ Moyai v1は各Projectの一部としてRepositoryを1つだけ管理するため
 
 `branch_create`には`project`、`branch`、明示的な`source`が必要です。`source`はliteral branch名または完全な40桁commit SHAを指定します。省略時にMoyaiが`main`、`develop`、現在の`HEAD`を補完することはありません。
 `tag_create`にも`project`、`tag`、明示的なliteral branch名または完全な40桁commit SHAの`source`が必要です。Providerが明示的なTag作成元に対応する場合、Moyaiは無変更で転送します。
+# Repository stash連携
+
+MCP Tool `repository_stash_push` / `repository_stash_list` / `repository_stash_apply` / `repository_stash_drop`は設定済みRepository Providerへ委譲します。`repository_stash_push`の`paths`はRepository相対pathの配列で、省略時は全変更を退避します。適用・削除ではlist/pushが返す完全なstash object IDを指定します。Assertion scopeは一覧が`repository.read`、変更操作が`repository.stash.write`です。
+
+CLI例: `moyaictl repository-stash-push --project Buckettie --message "split changes" --paths "src/a.cs,docs/readme.md"`、`moyaictl repository-stash-list --project Buckettie`、`moyaictl repository-stash-apply --project Buckettie --stash-id <40桁ID>`、`moyaictl repository-stash-drop --project Buckettie --stash-id <40桁ID>`。CLIの`paths`はカンマ区切りです。ファイル名にカンマが含まれる場合はMCPを使います。
+
+`repository_commit_selected`は`expected_head`とunified diffの`patch`をProviderへ渡し、Provider Capabilityで対応が明示される場合だけ実行します。未選択の作業ツリー変更は残り、staged変更がある場合はProvider側で拒否します。

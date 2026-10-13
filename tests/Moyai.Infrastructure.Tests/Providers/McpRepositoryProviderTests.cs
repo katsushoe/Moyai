@@ -1,10 +1,12 @@
 ﻿using Moyai.Application.Providers;
 using Moyai.Infrastructure.Providers;
+using Moyai.Application.Authentication;
 
 namespace Moyai.Infrastructure.Tests.Providers;
 
 public sealed class McpRepositoryProviderTests
 {
+    private static readonly string[] SelectedStashPaths = ["src/a.cs", "docs/readme.md"];
     [Fact]
     public async Task ExecuteAsyncReturnsUnavailableWhenProviderCannotBeReached()
     {
@@ -33,6 +35,10 @@ public sealed class McpRepositoryProviderTests
     [InlineData("bitbucket", RepositoryOperation.BranchList, "bitbucket_branch_list")]
     [InlineData("bitbucket", RepositoryOperation.TagCreate, "bitbucket_tag_create")]
     [InlineData("github", RepositoryOperation.ProviderVersion, "get_version")]
+    [InlineData("github", RepositoryOperation.StashPush, "github_repository_stash_push")]
+    [InlineData("github", RepositoryOperation.StashList, "github_repository_stash_list")]
+    [InlineData("bitbucket", RepositoryOperation.StashApply, "bitbucket_repository_stash_apply")]
+    [InlineData("bitbucket", RepositoryOperation.StashDrop, "bitbucket_repository_stash_drop")]
     [InlineData("bitbucket", RepositoryOperation.ProviderCapabilities, "bitbucket_provider_capabilities")]
     public void CommonContractMapsProviderTools(string prefix, RepositoryOperation operation, string expected)
     {
@@ -76,6 +82,61 @@ public sealed class McpRepositoryProviderTests
         Assert.Equal("main", RepositoryProviderContract.Arguments("github", createTag)["source"]);
         Assert.Null(RepositoryProviderContract.Arguments("github", createTag)["message"]);
         Assert.Equal("main", RepositoryProviderContract.Arguments("bitbucket", createTag)["source"]);
+    }
+
+    [Fact]
+    public void CommonContractMapsSelectedStashPathsAndFullStashId()
+    {
+        var push = new RepositoryProviderRequest("Moyai", "source", "url", "origin", RepositoryOperation.StashPush,
+            "before commit", null, Paths: SelectedStashPaths);
+        var apply = push with { Operation = RepositoryOperation.StashApply, StashId = new string('a', 40) };
+
+        var pushArguments = RepositoryProviderContract.Arguments("github", push);
+        Assert.Equal("before commit", pushArguments["message"]);
+        Assert.Equal(SelectedStashPaths, Assert.IsType<string[]>(pushArguments["paths"]));
+        Assert.Equal(new string('a', 40), RepositoryProviderContract.Arguments("github", apply)["stash_id"]);
+        Assert.Equal(new string('a', 40), RepositoryProviderContract.Arguments("bitbucket", apply)["stashId"]);
+    }
+
+    [Fact]
+    public void CommonContractMapsSelectedCommitPatchAndExpectedHead()
+    {
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", "origin", RepositoryOperation.CommitSelected,
+            "split changes", null, ExpectedHead: new string('a', 40), Patch: "diff --git a/a b/a");
+        IReadOnlyDictionary<string, object?> github = RepositoryProviderContract.Arguments("github", request);
+        IReadOnlyDictionary<string, object?> bitbucket = RepositoryProviderContract.Arguments("bitbucket", request);
+        Assert.Equal(request.ExpectedHead, github["expected_head"]);
+        Assert.Equal(request.Patch, github["patch"]);
+        Assert.Equal(request.Message, bitbucket["message"]);
+        Assert.Equal(request.ExpectedHead, bitbucket["expected_head"]);
+    }
+
+    [Theory]
+    [InlineData("{\"ok\":true,\"data\":{\"operations\":{\"repository_commit_selected\":true}}}", true)]
+    [InlineData("{\"ok\":true,\"data\":{\"operations\":{\"repository_commit_selected\":false}}}", false)]
+    [InlineData("{\"ok\":true,\"data\":{\"repository_commit_selected\":true}}", true)]
+    [InlineData("{\"ok\":true,\"data\":{}}", false)]
+    public void SelectedCommitRequiresExplicitProviderSupport(string output, bool expected) =>
+        Assert.Equal(expected, RepositoryProviderContract.SupportsSelectedCommit(output));
+
+    [Theory]
+    [InlineData(RepositoryOperation.StashList, "repository.read")]
+    [InlineData(RepositoryOperation.StashPush, "repository.stash.write")]
+    [InlineData(RepositoryOperation.StashApply, "repository.stash.write")]
+    [InlineData(RepositoryOperation.StashDrop, "repository.stash.write")]
+    public void StashOperationsUseReadOrDedicatedMutationScopes(RepositoryOperation operation, string expectedScope)
+    {
+        Assert.Equal(expectedScope, RepositoryAssertionPolicy.Scope(operation));
+    }
+
+    [Theory]
+    [InlineData("{\"ok\":true,\"data\":{\"operations\":{\"repository_stash_push\":true}}}", RepositoryOperation.StashPush, true)]
+    [InlineData("{\"ok\":true,\"data\":{\"repository_stash_apply\":true}}", RepositoryOperation.StashApply, true)]
+    [InlineData("{\"ok\":true,\"data\":{\"repository_stash_drop\":false}}", RepositoryOperation.StashDrop, false)]
+    [InlineData("{\"ok\":true,\"data\":{}}", RepositoryOperation.StashList, false)]
+    public void StashCapabilityNegotiationRequiresExplicitProviderSupport(string output, RepositoryOperation operation, bool expected)
+    {
+        Assert.Equal(expected, RepositoryProviderContract.SupportsStashOperation(output, operation));
     }
 
     [Fact]

@@ -50,6 +50,14 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
                 && !await IsMoyaiIntegrationModeAsync(cancellationToken).ConfigureAwait(false))
                 return new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_integration_mode_mismatch",
                     "Buckettie is not running in Moyai integration mode; state-changing operations are not delegated.");
+            if (IsStashOperation(request.Operation)
+                && !await IsStashOperationSupportedAsync(request, cancellationToken).ConfigureAwait(false))
+                return new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_capability_missing",
+                    "The configured Repository Provider does not advertise support for this stash operation; it was not dispatched.");
+            if (request.Operation == RepositoryOperation.CommitSelected
+                && !await IsSelectedCommitSupportedAsync(request, cancellationToken).ConfigureAwait(false))
+                return new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_capability_missing",
+                    "The configured Repository Provider does not advertise selected commit support; it was not dispatched.");
             bool supportsRemoteResolution = RepositoryProviderContract.SupportsRemoteArgument(_options.ToolPrefix, request.Operation)
                 && !string.IsNullOrWhiteSpace(request.RemoteName)
                 && await IsRemoteResolutionSupportedAsync(request, cancellationToken).ConfigureAwait(false);
@@ -129,6 +137,43 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
         }, cancellationToken).ConfigureAwait(false);
         return result.Ok && RepositoryProviderContract.SupportsRemoteResolution(result.Output);
     }
+
+    private async Task<bool> IsStashOperationSupportedAsync(RepositoryProviderRequest request, CancellationToken cancellationToken)
+    {
+        RepositoryProviderResult result = await ExecuteAsync(request with
+        {
+            Operation = RepositoryOperation.ProviderCapabilities,
+            Message = null,
+            Branch = null,
+            Tag = null,
+            BranchSource = null,
+            Paths = null,
+            StashId = null,
+            OperationId = Guid.NewGuid().ToString("N"),
+        }, cancellationToken).ConfigureAwait(false);
+        return result.Ok && RepositoryProviderContract.SupportsStashOperation(result.Output, request.Operation);
+    }
+
+    private async Task<bool> IsSelectedCommitSupportedAsync(RepositoryProviderRequest request, CancellationToken cancellationToken)
+    {
+        RepositoryProviderResult result = await ExecuteAsync(request with
+        {
+            Operation = RepositoryOperation.ProviderCapabilities,
+            Message = null,
+            Branch = null,
+            Tag = null,
+            BranchSource = null,
+            Paths = null,
+            StashId = null,
+            ExpectedHead = null,
+            Patch = null,
+            OperationId = Guid.NewGuid().ToString("N"),
+        }, cancellationToken).ConfigureAwait(false);
+        return result.Ok && RepositoryProviderContract.SupportsSelectedCommit(result.Output);
+    }
+
+    private static bool IsStashOperation(RepositoryOperation operation) => operation is
+        RepositoryOperation.StashPush or RepositoryOperation.StashList or RepositoryOperation.StashApply or RepositoryOperation.StashDrop;
 
     private static string? ReadIntegrationMode(string? output)
     {

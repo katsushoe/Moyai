@@ -6,10 +6,10 @@
 
 ## 集計
 
-- 適合: 44項目
-- 部分適合: 1項目
+- 適合: 45項目
+- 部分適合: 0項目
 - 未実装: 0項目
-- 全`部分適合`を検証済みにするか、明示承認された仕様訂正で解決するまでマイルストーン8は未完了です。
+- v1受入基準45件の検証根拠が揃いました。
 
 ## 追跡表
 
@@ -51,7 +51,7 @@
 | 34 | BuildArtifactがimmutableで、File HashまたはDirectory Manifest Hashを保持できる。 | 適合 | Schema不変性、file SHA-256、決定的なDirectory Manifest SHA-256を検証。 | — |
 | 35 | Projectごとに`local`/`server`のDeploy Modeを設定できる。 | 適合 | Project domain validationとDeployment Service routing。 | — |
 | 36 | Local Deployが`install_path`へBuildArtifactを配置できる。 | 適合 | `LocalDeployVerifiesArtifactAndRollbackRestoresPreviousContent`。 | — |
-| 37 | Server DeployがStreamable HTTP経由でKelpieSSHを利用できる。 | 部分適合 | MoyaiのProtocol v2段階adapterを実装済みで、対象テスト7件が成功しました。2026-10-08時点で、隔離Moyai（署名付きProvider認証は受理）、Buckettie、KelpieSSH（health HTTP 200）に到達できます。Project Aのremoteは`bitbucket-origin-https`、署名付き`repository_status`はcleanで、Moyai経由でfixtureのBuild用commit `82a1b52`を作成しました。Project AのBuild/Deployment記録はまだなく、実Deployは未実施です。 | 同一HEADのexportを受け渡し、sourcePath・node Buildを設定して管理BuildArtifactを作成した後、署名付き`target_status`の単独確認、通常の段階Deploy、cleanup前rollback／cleanupの別配備をEnd-to-Endで検証します。 |
+| 37 | Server DeployがStreamable HTTP経由でKelpieSSHを利用できる。 | 適合 | Protocol v2段階adapterの対象テストが成功。2026-10-13、隔離MoyaiからKelpieSSH 0.3.15.1へ署名付き`target_status`とlifecycle Toolを実行しました。別ID trialでprepare/upload/activate/verify/rollback、続けてcleanupを行い、署名statusでRolledBack/knownとCleaned/known、元のremote不在復元を確認しました。別IDのMoyai管理Deploy `8c1516f7-5100-4239-8e25-a19706ea06e0`はBuild `edb7f22a`とArtifact `f30f3c17`を用いてSucceeded/revision5、署名status Cleaned/knownとなりました。KelpieSSHは`/artifacts/ac37.txt`が通常ファイル24 bytesで期待SHA-256と一致することを読み取り確認。隔離profileはSafeに復元され、一時規則撤去・sudoers検証・作業窓終了を確認しました。証跡：`artifacts/provider-authentication/integration/ac37-live-window-results-20261013.json`。 | — |
 | 38 | MoyaiがSSH Password/Private Keyを保存しない。 | 適合 | DeploymentTargetはProvider target参照のみを持ち資格情報fieldなし。ADRにも分離を明記。 | — |
 | 39 | DeploymentTargetを独立Entityとして保持できる。 | 適合 | Domain、SQLite table、repository、CLI、MCPを実装。 | — |
 | 40 | v1で1 Project = 1 DeploymentTargetを保証する。 | 適合 | SQLiteの`project_id`一意制約とinitializer constraint test。 | — |
@@ -63,4 +63,4 @@
 
 ## 次の検証単位
 
-残る完了作業は、仕様19.5のKelpieSSH段階orchestrationの実Provider結合検証（受入基準37）です。
+未検証のv1受入基準はありません。

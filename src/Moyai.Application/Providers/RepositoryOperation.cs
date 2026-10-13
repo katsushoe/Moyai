@@ -8,6 +8,7 @@ public enum RepositoryOperation
     Status,
     Diff,
     Commit,
+    CommitSelected,
     Push,
     Pull,
     BranchList,
@@ -16,6 +17,10 @@ public enum RepositoryOperation
     TagCreate,
     TagDelete,
     TagPush,
+    StashPush,
+    StashList,
+    StashApply,
+    StashDrop,
 }
 
 /// <summary>Repository操作のProvider契約名を提供します。</summary>
@@ -29,6 +34,7 @@ public static class RepositoryOperationNames
         RepositoryOperation.Status => "repository_status",
         RepositoryOperation.Diff => "repository_diff",
         RepositoryOperation.Commit => "repository_commit",
+        RepositoryOperation.CommitSelected => "repository_commit_selected",
         RepositoryOperation.Push => "push",
         RepositoryOperation.Pull => "pull",
         RepositoryOperation.BranchList => "branch_list",
@@ -37,6 +43,10 @@ public static class RepositoryOperationNames
         RepositoryOperation.TagCreate => "tag_create",
         RepositoryOperation.TagDelete => "tag_delete",
         RepositoryOperation.TagPush => "tag_push",
+        RepositoryOperation.StashPush => "repository_stash_push",
+        RepositoryOperation.StashList => "repository_stash_list",
+        RepositoryOperation.StashApply => "repository_stash_apply",
+        RepositoryOperation.StashDrop => "repository_stash_drop",
         _ => throw new ArgumentOutOfRangeException(nameof(operation)),
     };
 }

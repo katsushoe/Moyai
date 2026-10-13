@@ -19,6 +19,19 @@ public static class RepositoryProviderContract
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
         if (supportsRemoteResolution && SupportsRemoteArgument(toolPrefix, request.Operation) && !string.IsNullOrWhiteSpace(request.RemoteName)) arguments["remote"] = request.RemoteName;
         if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message;
+        if (request.Operation == RepositoryOperation.CommitSelected)
+        {
+            arguments["message"] = request.Message;
+            arguments["expected_head"] = request.ExpectedHead ?? string.Empty;
+            arguments["patch"] = request.Patch;
+        }
+        if (request.Operation == RepositoryOperation.StashPush)
+        {
+            arguments["message"] = request.Message;
+            arguments["paths"] = request.Paths;
+        }
+        if (request.Operation is RepositoryOperation.StashApply or RepositoryOperation.StashDrop)
+            arguments[string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) ? "stash_id" : "stashId"] = request.StashId;
         if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) arguments["branch"] = request.Branch;
         if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
         if (request.Operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) arguments["tag"] = request.Tag;
@@ -27,14 +40,67 @@ public static class RepositoryProviderContract
             arguments["source"] = request.BranchSource;
             if (string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase)) arguments["message"] = null;
         }
+        if (request.Operation == RepositoryOperation.StashPush && request.Paths is null) arguments.Remove("paths");
         return arguments;
     }
 
     public static string OperationName(RepositoryOperation operation) => operation.ContractName();
 
+    /// <summary>Providerの共通Capability応答がstash操作を明示対応している場合だけtrueを返します。</summary>
+    public static bool SupportsStashOperation(string? output, RepositoryOperation operation)
+    {
+        (string operationName, string githubProperty) = operation switch
+        {
+            RepositoryOperation.StashPush => ("repository_stash_push", "repository_stash_push"),
+            RepositoryOperation.StashList => ("repository_stash_list", "repository_stash_list"),
+            RepositoryOperation.StashApply => ("repository_stash_apply", "repository_stash_apply"),
+            RepositoryOperation.StashDrop => ("repository_stash_drop", "repository_stash_drop"),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+        };
+        if (string.IsNullOrWhiteSpace(output)) return false;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("data", out JsonElement data)
+                || data.ValueKind != JsonValueKind.Object) return false;
+            if (data.TryGetProperty("operations", out JsonElement operations)
+                && operations.ValueKind == JsonValueKind.Object
+                && operations.TryGetProperty(operationName, out JsonElement supported)
+                && supported.ValueKind is JsonValueKind.True or JsonValueKind.False) return supported.GetBoolean();
+            return data.TryGetProperty(githubProperty, out JsonElement githubSupported)
+                && githubSupported.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Providerが選択commitを明示対応している場合だけtrueを返します。</summary>
+    public static bool SupportsSelectedCommit(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output)) return false;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("data", out JsonElement data)
+                || data.ValueKind != JsonValueKind.Object) return false;
+            if (data.TryGetProperty("operations", out JsonElement operations)
+                && operations.ValueKind == JsonValueKind.Object
+                && operations.TryGetProperty("repository_commit_selected", out JsonElement supported)
+                && supported.ValueKind is JsonValueKind.True or JsonValueKind.False) return supported.GetBoolean();
+            return data.TryGetProperty("repository_commit_selected", out JsonElement githubSupported)
+                && githubSupported.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException) { return false; }
+    }
+
     /// <summary>remote引数を受け取る既存のProvider操作かを返します。</summary>
     public static bool SupportsRemoteArgument(string toolPrefix, RepositoryOperation operation) =>
         operation == RepositoryOperation.Status
+        || operation == RepositoryOperation.CommitSelected
         || (operation == RepositoryOperation.Commit && string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase));
 
     public static bool SupportsRemoteResolution(string? output)

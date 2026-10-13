@@ -9,6 +9,47 @@ namespace Moyai.Infrastructure.Tests.Providers;
 public sealed class RepositoryProviderTransportTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SelectedCommitIsDispatchedOnlyWhenProviderAdvertisesSupport(bool supportsSelectedCommit)
+    {
+        using var handler = new SelectedCommitCapabilityHandler(supportsSelectedCommit);
+        var provider = new McpRepositoryProvider(new McpRepositoryProviderOptions("githubbie", new Uri("http://localhost/mcp"), "github"), new FreshClientFactory(handler));
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", null, RepositoryOperation.CommitSelected, "selected", null,
+            ExpectedHead: new string('a', 40), Patch: "diff --git a/a b/a");
+
+        RepositoryProviderResult result = await provider.ExecuteAsync(request);
+
+        Assert.Equal(supportsSelectedCommit, result.Ok);
+        if (!supportsSelectedCommit) Assert.Equal("provider_capability_missing", result.ErrorCode);
+        string[] expectedTools = supportsSelectedCommit
+            ? ["github_provider_capabilities", "github_repository_commit_selected"]
+            : ["github_provider_capabilities"];
+        Assert.Equal(expectedTools, handler.CalledTools);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StashIsDispatchedOnlyWhenProviderAdvertisesSupport(bool supportsStash)
+    {
+        using var handler = new StashCapabilityHandler(supportsStash);
+        var provider = new McpRepositoryProvider(new McpRepositoryProviderOptions("githubbie", new Uri("http://localhost/mcp"), "github"), new FreshClientFactory(handler));
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", null, RepositoryOperation.StashPush, "split changes", null,
+            Paths: ["src/a.cs"]);
+
+        RepositoryProviderResult result = await provider.ExecuteAsync(request);
+
+        Assert.Equal(supportsStash, result.Ok);
+        if (!supportsStash) Assert.Equal("provider_capability_missing", result.ErrorCode);
+        string[] expectedTools = supportsStash
+            ? ["github_provider_capabilities", "github_repository_stash_push"]
+            : ["github_provider_capabilities"];
+        Assert.Equal(expectedTools, handler.CalledTools);
+        Assert.Equal(supportsStash, handler.StashDispatched);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
@@ -157,6 +198,72 @@ public sealed class RepositoryProviderTransportTests
             }
             string json = JsonSerializer.Serialize(new { jsonrpc = "2.0", id, result });
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    private sealed class StashCapabilityHandler(bool supportsStash) : HttpMessageHandler
+    {
+        private static readonly string[] ProtocolVersions = ["2026-07-28"];
+        public List<string> CalledTools { get; } = [];
+        public bool StashDispatched { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method != HttpMethod.Post) return new HttpResponseMessage(HttpStatusCode.MethodNotAllowed);
+            using JsonDocument document = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("id", out JsonElement id)) return new HttpResponseMessage(HttpStatusCode.Accepted);
+            string? method = root.GetProperty("method").GetString();
+            object result;
+            if (method == "server/discover")
+                result = new { supportedVersions = ProtocolVersions, capabilities = new { tools = new { } }, ttlMs = 0, cacheScope = "private" };
+            else if (method == "initialize")
+                result = new { protocolVersion = root.GetProperty("params").GetProperty("protocolVersion").GetString(), capabilities = new { tools = new { } }, serverInfo = new { name = "test-provider", version = "1.0" } };
+            else
+            {
+                Assert.Equal("tools/call", method);
+                string tool = root.GetProperty("params").GetProperty("name").GetString()!;
+                CalledTools.Add(tool);
+                object payload;
+                if (tool == "github_provider_capabilities")
+                    payload = new { ok = true, data = new { repository_stash_push = supportsStash } };
+                else
+                {
+                    StashDispatched = tool == "github_repository_stash_push";
+                    payload = new { ok = StashDispatched, data = "done" };
+                }
+                string jsonPayload = JsonSerializer.Serialize(payload);
+                result = new { isError = false, content = new[] { new { type = "text", text = jsonPayload } } };
+            }
+            string response = JsonSerializer.Serialize(new { jsonrpc = "2.0", id, result });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(response, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    private sealed class SelectedCommitCapabilityHandler(bool supportsSelectedCommit) : HttpMessageHandler
+    {
+        private static readonly string[] ProtocolVersions = ["2026-07-28"];
+        public List<string> CalledTools { get; } = [];
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            using JsonDocument document = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("id", out JsonElement id)) return new HttpResponseMessage(HttpStatusCode.Accepted);
+            string? method = root.GetProperty("method").GetString();
+            object result;
+            if (method == "server/discover") result = new { supportedVersions = ProtocolVersions, capabilities = new { tools = new { } }, ttlMs = 0, cacheScope = "private" };
+            else if (method == "initialize") result = new { protocolVersion = root.GetProperty("params").GetProperty("protocolVersion").GetString(), capabilities = new { tools = new { } }, serverInfo = new { name = "test-provider", version = "1.0" } };
+            else
+            {
+                string tool = root.GetProperty("params").GetProperty("name").GetString()!;
+                CalledTools.Add(tool);
+                object payload = tool == "github_provider_capabilities"
+                    ? new { ok = true, data = new { operations = new { repository_commit_selected = supportsSelectedCommit } } }
+                    : new { ok = true, data = "done" };
+                result = new { isError = false, content = new[] { new { type = "text", text = JsonSerializer.Serialize(payload) } } };
+            }
+            string response = JsonSerializer.Serialize(new { jsonrpc = "2.0", id, result });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(response, Encoding.UTF8, "application/json") };
         }
     }
 

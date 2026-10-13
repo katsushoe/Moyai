@@ -115,3 +115,10 @@ Moyai v1 models exactly one Repository as part of each Project. It has no indepe
 
 `branch_create` requires `project`, `branch`, and an explicit `source`. `source` must be a literal branch name or a full 40-character commit SHA. Moyai never substitutes `main`, `develop`, or the current `HEAD` when it is omitted.
 `tag_create` likewise requires `project`, `tag`, and an explicit literal branch or full commit SHA `source`; Moyai forwards it unchanged when the Provider supports explicit tag sources.
+# Repository stash delegation
+
+The `repository_stash_push`, `repository_stash_list`, `repository_stash_apply`, and `repository_stash_drop` MCP tools delegate through the configured Repository Provider. `repository_stash_push` accepts an optional `paths` array of repository-relative paths; omitting it stashes all changes. Apply and drop require the full stash object ID returned by list/push. Assertion scopes are `repository.read` for listing and `repository.stash.write` for mutations.
+
+CLI examples: `moyaictl repository-stash-push --project Buckettie --message "split changes" --paths "src/a.cs,docs/readme.md"`, `moyaictl repository-stash-list --project Buckettie`, `moyaictl repository-stash-apply --project Buckettie --stash-id <40-character-id>`, and `moyaictl repository-stash-drop --project Buckettie --stash-id <40-character-id>`. The `paths` CLI value is comma-separated; use MCP directly when a filename contains a comma.
+
+`repository_commit_selected` forwards `expected_head` and a unified diff `patch` through the Provider, and runs only when Provider capabilities explicitly advertise support. Unselected working-tree changes remain; the Provider rejects the operation when staged changes exist.
