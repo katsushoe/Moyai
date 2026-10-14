@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 1.3.12.0 - 2026-10-14 (development build)
+
+- Add destructive branch-switch MCP/CLI routing to existing local branches through Githubie or Buckettie.
+- Require explicit capability and Project-bound repository.branch.write; preserve branch errors and unknown outcomes without automatic replay.
+- No installed configuration or live repository change; real Provider branch acceptance remains pending.
+
 ## 1.3.11.0 - 2026-10-14 (development build)
 
 - Add typed settings get/partial-update MCP and CLI operations for the agreed Githubie contract; preserve omissions and explicit false/arrays.

@@ -14,7 +14,7 @@ public static class RepositoryAssertionPolicy
         RepositoryOperation.Commit or RepositoryOperation.CommitSelected => "repository.commit",
         RepositoryOperation.Push => "repository.push",
         RepositoryOperation.Pull => "repository.pull",
-        RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete => "repository.branch.write",
+        RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch => "repository.branch.write",
         RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush => "repository.tag.write",
         _ => throw new ProviderAuthenticationException("auth_scope_denied"),
     };

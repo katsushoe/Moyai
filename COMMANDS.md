@@ -1,5 +1,11 @@
 # Moyai Commands
 
+## Local branch switch (development1.3.12.0)
+
+MCP `branch_switch(project, branch)` and CLI `moyaictl branch-switch --project <name> --branch <existing-local-branch>` switch through the registered Provider. Project identity, mapped Repository ID and URL remain unchanged; gitDefaultBranch is not updated. The Tool is destructive and requires an explicit capability plus repository.branch.write on github_branch_switch or buckettie_branch_switch. Buckettie must use Moyai integration mode. Legacy is rejected.
+
+No fetch, remote checkout, creation, source or remote argument is added. Provider checks local branch existence/ref/policy and dirty-tree safety. Same-branch no-op follows Provider policy. Existing RepositoryProviderResult.output keeps the Provider JSON: Githubie before/after in data.previous_branch/current_branch; Buckettie in data.branch_switch (plus switched). Preserve working_tree_dirty, branch_not_found, invalid_ref, Buckettie branch_switch_invalid_ref and policy codes. If resultUnknown=true, read repository status before another request; no automatic replay. Installed operation availability/scopes and disposable real-Provider acceptance are separate. See [ADR0013](docs/adr/0013-provider-branch-switch.md).
+
 ## Repository settings (development1.3.11.0)
 
 MCP `repository_settings_get(project)` / `repository_settings_update(project, changes)` have CLI counterparts `moyaictl repository-settings-get --project <name>` and `moyaictl repository-settings-update --project <name> --changes '<JSON object>'` (plus `--config` as needed). Example changes: `{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`. CLI connects to the service, never the DB.

@@ -1,5 +1,11 @@
 # Repository Provider Contract
 
+## Local branch switch extension (development1.3.12.0)
+
+Moyai branch_switch(project, branch) requires an explicit boolean data.branch_switch capability (or Buckettie data.operations.branch_switch), exact repository.branch.write scope, and Project-bound assertions. Resolve registered ID using providerRepositoryId while preserving UUID/URL. Githubie tool is github_branch_switch; Buckettie tool is buckettie_branch_switch despite the configured bitbucket prefix, and requires Moyai integration mode.
+
+Only repository/branch arguments are sent. Provider validates existing local branch, dirty tree and policy; there is no fetch, creation or default-branch change. Raw success preserves Githubie data.previous_branch/current_branch and Buckettie data.branch_switch. Branch-not-found, invalid-ref, dirty and policy rejection codes are preserved with Provider detail. Post-dispatch response loss is resultUnknown=true and requires status confirmation before another request. Runtime configuration and real Provider acceptance remain separate. See [ADR0013](../adr/0013-provider-branch-switch.md).
+
 ## Settings Consumer extension (development1.3.11.0)
 
 Githubie settings agreement is recorded in [ADR0012](../adr/0012-repository-settings-consumer.md). This implementation is not installed and is not a confirmed Buckettie contract. Only Githubie settings routing is enabled; other Providers and legacy authentication are rejected before dispatch.

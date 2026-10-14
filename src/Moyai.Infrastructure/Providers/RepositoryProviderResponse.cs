@@ -52,7 +52,8 @@ public static class RepositoryProviderResponse
     }
 
     private static RepositoryProviderResult Failure(string operation, string? detail) =>
-        new(false, operation, null, RepositoryProviderContract.NormalizeErrorCode(detail), detail, operation == "repository_settings_update" && UnknownOutcome(detail));
+        new(false, operation, null, operation == "branch_switch" ? RepositoryProviderContract.NormalizeBranchSwitchError(detail) : RepositoryProviderContract.NormalizeErrorCode(detail), detail,
+            operation is "repository_settings_update" or "branch_switch" && UnknownOutcome(detail));
 
     private static bool UnknownOutcome(string? detail)
     {
@@ -65,5 +66,5 @@ public static class RepositoryProviderResponse
     }
 
     private static RepositoryProviderResult Invalid(string operation, string detail) =>
-        new(false, operation, null, "provider_invalid_response", detail, operation == "repository_settings_update");
+        new(false, operation, null, "provider_invalid_response", detail, operation is "repository_settings_update" or "branch_switch");
 }

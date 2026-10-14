@@ -34,6 +34,9 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
     {
         ArgumentNullException.ThrowIfNull(request);
         bool settings = request.Operation is RepositoryOperation.SettingsGet or RepositoryOperation.SettingsUpdate;
+        bool branchSwitch = request.Operation == RepositoryOperation.BranchSwitch;
+        if (branchSwitch && !request.UseAssertion)
+            return new(false, request.Operation.ContractName(), null, "auth_scope_denied", "Branch switching requires Project-bound assertions.");
         if (settings && (!request.UseAssertion || _options.ToolPrefix != "github"))
             return new(false, request.Operation.ContractName(), null, "auth_scope_denied", "Settings require the agreed assertion-bound Githubie route.");
         bool settingsDispatched = false;
@@ -72,6 +75,13 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
                 if (!RepositoryProviderContract.SupportsSettings(capabilities.Output, request.Operation))
                     return new(false, request.Operation.ContractName(), null, "provider_capability_missing", "Settings capability was not advertised; operation not dispatched.");
             }
+            if (branchSwitch)
+            {
+                RepositoryProviderResult capabilities = await ExecuteAsync(request with { Operation = RepositoryOperation.ProviderCapabilities, Branch = null, OperationId = Guid.NewGuid().ToString("N") }, cancellationToken).ConfigureAwait(false);
+                if (!capabilities.Ok) return capabilities with { Operation = request.Operation.ContractName() };
+                if (!RepositoryProviderContract.SupportsBranchSwitch(capabilities.Output))
+                    return new(false, request.Operation.ContractName(), null, "provider_capability_missing", "Branch switch capability was not advertised; operation not dispatched.");
+            }
             var transportOptions = new HttpClientTransportOptions { Endpoint = _options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
             using HttpClient providerClient = _httpClientFactory.CreateClient(Name);
             using AssertionHttpHandler? assertionHandler = context is null ? null : new AssertionHttpHandler(providerClient, _issuer!, context, _audit);
@@ -79,7 +89,7 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
             IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(_options.ToolPrefix, request, supportsRemoteResolution);
-            settingsDispatched = settings;
+            settingsDispatched = settings || branchSwitch;
             CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
             RepositoryProviderResult parsed = RepositoryProviderResponse.Parse(request.Operation, result);
             if (assertionHandler is not null)
@@ -89,9 +99,9 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
             }
             return parsed;
         }
-        catch (OperationCanceledException) when (settings)
+        catch (OperationCanceledException) when (settings || branchSwitch)
         {
-            return new(false, request.Operation.ContractName(), null, "provider_unavailable", "Settings transport cancelled.", settingsDispatched && request.Operation == RepositoryOperation.SettingsUpdate);
+            return new(false, request.Operation.ContractName(), null, "provider_unavailable", "Provider transport cancelled.", settingsDispatched && (request.Operation == RepositoryOperation.SettingsUpdate || branchSwitch));
         }
         catch (ProviderAuthenticationException exception)
         {
@@ -105,11 +115,11 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException
             || (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(request.Operation), null, "provider_unavailable", request.UseAssertion ? "Provider transport failed; operation outcome may be unknown." : exception.Message, settingsDispatched && request.Operation == RepositoryOperation.SettingsUpdate);
+            return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(request.Operation), null, "provider_unavailable", request.UseAssertion ? "Provider transport failed; operation outcome may be unknown." : exception.Message, settingsDispatched && (request.Operation == RepositoryOperation.SettingsUpdate || branchSwitch));
         }
         catch (ModelContextProtocol.McpException exception)
         {
-            return request.UseAssertion ? new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_operation_failed", "Provider protocol failure; operation outcome may be unknown.", settingsDispatched && request.Operation == RepositoryOperation.SettingsUpdate) : Failure(request.Operation, exception.Message);
+            return request.UseAssertion ? new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_operation_failed", "Provider protocol failure; operation outcome may be unknown.", settingsDispatched && (request.Operation == RepositoryOperation.SettingsUpdate || branchSwitch)) : Failure(request.Operation, exception.Message);
         }
     }
 

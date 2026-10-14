@@ -23,6 +23,7 @@ public enum RepositoryOperation
     StashDrop,
     SettingsGet,
     SettingsUpdate,
+    BranchSwitch,
 }
 
 /// <summary>Repository操作のProvider契約名を提供します。</summary>
@@ -42,6 +43,7 @@ public static class RepositoryOperationNames
         RepositoryOperation.BranchList => "branch_list",
         RepositoryOperation.BranchCreate => "branch_create",
         RepositoryOperation.BranchDelete => "branch_delete",
+        RepositoryOperation.BranchSwitch => "branch_switch",
         RepositoryOperation.TagCreate => "tag_create",
         RepositoryOperation.TagDelete => "tag_delete",
         RepositoryOperation.TagPush => "tag_push",

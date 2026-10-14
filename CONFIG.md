@@ -1,5 +1,9 @@
 # Moyai configuration
 
+## Branch-switch authorization (development1.3.12.0)
+
+After the Provider runtime explicitly advertises branch_switch and the administrator authorizes enablement, configure github_branch_switch: [repository.branch.write] or buckettie_branch_switch: [repository.branch.write] in the respective assertionToolScopes. Buckettie's configured prefix remains bitbucket; only this operation resolves to buckettie_branch_switch. Require Moyai integration mode for Buckettie. Implementation does not edit installed scopes, signing keys, DB or service account. See [ADR0013](docs/adr/0013-provider-branch-switch.md).
+
 [English](CONFIG.md) | [日本語](CONFIG.ja.md)
 
 MCP client registration uses an explicitly selected user profile and preserves unrelated client settings. MSI properties: `MOYAI_CODEX`, `MOYAI_CLAUDE` (select with `1`), `MOYAI_CLIENT_PROFILE` (existing absolute profile path). See [MCP setup](MCP_SETUP.md#installer-client-registration) for ownership, uninstall and recovery behavior.

@@ -46,6 +46,7 @@ public sealed class ProviderRoutingService
         try { legacy = _authentication.UseLegacy(_timeProvider); }
         catch (ProviderAuthenticationException exception) { return Failure(operation, exception.Code, exception.Code); }
         if (settingsOperation && legacy) return Failure(operation, "auth_scope_denied", "Settings operations require Project-bound assertions.");
+        if (operation == RepositoryOperation.BranchSwitch && legacy) return Failure(operation, "auth_scope_denied", "Branch switching requires Project-bound assertions.");
         if (legacy && IsMutation(operation))
         {
             ServiceToken? token = await _tokens.FindByAudienceAsync(providerName, cancellationToken).ConfigureAwait(false);
@@ -108,7 +109,7 @@ public sealed class ProviderRoutingService
                 throw new ArgumentException("Selected commit arguments are invalid.");
         }
         if (operation == RepositoryOperation.StashPush) ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        if (operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) ArgumentException.ThrowIfNullOrWhiteSpace(branch);
+        if (operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch) ArgumentException.ThrowIfNullOrWhiteSpace(branch);
         if (operation == RepositoryOperation.BranchCreate) ValidateBranchSource(source);
         if (operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) ArgumentException.ThrowIfNullOrWhiteSpace(tag);
         if (operation == RepositoryOperation.TagCreate) ValidateBranchSource(source);

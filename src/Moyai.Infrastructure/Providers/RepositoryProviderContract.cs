@@ -9,6 +9,7 @@ public static class RepositoryProviderContract
     public static string ToolName(string toolPrefix, RepositoryOperation operation) => operation switch
     {
         RepositoryOperation.ProviderVersion => "get_version",
+        RepositoryOperation.BranchSwitch when string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase) => "buckettie_branch_switch",
         _ => $"{toolPrefix}_{OperationName(operation)}",
     };
 
@@ -33,7 +34,7 @@ public static class RepositoryProviderContract
         }
         if (request.Operation is RepositoryOperation.StashApply or RepositoryOperation.StashDrop)
             arguments[string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) ? "stash_id" : "stashId"] = request.StashId;
-        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) arguments["branch"] = request.Branch;
+        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch) arguments["branch"] = request.Branch;
         if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
         if (request.Operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) arguments["tag"] = request.Tag;
         if (request.Operation == RepositoryOperation.TagCreate)
@@ -46,6 +47,36 @@ public static class RepositoryProviderContract
     }
 
     public static string OperationName(RepositoryOperation operation) => operation.ContractName();
+
+    /// <summary>明示的なbranch切替能力だけを受理し、未指定や型不正では拒否します。</summary>
+    public static bool SupportsBranchSwitch(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output)) return false;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            JsonElement data = document.RootElement.GetProperty("data");
+            if (data.TryGetProperty("operations", out JsonElement operations)
+                && operations.ValueKind == JsonValueKind.Object && operations.TryGetProperty("branch_switch", out JsonElement operation))
+                return operation.ValueKind == JsonValueKind.True;
+            return data.TryGetProperty("branch_switch", out JsonElement supported) && supported.ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>branch切替で利用者が判断するProviderの識別可能な拒否理由を保持します。</summary>
+    public static string NormalizeBranchSwitchError(string? detail)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(detail ?? "null");
+            string? code = document.RootElement.GetProperty("error").GetProperty("code").GetString();
+            if (code is "working_tree_dirty" or "branch_not_found" or "invalid_ref" or "branch_switch_invalid_ref"
+                or "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" or "branch_not_allowed" or "permission_denied") return code;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return NormalizeErrorCode(detail); }
+        return NormalizeErrorCode(detail);
+    }
 
     /// <summary>合意した設定Capabilityキーだけを確認します。</summary>
     public static bool SupportsSettings(string? output, RepositoryOperation operation)

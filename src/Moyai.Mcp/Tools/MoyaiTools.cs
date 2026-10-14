@@ -203,6 +203,10 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "branch_delete", Destructive = true), Description("Deletes an allowed branch through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken));
 
+    /// <summary>対応Providerで既存local branchへ切り替え、作成やfetchは行いません。</summary>
+    [McpServerTool(Name = "branch_switch", Destructive = true), Description("Switches to an existing local branch through the configured Provider with repository.branch.write. Requires explicit capability and a clean working tree; never fetches or creates branches.")]
+    public Task<RepositoryProviderResult> BranchSwitch(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchSwitch, branch: branch, cancellationToken: cancellationToken));
+
     [McpServerTool(Name = "tag_create"), Description("Creates a tag through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> TagCreate(string project, string tag, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, source: source, cancellationToken: cancellationToken));
 

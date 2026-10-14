@@ -1,5 +1,9 @@
 # Moyai設定
 
+## branch切替の認可（開発版1.3.12.0）
+
+Providerがbranch_switch対応を明示し、管理者が有効化を承認した後、各assertionToolScopesへgithub_branch_switch: [repository.branch.write]またはbuckettie_branch_switch: [repository.branch.write]を設定します。Buckettieの設定prefixはbitbucketのままで、この操作だけbuckettie_branch_switchへ解決します。BuckettieはMoyai連携モードが必要です。実装時に稼働scope・署名鍵・DB・サービスアカウントは変更しません。[ADR0013](docs/adr/0013-provider-branch-switch.md)を参照してください。
+
 設定Consumer（開発版1.3.11.0）はGithubieの`repository_settings_read/update` capabilityを必須とします。対応Provider版が利用可能になり所有者が許可した後、Assertion Tool scopeを`github_repository_settings_get: [repository.read]`、`github_repository_settings_update: [repository.settings.write]`として設定します。commit/push scopeやlegacy tokenで代替しません。実装で稼働設定は変更しません。Buckettie設定は合意待ちで拒否します。Providerが保存と人の承認を管理します。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
 
 Repository認証の既定はES256 Assertionです。未構成時は操作を拒否します。[Provider認証設定・鍵初期化・移行手順](docs/specifications/provider-authentication-operations.md)を参照してください。静的Repository Tokenは最大7日の明示的な移行期間に限ります。

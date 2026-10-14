@@ -4,6 +4,12 @@
 
 ## 未公開
 
+## 1.3.12.0 - 2026-10-14（開発ビルド）
+
+- Githubie/Buckettie経由で既存local branchへ切り替える、状態変更MCP/CLI操作を追加します。
+- 明示capabilityとProject単位のrepository.branch.writeを必須とし、branch拒否コードと結果不明を保持して自動再送しません。
+- 稼働設定・実Repositoryは変更していません。実Providerでのbranch切替受入は未完了です。
+
 ## 1.3.11.0 - 2026-10-14（開発ビルド）
 
 - 合意済みGithubie契約の設定読取・部分更新をMCP/CLIへ追加し、省略とfalse/配列の明示値を保持します。

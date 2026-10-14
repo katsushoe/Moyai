@@ -1,5 +1,11 @@
 # Moyai Commands
 
+## ローカルbranch切替（開発版1.3.12.0）
+
+MCP `branch_switch(project, branch)`、CLI `moyaictl branch-switch --project <name> --branch <existing-local-branch>`で登録Providerへ委譲します。Project識別情報・対応付け済みRepository ID・URLは保持し、`gitDefaultBranch`も更新しません。状態変更Toolで、明示capabilityと`github_branch_switch`/`buckettie_branch_switch`への`repository.branch.write`が必要です。BuckettieはMoyai連携モードを要求し、legacyは拒否します。
+
+fetch・remote checkout・branch作成・source/remote引数の追加は行いません。local branchの存在・参照形式・policy・dirty拒否はProviderが検証し、同じbranchの無変更成功もProvider規則に従います。既存RepositoryProviderResult.outputにProvider JSONを保持し、Githubieはdata.previous_branch/current_branch、Buckettieはdata.branch_switch内（switchedも含む）に切替前後が入ります。working_tree_dirty/branch_not_found/invalid_ref/Buckettieのbranch_switch_invalid_refとpolicyコードを保持します。resultUnknown=trueなら別のrepository statusで確認してから再要求し、自動再送しません。稼働版・scope導入と使い捨て実Provider受入は別条件です。[ADR0013](docs/adr/0013-provider-branch-switch.md)を参照してください。
+
 ## Repository設定（開発版1.3.11.0）
 
 MCPは`repository_settings_get(project)`／`repository_settings_update(project, changes)`、CLIは`moyaictl repository-settings-get --project <name>`／`moyaictl repository-settings-update --project <name> --changes '<JSON object>'`です。必要に応じて`--config`を指定します。作者更新例は`{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`。CLIはサービスへ接続しDBを直接操作しません。
