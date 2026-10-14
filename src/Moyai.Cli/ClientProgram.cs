@@ -37,6 +37,8 @@ try
             "project-rename --current-name <old> --name <new> --expected-revision <revision>: rename while preserving settings.\n" +
             "project-provider-repository-set --project <name> --expected-revision <revision> (--provider-repository-id <id>|--clear-mapping): set/clear the Provider registration mapping.\n" +
             "commands: list service business commands and schemas. version: query service version.\n" +
+            "repository-settings-get --project <name>: read registered settings.\n" +
+            "repository-settings-update --project <name> --changes <JSON-object>: update explicit fields with Provider approval; read before retry after unknown outcome.\n" +
             "Business commands always connect to the service. Management commands target the Moyai Windows service.\n" +
             "Business failures (ok=false) return exit code 1 and structured errors on standard error.");
         return 0;

@@ -164,6 +164,14 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "provider_capabilities", ReadOnly = true), Description("Returns Repository Provider capabilities for negotiation before optional operations.")]
     public Task<RepositoryProviderResult> ProviderCapabilities(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.ProviderCapabilities, cancellationToken: cancellationToken));
 
+    /// <summary>Provider登録設定を読み取り、秘密を含まない結果を返します。</summary>
+    [McpServerTool(Name = "repository_settings_get", ReadOnly = true), Description("Reads eight non-secret registered Repository settings through the agreed Githubie assertion route. Does not change Git or Provider settings.")]
+    public Task<RepositorySettingsResult> RepositorySettingsGet(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, cancellationToken: cancellationToken));
+
+    /// <summary>指定設定だけをProviderの人による承認後に更新します。</summary>
+    [McpServerTool(Name = "repository_settings_update", Destructive = true), Description("Partially updates explicit settings through Githubie with repository.settings.write and Provider human approval. Omitted fields stay omitted; unknown outcomes require a read before another update.")]
+    public Task<RepositorySettingsResult> RepositorySettingsUpdate(string project, Dictionary<string, System.Text.Json.JsonElement> changes, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, changes ?? throw new ArgumentNullException(nameof(changes)), cancellationToken));
+
     [McpServerTool(Name = "repository_diff", ReadOnly = true), Description("Gets repository diff through the Provider configured for a Moyai-managed project.")]
     public Task<RepositoryProviderResult> RepositoryDiff(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Diff, cancellationToken: cancellationToken));
 

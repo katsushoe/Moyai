@@ -4,6 +4,13 @@
 
 ## 未公開
 
+## 1.3.11.0 - 2026-10-14（開発ビルド）
+
+- 合意済みGithubie契約の設定読取・部分更新をMCP/CLIへ追加し、省略とfalse/配列の明示値を保持します。
+- 設定capability、Project Assertion、専用write scope、Providerの人の承認を必須とし、未合意Buckettieとlegacy経路を拒否します。
+- 非秘密の登録設定8項目だけを返し、更新結果不明は自動再試行せず、再更新前に読取で確認します。
+- 稼働環境へ未導入・公開Release前です。両Providerの結合確認は未完了です。
+
 ## 1.3.10.0 - 2026-10-14（開発ビルド）
 
 - schema v7でProject単位のnullable Provider Repository IDを保存します。未設定時は従来のProject名を使い、UUIDと関連データを維持します。

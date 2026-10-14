@@ -1,5 +1,11 @@
 # Moyai Commands
 
+## Repository settings (development1.3.11.0)
+
+MCP `repository_settings_get(project)` / `repository_settings_update(project, changes)` have CLI counterparts `moyaictl repository-settings-get --project <name>` and `moyaictl repository-settings-update --project <name> --changes '<JSON object>'` (plus `--config` as needed). Example changes: `{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`. CLI connects to the service, never the DB.
+
+Only agreed Githubie routing is enabled. Get returns eight registered settings, with null authors when unset. Update accepts only specified fields; omission preserves, false is explicit, arrays replace. Reject empty changes, unknown/null/wrong-type fields and incomplete/invalid author pairs. Policy validation and human approval remain Provider-owned. The typed result exposes ok/operation/project/provider/settings/changedFields/approved/error, never raw Provider output. Errors retain auth/capability/settings codes and safe correlation IDs. Update success requires approved=true. Unknown transport/save outcomes return error.outcome=unknown and require a separate get before another update; no automatic update retry. No local Git/config changes or direct/legacy fallback. See [ADR0012](docs/adr/0012-repository-settings-consumer.md).
+
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
 Local MCP registration management: `configure codex|claude [--profile <path>] [--config <path>]`, `unconfigure codex|claude [--profile <path>]`; recovery: `client-transaction codex|claude --phase rollback|commit [--profile <path>]`. `--transaction` retains rollback state for MSI. These are installation commands, not service business tools. See [MCP setup](MCP_SETUP.md#installer-client-registration).

@@ -44,6 +44,8 @@ Schema v7 adds the nullable column without changing Project UUIDs, names, revisi
 
 ## Installation and migration
 
+Settings Consumer (development1.3.11.0) requires Githubie capabilities `repository_settings_read/update`. Enable exact assertion Tool scopes `github_repository_settings_get: [repository.read]`, `github_repository_settings_update: [repository.settings.write]` only after a corresponding Provider runtime is available and its owner approves enablement. Do not substitute commit/push scope or legacy tokens. Implementation does not modify installed config. Buckettie settings remain disabled pending agreement. Provider owns persistence and human approval. See [ADR 0012](docs/adr/0012-repository-settings-consumer.md).
+
 The MSI runs `config-init` before starting the automatic `Moyai` service under LocalService. Initial configuration is generated only when absent; a previously saved registry `McpUrl` is imported once. Existing JSON is validated and retained. Edit JSON as administrator, then use `service stop` and `service start`. The legacy MSI URL property/registry does not override an existing JSON file.
 
 Before upgrading an environment-configured installation, explicitly migrate its DB path, endpoint and Provider settings to JSON. Environment variables are no longer read. Do not install a development MSI over the running instance without approval. Configuration, data and logs are retained by uninstall; packaged binaries and the service registration are removed.

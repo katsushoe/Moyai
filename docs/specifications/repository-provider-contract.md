@@ -1,5 +1,13 @@
 # Repository Provider Contract
 
+## Settings Consumer extension (development1.3.11.0)
+
+Githubie settings agreement is recorded in [ADR0012](../adr/0012-repository-settings-consumer.md). This implementation is not installed and is not a confirmed Buckettie contract. Only Githubie settings routing is enabled; other Providers and legacy authentication are rejected before dispatch.
+
+Consumer operations are `repository_settings_get(project)` and `repository_settings_update(project, changes)`; Provider tools are `github_repository_settings_get/update`, exact capability keys `repository_settings_read/update`, read scope `repository.read` and update scope `repository.settings.write` plus Provider human approval. Preserve mapped registration ID and signed UUID/URL/tool context. Forward only explicit changes; omission preserves, false is explicit, arrays replace. Null/unknown/wrong-type/empty changes and incomplete authors are rejected. Provider remains the policy/persistence authority.
+
+Return only eight registered settings, actual changed fields and affirmative approval on update success. Preserve settings/authentication errors with safe correlation IDs; do not expose raw Provider output. Update response loss or invalid post-dispatch response is unknown, not a known rejection. No automatic update replay; obtain a separate read before deciding another update. Provider admission rejection remains fail-closed. CONFIG/COMMANDS describe setup and symmetric CLI JSON input.
+
 状態: 確定（2026-09-27、ユーザー承認）
 対象: Moyaiから委譲されるRepository Provider（Githubie、Buckettie、今後追加するProvider）
 関連: [Provider Consumer Contract](provider-authentication-consumer-contract.md)、`src/Moyai.Infrastructure/Providers/RepositoryProviderContract.cs`、CR `CR-2026-09-27-provider-git-remote-resolution`

@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 1.3.11.0 - 2026-10-14 (development build)
+
+- Add typed settings get/partial-update MCP and CLI operations for the agreed Githubie contract; preserve omissions and explicit false/arrays.
+- Require settings capabilities, Project assertions, dedicated write scope and Provider human approval. Unconfirmed Buckettie and legacy routes fail closed.
+- Return eight non-secret registered settings. Unknown update outcomes are not retried automatically; read before another update.
+- Not installed or publicly released; two-Provider integration remains pending.
+
 ## 1.3.10.0 - 2026-10-14 (development build)
 
 - Store a nullable Provider Repository ID per Project in schema v7; unset mappings retain the legacy Project-name fallback without changing UUIDs or linked data.

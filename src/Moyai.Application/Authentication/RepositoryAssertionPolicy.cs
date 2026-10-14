@@ -8,7 +8,8 @@ public static class RepositoryAssertionPolicy
     public static string Scope(RepositoryOperation operation) => operation switch
     {
         RepositoryOperation.ProviderVersion or RepositoryOperation.ProviderCapabilities or RepositoryOperation.Status
-            or RepositoryOperation.Diff or RepositoryOperation.BranchList or RepositoryOperation.StashList => "repository.read",
+            or RepositoryOperation.Diff or RepositoryOperation.BranchList or RepositoryOperation.StashList or RepositoryOperation.SettingsGet => "repository.read",
+        RepositoryOperation.SettingsUpdate => "repository.settings.write",
         RepositoryOperation.StashPush or RepositoryOperation.StashApply or RepositoryOperation.StashDrop => "repository.stash.write",
         RepositoryOperation.Commit or RepositoryOperation.CommitSelected => "repository.commit",
         RepositoryOperation.Push => "repository.push",

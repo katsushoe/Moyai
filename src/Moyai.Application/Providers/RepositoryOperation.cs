@@ -21,6 +21,8 @@ public enum RepositoryOperation
     StashList,
     StashApply,
     StashDrop,
+    SettingsGet,
+    SettingsUpdate,
 }
 
 /// <summary>Repository操作のProvider契約名を提供します。</summary>
@@ -47,6 +49,8 @@ public static class RepositoryOperationNames
         RepositoryOperation.StashList => "repository_stash_list",
         RepositoryOperation.StashApply => "repository_stash_apply",
         RepositoryOperation.StashDrop => "repository_stash_drop",
+        RepositoryOperation.SettingsGet => "repository_settings_get",
+        RepositoryOperation.SettingsUpdate => "repository_settings_update",
         _ => throw new ArgumentOutOfRangeException(nameof(operation)),
     };
 }

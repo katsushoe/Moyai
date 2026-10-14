@@ -17,6 +17,7 @@ public static class RepositoryProviderContract
         ArgumentNullException.ThrowIfNull(request);
         var arguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId };
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
+        if (request.Operation == RepositoryOperation.SettingsUpdate) arguments["changes"] = request.SettingsChanges?.Values ?? throw new ArgumentException("Settings changes are required.", nameof(request));
         if (supportsRemoteResolution && SupportsRemoteArgument(toolPrefix, request.Operation) && !string.IsNullOrWhiteSpace(request.RemoteName)) arguments["remote"] = request.RemoteName;
         if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message;
         if (request.Operation == RepositoryOperation.CommitSelected)
@@ -45,6 +46,20 @@ public static class RepositoryProviderContract
     }
 
     public static string OperationName(RepositoryOperation operation) => operation.ContractName();
+
+    /// <summary>合意した設定Capabilityキーだけを確認します。</summary>
+    public static bool SupportsSettings(string? output, RepositoryOperation operation)
+    {
+        string key = operation == RepositoryOperation.SettingsGet ? "repository_settings_read" : "repository_settings_update";
+        if (string.IsNullOrWhiteSpace(output)) return false;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            JsonElement data = document.RootElement.GetProperty("data");
+            return data.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
 
     /// <summary>Providerの共通Capability応答がstash操作を明示対応している場合だけtrueを返します。</summary>
     public static bool SupportsStashOperation(string? output, RepositoryOperation operation)
@@ -162,6 +177,7 @@ public static class RepositoryProviderContract
             or "auth_project_mismatch" or "auth_key_unknown" or "auth_key_revoked" or "auth_replay_detected"
             or "auth_key_provider_unavailable" or "auth_secret_decryption_failed" or "auth_protocol_unsupported"
             or "provider_capability_missing" => code,
+        "repository_settings_invalid" or "repository_settings_approval_cancelled" or "repository_settings_write_failed" => code,
         "provider_unavailable" => "provider_unavailable",
         "provider_remote_not_found" or "provider_remote_ambiguous" or "provider_remote_mismatch" => code,
         "unauthorized" or "invalid_service_token" or "service_token_expired" or "service_token_scope_missing" => "provider_authentication_failed",

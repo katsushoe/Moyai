@@ -1,5 +1,11 @@
 # Moyai Commands
 
+## Repository設定（開発版1.3.11.0）
+
+MCPは`repository_settings_get(project)`／`repository_settings_update(project, changes)`、CLIは`moyaictl repository-settings-get --project <name>`／`moyaictl repository-settings-update --project <name> --changes '<JSON object>'`です。必要に応じて`--config`を指定します。作者更新例は`{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`。CLIはサービスへ接続しDBを直接操作しません。
+
+合意済みGithubie経路のみ有効です。読取は登録8項目で作者未設定はnull。更新の省略は保持、falseは明示値、配列は置換です。空changes・未知項目・null・型不正・不正作者ペアを拒否します。policy検証と人の承認はProvider側です。型付き結果はok/operation/project/provider/settings/changedFields/approved/errorで、Provider生応答は返しません。認証・能力・設定エラーと安全な相関IDを保持し、更新成功にはapproved=trueが必須です。更新結果不明はerror.outcome=unknownとし、別の読取で確認してから再更新します。自動更新再試行、Git/稼働設定変更、直接/legacy代替は行いません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+
 Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`、`assertion-key-activate --kid <id> --trust-distribution-confirmed true [--overlap-seconds 86400]`、`assertion-key-revoke --kid <id>`、`assertion-protector-rotate`、`assertion-secret-rewrap`。すべてサービス経由で公開情報だけを返します。[運用Contract](docs/specifications/provider-authentication-operations.md)に状態遷移・エラー・移行・Trust配布条件を記載しています。
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
