@@ -20,6 +20,12 @@ Return only eight registered settings, actual changed fields and affirmative app
 
 本書は、Providerの認証以外の共通契約を定めます。認証・認可はProvider Consumer Contractを正本とします。
 
+## 選択commit patchの受け渡し
+
+`repository_diff`はProviderが生成した結果をMCPのJSON文字列として返します。Moyaiはunified diffを生成・編集・改行変換せず、Provider応答を`RepositoryProviderResult.Output`へ保持します。`repository_commit_selected`も受け取ったpatch文字列をJSON引数`patch`へそのまま渡します。UTF-8本文、日本語、BOM、複数hunkの内容をMoyai側で正規化しません。
+
+差分の妥当性検証、expected HEADとの照合、staged changeの拒否、patch適用とcommitの原子性はProviderの責務です。MoyaiはProvider capabilityが明示された場合だけ選択commitを呼び出し、`selected_commit_patch_invalid`、`expected_head_mismatch`、`staged_changes_present`を呼び出し元へ識別可能なまま返します。Moyaiのテストは、diff応答とcommit引数のpatch文字列がMCP transport境界で完全一致することを検証します。
+
 ## Gitリモートの解決
 
 ### 1. 解決規則

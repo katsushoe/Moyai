@@ -26,6 +26,20 @@ public sealed class RepositoryProviderResponseTests
     }
 
     [Theory]
+    [InlineData("selected_commit_patch_invalid")]
+    [InlineData("expected_head_mismatch")]
+    [InlineData("staged_changes_present")]
+    public void ParseSelectedCommitFailurePreservesProviderErrorCode(string errorCode)
+    {
+        string payload = $"{{\"ok\":false,\"error\":{{\"code\":\"{errorCode}\"}}}}";
+
+        RepositoryProviderResult result = RepositoryProviderResponse.Parse(RepositoryOperation.CommitSelected, Text(payload));
+
+        Assert.False(result.Ok);
+        Assert.Equal(errorCode, result.ErrorCode);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("{\"ok\":true}")]
     public void ParseWhenStructuredContentFailsPreservesFailure(string? text)
@@ -96,6 +110,22 @@ public sealed class RepositoryProviderResponseTests
         Assert.True(result.Ok);
         Assert.Equal(payload, result.Output);
         Assert.Null(result.ErrorCode);
+    }
+
+    [Fact]
+    public void ParseDiffPreservesStructuredUtf8JapanesePatchPayloadExactly()
+    {
+        const string patch = "diff --git a/COMMANDS.ja.md b/COMMANDS.ja.md\n--- a/COMMANDS.ja.md\n+++ b/COMMANDS.ja.md\n@@ -1,2 +1,3 @@\n 日本語の説明\n+追加行\n@@ -8,3 +9,2 @@\n-削除行\n 維持行\ndiff --git a/src/Program.cs b/src/Program.cs\nnew file mode 100644\n--- /dev/null\n+++ b/src/Program.cs\n@@ -0,0 +1,2 @@\n+\uFEFFusing System;\n+Console.WriteLine(\"日本語\");\n";
+        string payload = JsonSerializer.Serialize(new { ok = true, data = new { diff = patch } });
+        var response = Text(null);
+        response.StructuredContent = JsonSerializer.Deserialize<JsonElement>(payload);
+
+        RepositoryProviderResult result = RepositoryProviderResponse.Parse(RepositoryOperation.Diff, response);
+
+        Assert.True(result.Ok);
+        Assert.Equal(payload, result.Output);
+        using JsonDocument document = JsonDocument.Parse(result.Output!);
+        Assert.Equal(patch, document.RootElement.GetProperty("data").GetProperty("diff").GetString());
     }
 
     [Fact]

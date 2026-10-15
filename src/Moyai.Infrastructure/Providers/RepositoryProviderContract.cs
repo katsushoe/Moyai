@@ -210,6 +210,7 @@ public static class RepositoryProviderContract
             or "provider_capability_missing" => code,
         "repository_settings_invalid" or "repository_settings_approval_cancelled" or "repository_settings_write_failed" => code,
         "provider_unavailable" => "provider_unavailable",
+        "selected_commit_patch_invalid" or "expected_head_mismatch" or "staged_changes_present" => code,
         "provider_remote_not_found" or "provider_remote_ambiguous" or "provider_remote_mismatch" => code,
         "unauthorized" or "invalid_service_token" or "service_token_expired" or "service_token_scope_missing" => "provider_authentication_failed",
         "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" => "provider_policy_rejected",

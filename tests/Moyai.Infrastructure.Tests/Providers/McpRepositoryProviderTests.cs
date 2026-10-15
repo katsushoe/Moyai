@@ -61,6 +61,15 @@ public sealed class McpRepositoryProviderTests
     }
 
     [Theory]
+    [InlineData("selected_commit_patch_invalid")]
+    [InlineData("expected_head_mismatch")]
+    [InlineData("staged_changes_present")]
+    public void CommonContractPreservesSelectedCommitRejectionErrors(string errorCode)
+    {
+        Assert.Equal(errorCode, RepositoryProviderContract.NormalizeErrorCode($"{{\"error\":{{\"code\":\"{errorCode}\"}}}}"));
+    }
+
+    [Theory]
     [InlineData("provider_remote_not_found")]
     [InlineData("provider_remote_ambiguous")]
     [InlineData("provider_remote_mismatch")]
