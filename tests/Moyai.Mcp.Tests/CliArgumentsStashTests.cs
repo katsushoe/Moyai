@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Moyai.Cli;
 
 namespace Moyai.Mcp.Tests;

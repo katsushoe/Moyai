@@ -140,7 +140,8 @@ public sealed class RepositorySettingsTests
         data = new
         {
             settings = new { direct_push_branches = DevelopBranches, pull_branches = DevelopBranches, protected_branches = MainBranches, tag_target_branch = "main", tag_pattern = "v.*", require_clean_working_tree = false, commit_author_name = (string?)null, commit_author_email = (string?)null, token = "secret-value" },
-            changed_fields = CleanChangedFields, approved,
+            changed_fields = CleanChangedFields,
+            approved,
         },
     });
 

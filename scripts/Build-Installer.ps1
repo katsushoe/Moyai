@@ -1,12 +1,17 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$Version = "1.3.8.0",
+    [string]$Version = "",
     [string]$WixCommand = "",
     [string]$ArtifactsDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    [xml]$buildProperties = Get-Content -LiteralPath (Join-Path $repositoryRoot "Directory.Build.props") -Raw
+    $Version = [string]$buildProperties.Project.PropertyGroup.Version
+    if ([string]::IsNullOrWhiteSpace($Version)) { throw "Directory.Build.props must specify Version." }
+}
 $artifactsRoot = if ([string]::IsNullOrWhiteSpace($ArtifactsDirectory)) { Join-Path $repositoryRoot "artifacts" } else { [IO.Path]::GetFullPath($ArtifactsDirectory) }
 $allowedArtifactsRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot "artifacts"))
 if ($artifactsRoot -ne $allowedArtifactsRoot -and -not $artifactsRoot.StartsWith($allowedArtifactsRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {

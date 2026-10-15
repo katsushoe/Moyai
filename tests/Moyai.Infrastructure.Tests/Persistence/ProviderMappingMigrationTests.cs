@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using Moyai.Infrastructure.Persistence;
 
 namespace Moyai.Infrastructure.Tests.Persistence;

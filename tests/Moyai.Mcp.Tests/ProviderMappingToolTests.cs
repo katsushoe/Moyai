@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using ModelContextProtocol.Server;

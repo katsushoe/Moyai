@@ -1,6 +1,6 @@
-﻿using Moyai.Application.Providers;
+﻿using Moyai.Application.Authentication;
+using Moyai.Application.Providers;
 using Moyai.Infrastructure.Providers;
-using Moyai.Application.Authentication;
 
 namespace Moyai.Infrastructure.Tests.Providers;
 
