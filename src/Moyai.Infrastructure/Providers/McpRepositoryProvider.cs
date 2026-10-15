@@ -33,6 +33,13 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
     public async Task<RepositoryProviderResult> ExecuteAsync(RepositoryProviderRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        bool settings = request.Operation is RepositoryOperation.SettingsGet or RepositoryOperation.SettingsUpdate;
+        bool branchSwitch = request.Operation == RepositoryOperation.BranchSwitch;
+        if (branchSwitch && !request.UseAssertion)
+            return new(false, request.Operation.ContractName(), null, "auth_scope_denied", "Branch switching requires Project-bound assertions.");
+        if (settings && (!request.UseAssertion || _options.ToolPrefix != "github"))
+            return new(false, request.Operation.ContractName(), null, "auth_scope_denied", "Settings require the agreed assertion-bound Githubie route.");
+        bool settingsDispatched = false;
         try
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -50,13 +57,39 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
                 && !await IsMoyaiIntegrationModeAsync(cancellationToken).ConfigureAwait(false))
                 return new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_integration_mode_mismatch",
                     "Buckettie is not running in Moyai integration mode; state-changing operations are not delegated.");
+            if (IsStashOperation(request.Operation)
+                && !await IsStashOperationSupportedAsync(request, cancellationToken).ConfigureAwait(false))
+                return new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_capability_missing",
+                    "The configured Repository Provider does not advertise support for this stash operation; it was not dispatched.");
+            if (request.Operation == RepositoryOperation.CommitSelected
+                && !await IsSelectedCommitSupportedAsync(request, cancellationToken).ConfigureAwait(false))
+                return new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_capability_missing",
+                    "The configured Repository Provider does not advertise selected commit support; it was not dispatched.");
+            bool supportsRemoteResolution = RepositoryProviderContract.SupportsRemoteArgument(_options.ToolPrefix, request.Operation)
+                && !string.IsNullOrWhiteSpace(request.RemoteName)
+                && await IsRemoteResolutionSupportedAsync(request, cancellationToken).ConfigureAwait(false);
+            if (settings)
+            {
+                RepositoryProviderResult capabilities = await ExecuteAsync(request with { Operation = RepositoryOperation.ProviderCapabilities, SettingsChanges = null, OperationId = Guid.NewGuid().ToString("N") }, cancellationToken).ConfigureAwait(false);
+                if (!capabilities.Ok) return capabilities with { Operation = request.Operation.ContractName() };
+                if (!RepositoryProviderContract.SupportsSettings(capabilities.Output, request.Operation))
+                    return new(false, request.Operation.ContractName(), null, "provider_capability_missing", "Settings capability was not advertised; operation not dispatched.");
+            }
+            if (branchSwitch)
+            {
+                RepositoryProviderResult capabilities = await ExecuteAsync(request with { Operation = RepositoryOperation.ProviderCapabilities, Branch = null, OperationId = Guid.NewGuid().ToString("N") }, cancellationToken).ConfigureAwait(false);
+                if (!capabilities.Ok) return capabilities with { Operation = request.Operation.ContractName() };
+                if (!RepositoryProviderContract.SupportsBranchSwitch(capabilities.Output))
+                    return new(false, request.Operation.ContractName(), null, "provider_capability_missing", "Branch switch capability was not advertised; operation not dispatched.");
+            }
             var transportOptions = new HttpClientTransportOptions { Endpoint = _options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
             using HttpClient providerClient = _httpClientFactory.CreateClient(Name);
             using AssertionHttpHandler? assertionHandler = context is null ? null : new AssertionHttpHandler(providerClient, _issuer!, context, _audit);
             using HttpClient httpClient = assertionHandler is null ? providerClient : new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
             await using var transport = new HttpClientTransport(transportOptions, httpClient);
             await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
-            IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(_options.ToolPrefix, request);
+            IReadOnlyDictionary<string, object?> arguments = RepositoryProviderContract.Arguments(_options.ToolPrefix, request, supportsRemoteResolution);
+            settingsDispatched = settings || branchSwitch;
             CallToolResult result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
             RepositoryProviderResult parsed = RepositoryProviderResponse.Parse(request.Operation, result);
             if (assertionHandler is not null)
@@ -65,6 +98,10 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
                 if (_audit is not null) await _audit.WriteAsync(context!, assertionHandler.KeyId, parsed.Ok ? "accepted" : parsed.ErrorCode ?? "provider_operation_failed", cancellationToken).ConfigureAwait(false);
             }
             return parsed;
+        }
+        catch (OperationCanceledException) when (settings || branchSwitch)
+        {
+            return new(false, request.Operation.ContractName(), null, "provider_unavailable", "Provider transport cancelled.", settingsDispatched && (request.Operation == RepositoryOperation.SettingsUpdate || branchSwitch));
         }
         catch (ProviderAuthenticationException exception)
         {
@@ -78,11 +115,11 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException
             || (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(request.Operation), null, "provider_unavailable", request.UseAssertion ? "Provider transport failed; operation outcome may be unknown." : exception.Message);
+            return new RepositoryProviderResult(false, RepositoryProviderContract.OperationName(request.Operation), null, "provider_unavailable", request.UseAssertion ? "Provider transport failed; operation outcome may be unknown." : exception.Message, settingsDispatched && (request.Operation == RepositoryOperation.SettingsUpdate || branchSwitch));
         }
         catch (ModelContextProtocol.McpException exception)
         {
-            return request.UseAssertion ? new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_operation_failed", "Provider protocol failure; operation outcome may be unknown.") : Failure(request.Operation, exception.Message);
+            return request.UseAssertion ? new RepositoryProviderResult(false, request.Operation.ContractName(), null, "provider_operation_failed", "Provider protocol failure; operation outcome may be unknown.", settingsDispatched && (request.Operation == RepositoryOperation.SettingsUpdate || branchSwitch)) : Failure(request.Operation, exception.Message);
         }
     }
 
@@ -112,6 +149,57 @@ public sealed class McpRepositoryProvider : IRepositoryProvider
         RepositoryProviderResult parsed = RepositoryProviderResponse.Parse(RepositoryOperation.ProviderCapabilities, result);
         return parsed.Ok && string.Equals(ReadIntegrationMode(parsed.Output), "moyai", StringComparison.Ordinal);
     }
+
+    private async Task<bool> IsRemoteResolutionSupportedAsync(RepositoryProviderRequest request, CancellationToken cancellationToken)
+    {
+        RepositoryProviderResult result = await ExecuteAsync(request with
+        {
+            Operation = RepositoryOperation.ProviderCapabilities,
+            RemoteName = null,
+            Message = null,
+            Branch = null,
+            Tag = null,
+            BranchSource = null,
+        }, cancellationToken).ConfigureAwait(false);
+        return result.Ok && RepositoryProviderContract.SupportsRemoteResolution(result.Output);
+    }
+
+    private async Task<bool> IsStashOperationSupportedAsync(RepositoryProviderRequest request, CancellationToken cancellationToken)
+    {
+        RepositoryProviderResult result = await ExecuteAsync(request with
+        {
+            Operation = RepositoryOperation.ProviderCapabilities,
+            Message = null,
+            Branch = null,
+            Tag = null,
+            BranchSource = null,
+            Paths = null,
+            StashId = null,
+            OperationId = Guid.NewGuid().ToString("N"),
+        }, cancellationToken).ConfigureAwait(false);
+        return result.Ok && RepositoryProviderContract.SupportsStashOperation(result.Output, request.Operation);
+    }
+
+    private async Task<bool> IsSelectedCommitSupportedAsync(RepositoryProviderRequest request, CancellationToken cancellationToken)
+    {
+        RepositoryProviderResult result = await ExecuteAsync(request with
+        {
+            Operation = RepositoryOperation.ProviderCapabilities,
+            Message = null,
+            Branch = null,
+            Tag = null,
+            BranchSource = null,
+            Paths = null,
+            StashId = null,
+            ExpectedHead = null,
+            Patch = null,
+            OperationId = Guid.NewGuid().ToString("N"),
+        }, cancellationToken).ConfigureAwait(false);
+        return result.Ok && RepositoryProviderContract.SupportsSelectedCommit(result.Output);
+    }
+
+    private static bool IsStashOperation(RepositoryOperation operation) => operation is
+        RepositoryOperation.StashPush or RepositoryOperation.StashList or RepositoryOperation.StashApply or RepositoryOperation.StashDrop;
 
     private static string? ReadIntegrationMode(string? output)
     {

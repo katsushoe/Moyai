@@ -4,6 +4,35 @@
 
 ## Unreleased
 
+## 1.3.12.0 - 2026-10-14 (development build)
+
+- Add destructive branch-switch MCP/CLI routing to existing local branches through Githubie or Buckettie.
+- Require explicit capability and Project-bound repository.branch.write; preserve branch errors and unknown outcomes without automatic replay.
+- No installed configuration or live repository change; real Provider branch acceptance remains pending.
+
+## 1.3.11.0 - 2026-10-14 (development build)
+
+- Add typed settings get/partial-update MCP and CLI operations for the agreed Githubie contract; preserve omissions and explicit false/arrays.
+- Require settings capabilities, Project assertions, dedicated write scope and Provider human approval. Unconfirmed Buckettie and legacy routes fail closed.
+- Return eight non-secret registered settings. Unknown update outcomes are not retried automatically; read before another update.
+- Not installed or publicly released; two-Provider integration remains pending.
+
+## 1.3.10.0 - 2026-10-14 (development build)
+
+- Store a nullable Provider Repository ID per Project in schema v7; unset mappings retain the legacy Project-name fallback without changing UUIDs or linked data.
+- Add audited `project_provider_repository_set` / `project-provider-repository-set` for explicit mapping updates and clears using optimistic concurrency.
+- Forward the registered ID to Repository and Repository-backed release tools while preserving Project labels and the signed UUID, canonical Repository URL, audience, and scopes.
+- This entry describes a development build, not an installed or public release.
+
+## 1.3.9.0 - 2026-10-08 (local package)
+
+- Made `Project.GitRemoteName` optional; schema v6 rebuilds the `projects` table, converting stored `origin` to `null` (automatic resolution) and keeping other names as explicit values.
+- Forward `gitRemoteName` as the Provider `remote` argument only when the Provider advertises `remote_resolution` version 1 / `repository_url`: for `repository_status` on Githubie and Buckettie, and for Buckettie `repository_commit`. Githubie commit and other operations do not receive `remote`.
+- Preserve the Provider error codes `provider_remote_not_found`, `provider_remote_ambiguous` and `provider_remote_mismatch`.
+- Build start now reads `local_head` as the source commit and treats `working_tree_clean=false` as dirty when `dirty`/`is_dirty` are absent.
+- The isolated AC37 runtime (2026-10-07/08) ran this code while still labelled 1.3.8.0.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.8.0 - 2026-09-27 (local package)
 
 - Send per-tool Provider assertions for Buckettie release lookup, creation, publication and withdrawal instead of requiring the legacy static `release.write` service token.

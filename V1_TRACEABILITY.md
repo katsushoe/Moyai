@@ -6,10 +6,10 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 
 ## Summary
 
-- Verified: 44
-- Partial: 1
+- Verified: 45
+- Partial: 0
 - Not implemented: 0
-- Milestone 8 remains incomplete until every `Partial` row is verified or resolved by an explicitly approved specification correction.
+- All 45 v1 acceptance criteria have verified evidence.
 
 ## Matrix
 
@@ -51,7 +51,7 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 | 34 | BuildArtifact is immutable and stores a file or directory-manifest hash. | Verified | Schema immutability, file SHA-256, and deterministic directory-manifest SHA-256 are tested. | — |
 | 35 | Each project supports `local` or `server` Deploy Mode. | Verified | Project domain validation and deployment service routing cover both modes. | — |
 | 36 | Local Deploy places a BuildArtifact at `install_path`. | Verified | `DeploymentServiceTests.LocalDeployVerifiesArtifactAndRollbackRestoresPreviousContent`. | — |
-| 37 | Server Deploy uses KelpieSSH over Streamable HTTP. | Partial | Streamable HTTP transport exists, but the current lifecycle adapter calls one `<prefix>_deploy` Tool. The KelpieSSH task `kelpiessh-moyai-deploy-contract-20260830` reached 95% after sending an integration-test request to Moyai, then became `Expired` during database maintenance. | Reconfirm the KelpieSSH contract and integration environment, implement staged orchestration, and complete integration tests. |
+| 37 | Server Deploy uses KelpieSSH over Streamable HTTP. | Verified | Protocol v2 staged adapter focused tests pass. On 2026-10-13, isolated Moyai used signed `target_status` and lifecycle calls against KelpieSSH 0.3.15.1. A separate-ID trial completed prepare/upload/activate/verify/rollback then cleanup, with signed final states RolledBack/known and Cleaned/known and the original remote absence restored. A separate Moyai-managed deployment `8c1516f7-5100-4239-8e25-a19706ea06e0` using Build `edb7f22a` and Artifact `f30f3c17` reached Succeeded/revision5 and signed Cleaned/known. KelpieSSH independently confirmed `/artifacts/ac37.txt` as a regular 24-byte file with the expected SHA-256; its isolated profile was restored to Safe, temporary rules removed, sudoers validated, and the window closed. Evidence: `artifacts/provider-authentication/integration/ac37-live-window-results-20261013.json`. | — |
 | 38 | Moyai does not store SSH passwords or private keys. | Verified | DeploymentTarget contains a provider target reference and no credential fields; the ADR documents credential separation. | — |
 | 39 | DeploymentTarget is an independent entity. | Verified | Domain, SQLite table, repository, CLI, and MCP surface are implemented. | — |
 | 40 | v1 guarantees one DeploymentTarget per project. | Verified | SQLite schema enforces unique `project_id` and initializer constraint tests cover it. | — |
@@ -63,4 +63,4 @@ This matrix maps the 45 acceptance criteria in section 51 of the v1 specificatio
 
 ## Next Verification Batch
 
-Remaining closure work: complete real KelpieSSH integration for the section 19.5 staged orchestration (acceptance criterion 37).
+No v1 acceptance criteria remain partial.

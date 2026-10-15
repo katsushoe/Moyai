@@ -52,8 +52,19 @@ public static class RepositoryProviderResponse
     }
 
     private static RepositoryProviderResult Failure(string operation, string? detail) =>
-        new(false, operation, null, RepositoryProviderContract.NormalizeErrorCode(detail), detail);
+        new(false, operation, null, operation == "branch_switch" ? RepositoryProviderContract.NormalizeBranchSwitchError(detail) : RepositoryProviderContract.NormalizeErrorCode(detail), detail,
+            operation is "repository_settings_update" or "branch_switch" && UnknownOutcome(detail));
+
+    private static bool UnknownOutcome(string? detail)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(detail ?? "null");
+            return document.RootElement.TryGetProperty("error", out JsonElement error) && error.TryGetProperty("outcome", out JsonElement outcome) && outcome.GetString() == "unknown";
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException) { return false; }
+    }
 
     private static RepositoryProviderResult Invalid(string operation, string detail) =>
-        new(false, operation, null, "provider_invalid_response", detail);
+        new(false, operation, null, "provider_invalid_response", detail, operation is "repository_settings_update" or "branch_switch");
 }

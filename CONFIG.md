@@ -1,5 +1,9 @@
 # Moyai configuration
 
+## Branch-switch authorization (development1.3.12.0)
+
+After the Provider runtime explicitly advertises branch_switch and the administrator authorizes enablement, configure github_branch_switch: [repository.branch.write] or buckettie_branch_switch: [repository.branch.write] in the respective assertionToolScopes. Buckettie's configured prefix remains bitbucket; only this operation resolves to buckettie_branch_switch. Require Moyai integration mode for Buckettie. Implementation does not edit installed scopes, signing keys, DB or service account. See [ADR0013](docs/adr/0013-provider-branch-switch.md).
+
 [English](CONFIG.md) | [日本語](CONFIG.ja.md)
 
 MCP client registration uses an explicitly selected user profile and preserves unrelated client settings. MSI properties: `MOYAI_CODEX`, `MOYAI_CLAUDE` (select with `1`), `MOYAI_CLIENT_PROFILE` (existing absolute profile path). See [MCP setup](MCP_SETUP.md#installer-client-registration) for ownership, uninstall and recovery behavior.
@@ -34,7 +38,17 @@ Each entry has `name`, `endpoint`, `toolPrefix`, and optional `repository` (defa
 
 Project `build_config_json` accepts `configuration` and an `artifacts` array with `name`, `artifact_type`, and project-relative `file_path`. A server deployment target must set `kelpieTarget` to the immutable KelpieSSH target ID and supply a destination path. Deployment requires one file artifact with a SHA-256 value. The fixed Protocol v2 scopes are described in the [Provider authentication operations contract](docs/specifications/provider-authentication-operations.md).
 
+## Project Provider Repository mapping
+
+Project `providerRepositoryId` is stored in `projects.provider_repository_id`, not in the service JSON. It identifies an existing Provider registration independently of the Moyai Project name. Set it using `project_provider_repository_set` or `moyaictl project-provider-repository-set`, with the current Project revision. Query it using `project_get` / Project lists. See [ADR 0011](docs/adr/0011-provider-repository-id.md).
+
+When unset, Provider `repository` arguments use the Project name for backward compatibility. IDs retain their supplied case, contain 1–128 ASCII letters/digits/underscores/hyphens/dots, and start with a letter or digit. Explicit `clearMapping=true` clears the mapping; omitted/null IDs alone do not clear it. Basic Project update/configure/rename/archive operations preserve the mapping.
+
+Schema v7 adds the nullable column without changing Project UUIDs, names, revisions, or linked WorkItems. The service's migration backup and transaction rules apply. Repository operations and Repository-backed release operations use the mapped registration ID while Assertion UUID, canonical Repository URL, audience, and scopes remain unchanged. Saving a mapping does not register a Repository or authorize an unrelated Repository; incorrect Provider bindings are rejected when delegated.
+
 ## Installation and migration
+
+Settings Consumer (development1.3.11.0) requires Githubie capabilities `repository_settings_read/update`. Enable exact assertion Tool scopes `github_repository_settings_get: [repository.read]`, `github_repository_settings_update: [repository.settings.write]` only after a corresponding Provider runtime is available and its owner approves enablement. Do not substitute commit/push scope or legacy tokens. Implementation does not modify installed config. Buckettie settings remain disabled pending agreement. Provider owns persistence and human approval. See [ADR 0012](docs/adr/0012-repository-settings-consumer.md).
 
 The MSI runs `config-init` before starting the automatic `Moyai` service under LocalService. Initial configuration is generated only when absent; a previously saved registry `McpUrl` is imported once. Existing JSON is validated and retained. Edit JSON as administrator, then use `service stop` and `service start`. The legacy MSI URL property/registry does not override an existing JSON file.
 

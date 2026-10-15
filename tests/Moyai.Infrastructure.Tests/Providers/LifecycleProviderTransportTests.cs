@@ -47,6 +47,24 @@ public sealed class LifecycleProviderTransportTests
         Assert.Contains("release_not_found", result.ErrorMessage);
     }
 
+    [Theory]
+    [InlineData("githubbie", "github")]
+    [InlineData("buckettie", "bitbucket")]
+    public async Task ReleaseUsesProviderMappingWithoutChangingProjectLabel(string name, string prefix)
+    {
+        using var handler = new ProviderHandler();
+        using var client = new HttpClient(handler);
+        var provider = new McpLifecycleProvider(new McpRepositoryProviderOptions(name, new Uri("http://localhost/mcp"), prefix), new ClientFactory(client));
+        var request = new LifecycleRequest("Display_Project", "source", null, LifecycleAction.ReleaseCreate, "1.2.3", null, null, null, ProviderRepositoryId: "provider-id");
+
+        LifecycleResult result = await provider.ExecuteAsync(request);
+
+        Assert.True(result.Ok);
+        Assert.Equal("provider-id", handler.Arguments!.Value.GetProperty("repository").GetString());
+        if (prefix == "github") Assert.Equal("Display_Project", handler.Arguments.Value.GetProperty("project").GetString());
+        Assert.Equal("Display_Project", request.Project);
+    }
+
     [Fact]
     public async Task GithubReleaseCreatePassesEveryArtifact()
     {

@@ -74,8 +74,9 @@ public sealed class BuildService(IProjectRepository projects, IBuildRepository b
         if (string.IsNullOrWhiteSpace(output)) throw new InvalidOperationException("Repository status did not return source commit data.");
         using JsonDocument document = JsonDocument.Parse(output);
         JsonElement root = document.RootElement;
-        string? commit = FindString(root, "commit") ?? FindString(root, "head_sha") ?? FindString(root, "head");
-        bool dirty = FindBoolean(root, "dirty") ?? FindBoolean(root, "is_dirty") ?? false;
+        string? commit = FindString(root, "commit") ?? FindString(root, "head_sha") ?? FindString(root, "head") ?? FindString(root, "local_head");
+        bool? clean = FindBoolean(root, "working_tree_clean");
+        bool dirty = FindBoolean(root, "dirty") ?? FindBoolean(root, "is_dirty") ?? (clean.HasValue ? !clean.Value : false);
         return (!string.IsNullOrWhiteSpace(commit) ? commit : throw new InvalidOperationException("Repository status did not return a source commit."), dirty);
     }
     private static string? FindString(JsonElement value, string name) { if (value.ValueKind == JsonValueKind.Object) { if (value.TryGetProperty(name, out JsonElement found) && found.ValueKind == JsonValueKind.String) return found.GetString(); foreach (JsonProperty property in value.EnumerateObject()) { string? nested = FindString(property.Value, name); if (nested is not null) return nested; } } return null; }

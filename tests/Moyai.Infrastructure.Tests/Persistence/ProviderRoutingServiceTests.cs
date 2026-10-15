@@ -76,7 +76,7 @@ public sealed class ProviderRoutingServiceTests
         Assert.Equal("main", request.BranchSource);
         Assert.Equal("source", request.SourcePath);
         Assert.Equal("https://github.com/example/moyai", request.RepositoryUrl);
-        Assert.Equal("origin", request.RemoteName);
+        Assert.Null(request.RemoteName);
         Assert.NotNull(request.ServiceToken);
     }
 
@@ -134,11 +134,60 @@ public sealed class ProviderRoutingServiceTests
         Assert.Equal(source, provider.LastRequest?.BranchSource);
     }
 
+    [Fact]
+    public async Task BranchSwitchUsesProjectIdentityAndMappedRepositoryWithoutMutation()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, legacy: false, mapped: true);
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.BranchSwitch, branch: "feature/existing");
+        Assert.True(result.Ok);
+        RepositoryProviderRequest request = Assert.IsType<RepositoryProviderRequest>(provider.LastRequest);
+        Assert.True(request.UseAssertion);
+        Assert.NotEqual(Guid.Empty, request.ProjectId);
+        Assert.Equal("registered", request.RepositoryId);
+        Assert.Equal("feature/existing", request.Branch);
+        Assert.Null(request.BranchSource);
+        Assert.Null(request.ServiceToken);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task BranchSwitchRejectsMissingBranchBeforeDispatch(string? branch)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, legacy: false);
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => service.ExecuteAsync("Moyai", RepositoryOperation.BranchSwitch, branch: branch));
+        Assert.Null(provider.LastRequest);
+    }
+
+    [Fact]
+    public async Task BranchSwitchRejectsLegacyEvenWithGenericWriteToken()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.BranchSwitch, branch: "develop");
+        Assert.Equal("auth_scope_denied", result.ErrorCode);
+        Assert.Null(provider.LastRequest);
+    }
+
+    [Fact]
+    public async Task UnknownBranchSwitchOutcomeDoesNotRetryExpiryCode()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, legacy: false);
+        provider.Next = new(false, "branch_switch", null, "auth_assertion_expired", null, true);
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.BranchSwitch, branch: "develop");
+        Assert.True(result.ResultUnknown);
+        Assert.Equal(1, provider.Calls);
+    }
+
     private sealed class RoutingFixture : IAsyncDisposable
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-routing-{Guid.NewGuid():N}.db");
 
-        public async Task<(ProviderRoutingService Service, RecordingProvider Provider)> CreateAsync(bool issueToken, string scope = "repository.write")
+        public async Task<(ProviderRoutingService Service, RecordingProvider Provider)> CreateAsync(bool issueToken, string scope = "repository.write", bool legacy = true, bool mapped = false)
         {
             string connectionString = new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString();
             var options = new SqliteDatabaseOptions(connectionString);
@@ -146,6 +195,7 @@ public sealed class ProviderRoutingServiceTests
             var projectRepository = new SqliteProjectRepository(options);
             var projectService = new ProjectService(projectRepository, TimeProvider.System);
             await projectService.CreateAsync(new CreateProjectCommand("Moyai", "source", "install", "https://github.com/example/moyai", null, "dotnet", "local", "test", "routing"));
+            if (mapped) await projectService.SetProviderRepositoryAsync("Moyai", 1, "registered", false, "test", "routing");
             var tokenRepository = new SqliteServiceTokenRepository(options);
             if (issueToken)
             {
@@ -154,7 +204,7 @@ public sealed class ProviderRoutingServiceTests
             }
             var provider = new RecordingProvider();
             return (new ProviderRoutingService(projectRepository, tokenRepository, [provider], TimeProvider.System,
-                new RepositoryAuthentication("legacy", DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddDays(1))), provider);
+                legacy ? new RepositoryAuthentication("legacy", DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddDays(1)) : null), provider);
         }
 
         public ValueTask DisposeAsync()
@@ -168,11 +218,14 @@ public sealed class ProviderRoutingServiceTests
     {
         public string Name => "githubbie";
         public RepositoryProviderRequest? LastRequest { get; private set; }
+        public RepositoryProviderResult? Next { get; set; }
+        public int Calls { get; private set; }
 
         public Task<RepositoryProviderResult> ExecuteAsync(RepositoryProviderRequest request, CancellationToken cancellationToken = default)
         {
             LastRequest = request;
-            return Task.FromResult(new RepositoryProviderResult(true, request.Operation.ToString(), "ok", null, null));
+            Calls++;
+            return Task.FromResult(Next ?? new RepositoryProviderResult(true, request.Operation.ToString(), "ok", null, null));
         }
     }
 }

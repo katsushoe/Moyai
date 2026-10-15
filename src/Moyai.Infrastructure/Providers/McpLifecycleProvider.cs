@@ -46,7 +46,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
                 ? new AssertionToolCaller(this, request)
                 : await LegacyToolCaller.CreateAsync(this, request, cancellationToken).ConfigureAwait(false);
             string operation = OperationName(request.Action);
-            var arguments = new Dictionary<string, object?> { ["repository"] = request.Project };
+            var arguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId };
             if (IsGithubie) arguments["project"] = request.Project;
             Add(arguments, "version", request.Version);
             if (IsGithubie && request.Action == LifecycleAction.ReleaseCreate && request.ArtifactPaths is { Count: > 0 })
@@ -126,7 +126,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     private async Task<LifecycleResult?> ReconcileExistingReleaseAsync(ToolCaller client, LifecycleRequest request, string operation, CancellationToken cancellationToken)
     {
         string getTool = $"{LifecycleToolPrefix}_release_get";
-        var getArguments = new Dictionary<string, object?> { ["repository"] = request.Project, ["version"] = request.Version };
+        var getArguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId, ["version"] = request.Version };
         if (IsGithubie) getArguments["project"] = request.Project;
         LifecycleResult found = await client.CallAsync(getTool, getArguments, operation, cancellationToken).ConfigureAwait(false);
         if (!found.Ok) return found.ErrorCode == "provider_not_found" ? null : found;
@@ -174,7 +174,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         if (string.IsNullOrWhiteSpace(request.CommitHash)) return null;
         string expectedTag = ExpectedTag(request);
         string toolName = IsGithubie ? "github_tag_get" : "bitbucket_tag_get";
-        var arguments = new Dictionary<string, object?> { ["repository"] = request.Project, ["tag"] = expectedTag };
+        var arguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId, ["tag"] = expectedTag };
         LifecycleResult tagResult = await client.CallAsync(toolName, arguments, operation, cancellationToken).ConfigureAwait(false);
         if (!tagResult.Ok) return tagResult;
         try

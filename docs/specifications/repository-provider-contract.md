@@ -1,5 +1,19 @@
 # Repository Provider Contract
 
+## Local branch switch extension (development1.3.12.0)
+
+Moyai branch_switch(project, branch) requires an explicit boolean data.branch_switch capability (or Buckettie data.operations.branch_switch), exact repository.branch.write scope, and Project-bound assertions. Resolve registered ID using providerRepositoryId while preserving UUID/URL. Githubie tool is github_branch_switch; Buckettie tool is buckettie_branch_switch despite the configured bitbucket prefix, and requires Moyai integration mode.
+
+Only repository/branch arguments are sent. Provider validates existing local branch, dirty tree and policy; there is no fetch, creation or default-branch change. Raw success preserves Githubie data.previous_branch/current_branch and Buckettie data.branch_switch. Branch-not-found, invalid-ref, dirty and policy rejection codes are preserved with Provider detail. Post-dispatch response loss is resultUnknown=true and requires status confirmation before another request. Runtime configuration and real Provider acceptance remain separate. See [ADR0013](../adr/0013-provider-branch-switch.md).
+
+## Settings Consumer extension (development1.3.11.0)
+
+Githubie settings agreement is recorded in [ADR0012](../adr/0012-repository-settings-consumer.md). This implementation is not installed and is not a confirmed Buckettie contract. Only Githubie settings routing is enabled; other Providers and legacy authentication are rejected before dispatch.
+
+Consumer operations are `repository_settings_get(project)` and `repository_settings_update(project, changes)`; Provider tools are `github_repository_settings_get/update`, exact capability keys `repository_settings_read/update`, read scope `repository.read` and update scope `repository.settings.write` plus Provider human approval. Preserve mapped registration ID and signed UUID/URL/tool context. Forward only explicit changes; omission preserves, false is explicit, arrays replace. Null/unknown/wrong-type/empty changes and incomplete authors are rejected. Provider remains the policy/persistence authority.
+
+Return only eight registered settings, actual changed fields and affirmative approval on update success. Preserve settings/authentication errors with safe correlation IDs; do not expose raw Provider output. Update response loss or invalid post-dispatch response is unknown, not a known rejection. No automatic update replay; obtain a separate read before deciding another update. Provider admission rejection remains fail-closed. CONFIG/COMMANDS describe setup and symmetric CLI JSON input.
+
 状態: 確定（2026-09-27、ユーザー承認）
 対象: Moyaiから委譲されるRepository Provider（Githubie、Buckettie、今後追加するProvider）
 関連: [Provider Consumer Contract](provider-authentication-consumer-contract.md)、`src/Moyai.Infrastructure/Providers/RepositoryProviderContract.cs`、CR `CR-2026-09-27-provider-git-remote-resolution`
@@ -57,11 +71,26 @@ Providerは、ローカルリポジトリのGit設定（`remote.<name>.url`）�
 | `provider_remote_ambiguous` | 一致するリモートが複数あり、命名規則でも一意に決まらない |
 | `provider_remote_mismatch` | 指定された`gitRemoteName`のURLが`repositoryUrl`と一致しない |
 
+## Provider Repository登録ID
+
+Moyai Projectの `providerRepositoryId` は、Providerの登録IDをProject名とは別に保持します。未設定なら従来どおりProject名を `repository` 引数として渡し、明示設定した場合は登録IDを使います。Project名、UUID、正規化Repository URL、audience、scopeは変更しません。Project名変更時にも明示した登録IDは維持します。
+
+登録・更新・解除は `project_provider_repository_set` を使い、現在revisionと監査を適用します。`clearMapping=true` で解除し、Project名へのfallbackを戻します。設定形式・schema v7・運用条件は[ADR 0011](../adr/0011-provider-repository-id.md)を正本とします。Provider自身の登録・対応付け検証は維持され、Moyai側の設定保存だけで認可を成立させません。
+
+この対応はMoyai 1.3.10.0のソース実装です。稼働環境への導入とNeon_SDKの読取結合確認は別の完了条件です。
+
+## Build開始時のstatus読取
+
+MoyaiのBuild状態読取は、Source Commitとして従来の`commit`／`head_sha`／`head`に加えて`local_head`を認識します。作業ツリー判定は`dirty`／`is_dirty`を優先し、これらがない場合は`working_tree_clean`の真偽を反転してDirtyを判定します。Provider応答の`data`内の値も対象です。これはMoyaiの既存応答への対応であり、Providerへ新しい応答形式を要求するものではありません。
+
+Dirtyの場合、またはSource Commitが欠落・空の場合は、Build Provider呼出しとBuild記録の作成より前に拒否します。
+
 ## Moyai側の実装方針
 
-- 現行のMoyaiは`gitRemoteName`を保持していますが、Provider呼び出しの引数には含めていません（Providerへ渡すのはRepository IDのみ）。リモートの選択は、現状も各ProviderがRepository登録に基づいて行っています。
-- `Project.GitRemoteName`を省略可能（`null`許容）に変更し、新規Projectの既定値`origin`を廃止します。
-- 既存Projectの`git_remote_name='origin'`は、利用者が明示した値と区別できないため、移行時に`null`（自動解決）へ変更します。`origin`以外の値は、明示指定として保持します。
-- `gitRemoteName`が設定されている場合だけ、Provider呼び出しの引数`remote`として渡します。未対応Providerには送りません（`remote_resolution`で判定します）。
-- 共通エラーコード3種を、`RepositoryProviderContract`の既知コードへ追加し、そのまま利用者へ返します。
-- 実装はMoyaiの次版で行います（2026-09-27時点で未実装）。
+- Moyaiは`gitRemoteName`を保持し、下記の条件を満たす操作ではProviderの`remote`引数へ転送します。未指定の場合はProvider側の解決規則に委ねます。
+- `Project.GitRemoteName`は省略可能（`null`許容）とし、新規Projectの既定値`origin`は使用しません。
+- 既存Projectの`git_remote_name='origin'`は、利用者が明示した値と区別できないため、DB schema v6への移行で`null`（自動解決）へ変更します。`origin`以外の値は明示指定として保持します。
+- `gitRemoteName`が設定され、Providerが`remote_resolution` version 1 / `repository_url` modeを表明した場合だけ、remote引数を渡します。対象はGithubie／Buckettieの`repository_status`と、既存Toolがremote引数を受け取るBuckettieの`commit`です。Githubieの`commit`およびその他の操作にはremoteを送りません。未対応または能力を取得できないProviderにもremoteを送りません。
+- Buckettieの`commit`では、従来どおり`integration_mode=moyai`を確認してから委譲します。Assertionのscope／Repository Claim、ProviderのURL照合・ブランチ保護は変更しません。登録remoteや認証情報を変更せず、明示されたremoteをProviderの既存検証へ渡します（2026-10-08追記）。
+- Providerが返す共通エラーコード3種は、`RepositoryProviderContract`で正規化後も同じコードを利用者へ返します。
+- Moyai側の基本実装とunit testsは2026-10-03に追加しました。2026-10-07に、非`origin` remoteを持つ隔離ProjectでMoyai経由のGithubie capabilities・statusの成功を確認しました（`artifacts/nonorigin-integration/e2e-20261007.json`）。

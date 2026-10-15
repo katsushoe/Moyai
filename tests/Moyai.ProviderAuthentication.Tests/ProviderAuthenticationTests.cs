@@ -55,6 +55,36 @@ public sealed class ProviderAuthenticationTests : IAsyncDisposable
     }
 
     [Theory]
+    [InlineData("githubie")]
+    [InlineData("buckettie")]
+    public async Task ProtocolV2RejectsAssertionForDifferentProviderAudience(string otherProvider)
+    {
+        AssertionContext context = AssertionContext.ForResource(
+            "kelpiessh",
+            Guid.NewGuid(),
+            "kelpie_target",
+            "target-01",
+            "deploy_status",
+            ["deploy.status"],
+            "operation-audience-isolation");
+        string assertion = CreateAssertion(context, payload => payload["aud"] = otherProvider);
+        string trustPath = await WriteTrustAsync(SigningKeyState.Active);
+        var replay = new RecordingReplayCache();
+        var validator = new Es256AssertionValidator(
+            new FileAssertionTrustStore(trustPath),
+            replay,
+            new AssertionOptions(_issuer),
+            CreateCapability(context),
+            _clock);
+
+        ProviderAuthenticationException error = await Assert.ThrowsAsync<ProviderAuthenticationException>(
+            () => validator.ValidateAsync(assertion, context));
+
+        Assert.Equal("auth_audience_mismatch", error.Code);
+        Assert.Equal(0, replay.CallCount);
+    }
+
+    [Theory]
     [InlineData("repository", "unexpected")]
     [InlineData("unknown", "unexpected")]
     public async Task ProtocolV2RejectsMixedOrUnknownClaims(string name, string value)

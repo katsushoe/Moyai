@@ -1,5 +1,17 @@
 # Moyai Commands
 
+## Local branch switch (development1.3.12.0)
+
+MCP `branch_switch(project, branch)` and CLI `moyaictl branch-switch --project <name> --branch <existing-local-branch>` switch through the registered Provider. Project identity, mapped Repository ID and URL remain unchanged; gitDefaultBranch is not updated. The Tool is destructive and requires an explicit capability plus repository.branch.write on github_branch_switch or buckettie_branch_switch. Buckettie must use Moyai integration mode. Legacy is rejected.
+
+No fetch, remote checkout, creation, source or remote argument is added. Provider checks local branch existence/ref/policy and dirty-tree safety. Same-branch no-op follows Provider policy. Existing RepositoryProviderResult.output keeps the Provider JSON: Githubie before/after in data.previous_branch/current_branch; Buckettie in data.branch_switch (plus switched). Preserve working_tree_dirty, branch_not_found, invalid_ref, Buckettie branch_switch_invalid_ref and policy codes. If resultUnknown=true, read repository status before another request; no automatic replay. Installed operation availability/scopes and disposable real-Provider acceptance are separate. See [ADR0013](docs/adr/0013-provider-branch-switch.md).
+
+## Repository settings (development1.3.11.0)
+
+MCP `repository_settings_get(project)` / `repository_settings_update(project, changes)` have CLI counterparts `moyaictl repository-settings-get --project <name>` and `moyaictl repository-settings-update --project <name> --changes '<JSON object>'` (plus `--config` as needed). Example changes: `{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`. CLI connects to the service, never the DB.
+
+Only agreed Githubie routing is enabled. Get returns eight registered settings, with null authors when unset. Update accepts only specified fields; omission preserves, false is explicit, arrays replace. Reject empty changes, unknown/null/wrong-type fields and incomplete/invalid author pairs. Policy validation and human approval remain Provider-owned. The typed result exposes ok/operation/project/provider/settings/changedFields/approved/error, never raw Provider output. Errors retain auth/capability/settings codes and safe correlation IDs. Update success requires approved=true. Unknown transport/save outcomes return error.outcome=unknown and require a separate get before another update; no automatic update retry. No local Git/config changes or direct/legacy fallback. See [ADR0012](docs/adr/0012-repository-settings-consumer.md).
+
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
 Local MCP registration management: `configure codex|claude [--profile <path>] [--config <path>]`, `unconfigure codex|claude [--profile <path>]`; recovery: `client-transaction codex|claude --phase rollback|commit [--profile <path>]`. `--transaction` retains rollback state for MSI. These are installation commands, not service business tools. See [MCP setup](MCP_SETUP.md#installer-client-registration).
@@ -18,7 +30,7 @@ Provider authentication administration: `assertion-key-prepare`, `assertion-key-
 
 | Group | Commands | Purpose |
 | :--- | :--- | :--- |
-| Project | `project-list`, `project-get`, `project-create`, `project-ensure`, `project-configure`, `project-rename`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
+| Project | `project-list`, `project-get`, `project-create`, `project-ensure`, `project-configure`, `project-rename`, `project-provider-repository-set`, `project-update`, `project-set-archived`, `project-overview`, `project-changes-since` | Project state and aggregate views |
 | Work item | `work-item-list`, `work-item-get`, `work-item-create`, `work-item-update`, `work-item-set-deleted`, `work-item-transition`, `work-item-history`, `item-search` | Work tracking, history, and FTS5 search |
 | Collaboration | `relation-add/remove/list`, `comment-add/list`, `task-link-add/remove/list`, `commit-link-add/remove/list` | Persistent WorkItem collaboration records |
 | Repository | `repository-status`, `repository-diff`, `repository-commit`, `repository-push`, `repository-pull` | Provider-routed Git operations |
@@ -51,6 +63,20 @@ Each command below has the syntax, processing rule, and result contract. Returne
 - `project-set-archived`: requires `--name --expected-revision --archived --actor-type --actor-name`; archives or restores and returns the project.
 - `project-overview`: requires `--project`; optional `--recent-limit` defaults to `10` and must be `1..100`; returns open WorkItem counts, blockers, latest stable release, planned release, and recent events.
 - `project-changes-since`: requires `--project --since`; optional `--offset --limit` default to `0` and `50`; returns events strictly after the ISO 8601 timestamp in deterministic chronological order.
+
+#### `project-provider-repository-set`
+
+Purpose: set, update, or explicitly clear a Provider registration ID without renaming the Moyai Project. MCP tool: `project_provider_repository_set`.
+
+Syntax: `moyaictl project-provider-repository-set --project <name> --expected-revision <revision> (--provider-repository-id <id> | --clear-mapping) [--actor-type <type>] [--actor-name <name>]`.
+
+`project` selects an existing Project; `expectedRevision` is its current revision. `providerRepositoryId` must be a valid registration ID (see CONFIG). `clearMapping` defaults to false. Specify an ID or clear, never both. Optional actors default to `client` / `unspecified`, providing audit attribution rather than authentication.
+
+Example: `moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 1 --provider-repository-id neonsdk`. Read the actual revision from `project-get` before using this example; do not assume revision 1 for an existing Project. To clear the mapping: `moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 2 --clear-mapping`.
+
+The service saves the mapping and `project_provider_repository_set` audit event atomically, increments revision, and preserves UUID, name, other settings, archive state, and linked data. Results return the persisted Project with `providerRepositoryId` and the new revision; an explicit clear stores null and restores the legacy Project-name fallback. Example result fields: `{"name":"Neon_SDK","providerRepositoryId":"neonsdk","revision":2}` (the real result also includes the other Project fields).
+
+Missing Project, stale revision, invalid ID, omitted ID without clear, or simultaneous ID/clear fails without persistence (CLI exit 1). The CLI connects to the service; it never modifies SQLite directly. The mapping does not create a Provider registration, alter credentials, or bypass Provider UUID/Repository URL validation. Live commit/push is not needed to verify this configuration operation.
 
 ### Work item commands
 
@@ -115,3 +141,10 @@ Moyai v1 models exactly one Repository as part of each Project. It has no indepe
 
 `branch_create` requires `project`, `branch`, and an explicit `source`. `source` must be a literal branch name or a full 40-character commit SHA. Moyai never substitutes `main`, `develop`, or the current `HEAD` when it is omitted.
 `tag_create` likewise requires `project`, `tag`, and an explicit literal branch or full commit SHA `source`; Moyai forwards it unchanged when the Provider supports explicit tag sources.
+# Repository stash delegation
+
+The `repository_stash_push`, `repository_stash_list`, `repository_stash_apply`, and `repository_stash_drop` MCP tools delegate through the configured Repository Provider. `repository_stash_push` accepts an optional `paths` array of repository-relative paths; omitting it stashes all changes. Apply and drop require the full stash object ID returned by list/push. Assertion scopes are `repository.read` for listing and `repository.stash.write` for mutations.
+
+CLI examples: `moyaictl repository-stash-push --project Buckettie --message "split changes" --paths "src/a.cs,docs/readme.md"`, `moyaictl repository-stash-list --project Buckettie`, `moyaictl repository-stash-apply --project Buckettie --stash-id <40-character-id>`, and `moyaictl repository-stash-drop --project Buckettie --stash-id <40-character-id>`. The `paths` CLI value is comma-separated; use MCP directly when a filename contains a comma.
+
+`repository_commit_selected` forwards `expected_head` and a unified diff `patch` through the Provider, and runs only when Provider capabilities explicitly advertise support. Unselected working-tree changes remain; the Provider rejects the operation when staged changes exist.

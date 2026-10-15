@@ -37,6 +37,7 @@ public static class CliArguments
                 "integer" => long.Parse(value ?? throw new ArgumentException($"--{key} requires a value."), CultureInfo.InvariantCulture),
                 "number" => double.Parse(value ?? throw new ArgumentException($"--{key} requires a value."), CultureInfo.InvariantCulture),
                 "array" => (value ?? throw new ArgumentException($"--{key} requires a value.")).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
+                "object" => ParseObject(value ?? throw new ArgumentException($"--{key} requires a JSON object.")),
                 _ => value ?? throw new ArgumentException($"--{key} requires a value."),
             };
             result.Add(name, converted);
@@ -52,5 +53,12 @@ public static class CliArguments
                 else throw new ArgumentException($"Missing required option: {key}.");
             }
         return result;
+    }
+
+    private static JsonElement ParseObject(string value)
+    {
+        using JsonDocument document = JsonDocument.Parse(value);
+        if (document.RootElement.ValueKind != JsonValueKind.Object) throw new ArgumentException("Expected a JSON object.");
+        return document.RootElement.Clone();
     }
 }

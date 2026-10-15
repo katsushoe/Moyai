@@ -1,5 +1,17 @@
 # Moyai Commands
 
+## ローカルbranch切替（開発版1.3.12.0）
+
+MCP `branch_switch(project, branch)`、CLI `moyaictl branch-switch --project <name> --branch <existing-local-branch>`で登録Providerへ委譲します。Project識別情報・対応付け済みRepository ID・URLは保持し、`gitDefaultBranch`も更新しません。状態変更Toolで、明示capabilityと`github_branch_switch`/`buckettie_branch_switch`への`repository.branch.write`が必要です。BuckettieはMoyai連携モードを要求し、legacyは拒否します。
+
+fetch・remote checkout・branch作成・source/remote引数の追加は行いません。local branchの存在・参照形式・policy・dirty拒否はProviderが検証し、同じbranchの無変更成功もProvider規則に従います。既存RepositoryProviderResult.outputにProvider JSONを保持し、Githubieはdata.previous_branch/current_branch、Buckettieはdata.branch_switch内（switchedも含む）に切替前後が入ります。working_tree_dirty/branch_not_found/invalid_ref/Buckettieのbranch_switch_invalid_refとpolicyコードを保持します。resultUnknown=trueなら別のrepository statusで確認してから再要求し、自動再送しません。稼働版・scope導入と使い捨て実Provider受入は別条件です。[ADR0013](docs/adr/0013-provider-branch-switch.md)を参照してください。
+
+## Repository設定（開発版1.3.11.0）
+
+MCPは`repository_settings_get(project)`／`repository_settings_update(project, changes)`、CLIは`moyaictl repository-settings-get --project <name>`／`moyaictl repository-settings-update --project <name> --changes '<JSON object>'`です。必要に応じて`--config`を指定します。作者更新例は`{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`。CLIはサービスへ接続しDBを直接操作しません。
+
+合意済みGithubie経路のみ有効です。読取は登録8項目で作者未設定はnull。更新の省略は保持、falseは明示値、配列は置換です。空changes・未知項目・null・型不正・不正作者ペアを拒否します。policy検証と人の承認はProvider側です。型付き結果はok/operation/project/provider/settings/changedFields/approved/errorで、Provider生応答は返しません。認証・能力・設定エラーと安全な相関IDを保持し、更新成功にはapproved=trueが必須です。更新結果不明はerror.outcome=unknownとし、別の読取で確認してから再更新します。自動更新再試行、Git/稼働設定変更、直接/legacy代替は行いません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+
 Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`、`assertion-key-activate --kid <id> --trust-distribution-confirmed true [--overlap-seconds 86400]`、`assertion-key-revoke --kid <id>`、`assertion-protector-rotate`、`assertion-secret-rewrap`。すべてサービス経由で公開情報だけを返します。[運用Contract](docs/specifications/provider-authentication-operations.md)に状態遷移・エラー・移行・Trust配布条件を記載しています。
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
@@ -18,7 +30,7 @@ Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`�
 
 | Group | Commands | 用途 |
 | :--- | :--- | :--- |
-| Project | `project-list`、`project-get`、`project-create`、`project-ensure`、`project-configure`、`project-rename`、`project-update`、`project-set-archived`、`project-overview`、`project-changes-since` | Project状態・集約表示 |
+| Project | `project-list`、`project-get`、`project-create`、`project-ensure`、`project-configure`、`project-rename`、`project-provider-repository-set`、`project-update`、`project-set-archived`、`project-overview`、`project-changes-since` | Project状態・集約表示 |
 | Work item | `work-item-list`、`work-item-get`、`work-item-create`、`work-item-update`、`work-item-set-deleted`、`work-item-transition`、`work-item-history`、`item-search` | 作業管理・履歴・FTS5検索 |
 | Collaboration | `relation-add/remove/list`、`comment-add/list`、`task-link-add/remove/list`、`commit-link-add/remove/list` | WorkItem連携記録 |
 | Repository | `repository-status`、`repository-diff`、`repository-commit`、`repository-push`、`repository-pull` | Provider経由Git操作 |
@@ -49,6 +61,20 @@ Project名の検索、重複登録判定、変更対象の解決にはOrdinalな
 - `project-set-archived`: `--name --expected-revision --archived --actor-type --actor-name`が必須です。
 - `project-overview --project`はOpen WorkItem件数、blocker、最新stable Release、予定Release、直近Eventを返します。`--recent-limit`は既定`10`、範囲`1..100`です。
 - `project-changes-since`は`--project --since`が必須で、指定したISO 8601日時より後のEventを時系列順に返します。`--offset --limit`の既定値は`0`と`50`です。
+
+#### `project-provider-repository-set`
+
+目的：Moyai Project名を変えず、Provider登録IDを設定・更新・明示解除します。MCP Toolは `project_provider_repository_set` です。
+
+構文：`moyaictl project-provider-repository-set --project <name> --expected-revision <revision> (--provider-repository-id <id> | --clear-mapping) [--actor-type <type>] [--actor-name <name>]`。
+
+`project` は既存Project、`expectedRevision` は現在のrevisionです。`providerRepositoryId` はCONFIG記載の形式に従う登録ID、`clearMapping` の既定値はfalseです。ID指定か解除のどちらか一方だけを指定します。任意actorの既定は `client`／`unspecified` で、監査上の記録であり認証ではありません。
+
+例：`moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 1 --provider-repository-id neonsdk`。実際のrevisionは事前に `project-get` で確認し、既存Projectで1と仮定しません。解除例：`moyaictl project-provider-repository-set --project Neon_SDK --expected-revision 2 --clear-mapping`。
+
+サービスが対応付けと `project_provider_repository_set` 監査Eventを同じトランザクションで保存し、revisionを増やします。UUID・名前・他設定・archive状態・関連データは保持します。結果は保存済みProjectを返し、`providerRepositoryId` と新revisionを含みます。明示解除はnullを保存し、従来のProject名へのfallbackを戻します。結果項目の例：`{"name":"Neon_SDK","providerRepositoryId":"neonsdk","revision":2}`（実際の応答には他のProject項目も含みます）。
+
+対象なし、古いrevision、不正ID、解除なしのID省略、IDと解除の同時指定では保存せず失敗します（CLI終了コード1）。CLIはサービスに接続し、SQLiteを直接変更しません。Provider登録の作成、資格情報変更、UUID／Repository URL検証の回避は行いません。この設定操作の確認に実commit／pushは不要です。
 
 ### Work item commands
 
@@ -105,3 +131,10 @@ Moyai v1は各Projectの一部としてRepositoryを1つだけ管理するため
 
 `branch_create`には`project`、`branch`、明示的な`source`が必要です。`source`はliteral branch名または完全な40桁commit SHAを指定します。省略時にMoyaiが`main`、`develop`、現在の`HEAD`を補完することはありません。
 `tag_create`にも`project`、`tag`、明示的なliteral branch名または完全な40桁commit SHAの`source`が必要です。Providerが明示的なTag作成元に対応する場合、Moyaiは無変更で転送します。
+# Repository stash連携
+
+MCP Tool `repository_stash_push` / `repository_stash_list` / `repository_stash_apply` / `repository_stash_drop`は設定済みRepository Providerへ委譲します。`repository_stash_push`の`paths`はRepository相対pathの配列で、省略時は全変更を退避します。適用・削除ではlist/pushが返す完全なstash object IDを指定します。Assertion scopeは一覧が`repository.read`、変更操作が`repository.stash.write`です。
+
+CLI例: `moyaictl repository-stash-push --project Buckettie --message "split changes" --paths "src/a.cs,docs/readme.md"`、`moyaictl repository-stash-list --project Buckettie`、`moyaictl repository-stash-apply --project Buckettie --stash-id <40桁ID>`、`moyaictl repository-stash-drop --project Buckettie --stash-id <40桁ID>`。CLIの`paths`はカンマ区切りです。ファイル名にカンマが含まれる場合はMCPを使います。
+
+`repository_commit_selected`は`expected_head`とunified diffの`patch`をProviderへ渡し、Provider Capabilityで対応が明示される場合だけ実行します。未選択の作業ツリー変更は残り、staged変更がある場合はProvider側で拒否します。

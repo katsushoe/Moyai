@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented locally on 2026-09-07. Provider integration and isolated end-to-end verification remain pending until KelpieSSH implements the shared validator and persistent deployment status contract. Installation and publication require separate approval.
+Moyai's staged Protocol v2 adapter was implemented locally on 2026-09-07. KelpieSSH has since implemented the shared assertion validator and persistent deployment status contract. Real end-to-end deployment, status reconciliation, process-restart recovery, restricted SSH execution, and trust/replay separation still require isolated validation. Installation and publication require separate approval.
 
 ## Context
 

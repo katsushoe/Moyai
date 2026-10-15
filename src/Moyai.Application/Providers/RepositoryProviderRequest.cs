@@ -5,7 +5,7 @@ public sealed record RepositoryProviderRequest(
     string Project,
     string SourcePath,
     string RepositoryUrl,
-    string RemoteName,
+    string? RemoteName,
     RepositoryOperation Operation,
     string? Message,
     [property: System.Text.Json.Serialization.JsonIgnore] string? ServiceToken,
@@ -17,7 +17,15 @@ public sealed record RepositoryProviderRequest(
     string? BranchSource = null,
     Guid ProjectId = default,
     string? OperationId = null,
-    bool UseAssertion = false)
+    bool UseAssertion = false,
+    string[]? Paths = null,
+    string? StashId = null,
+    string? ExpectedHead = null,
+    string? Patch = null,
+    string? ProviderRepositoryId = null,
+    RepositorySettingsChanges? SettingsChanges = null)
 {
+    /// <summary>Providerの登録IDを返します。未設定時は従来のProject名です。</summary>
+    public string RepositoryId => ProviderRepositoryId ?? Project;
     public override string ToString() => $"Repository request: {Operation}";
 }

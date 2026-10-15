@@ -28,11 +28,14 @@ public sealed class ProviderRoutingService
     }
 
     /// <summary>Projectに設定されたProviderへ標準Repository操作を委譲します。</summary>
-    public async Task<RepositoryProviderResult> ExecuteAsync(string projectName, RepositoryOperation operation, string? message = null, string? branch = null, string? tag = null, string? source = null, CancellationToken cancellationToken = default)
+    public async Task<RepositoryProviderResult> ExecuteAsync(string projectName, RepositoryOperation operation, string? message = null, string? branch = null, string? tag = null, string? source = null, string[]? paths = null, string? stashId = null, string? expectedHead = null, string? patch = null, RepositorySettingsChanges? settingsChanges = null, CancellationToken cancellationToken = default)
     {
         Project project = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
         project.RequireConfiguration("sourcePath", "repositoryUrl", "repositoryProvider");
         string providerName = ProviderName(project.RepositoryProvider);
+        bool settingsOperation = operation is RepositoryOperation.SettingsGet or RepositoryOperation.SettingsUpdate;
+        if (settingsOperation && providerName != "githubbie") return Failure(operation, "provider_capability_missing", "Settings contract is not confirmed for this Provider.");
+        if (operation == RepositoryOperation.SettingsUpdate && settingsChanges is null) return Failure(operation, "repository_settings_invalid", "Settings changes are required.");
         if (!_providers.TryGetValue(providerName, out IRepositoryProvider? provider))
         {
             return Failure(operation, "provider_unavailable", $"Repository provider '{providerName}' is unavailable.");
@@ -42,6 +45,8 @@ public sealed class ProviderRoutingService
         bool legacy;
         try { legacy = _authentication.UseLegacy(_timeProvider); }
         catch (ProviderAuthenticationException exception) { return Failure(operation, exception.Code, exception.Code); }
+        if (settingsOperation && legacy) return Failure(operation, "auth_scope_denied", "Settings operations require Project-bound assertions.");
+        if (operation == RepositoryOperation.BranchSwitch && legacy) return Failure(operation, "auth_scope_denied", "Branch switching requires Project-bound assertions.");
         if (legacy && IsMutation(operation))
         {
             ServiceToken? token = await _tokens.FindByAudienceAsync(providerName, cancellationToken).ConfigureAwait(false);
@@ -60,10 +65,10 @@ public sealed class ProviderRoutingService
             tokenValue = token.Token;
         }
 
-        ValidateArguments(operation, message, branch, tag, source);
-        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source, project.Id, Guid.NewGuid().ToString("N"), !legacy);
+        ValidateArguments(operation, message, branch, tag, source, paths, stashId, expectedHead, patch);
+        var request = new RepositoryProviderRequest(project.Name, project.SourcePath, project.RepositoryUrl, project.GitRemoteName, operation, message, tokenValue, branch, tag, project.GitDefaultBranch, project.GitUserName, project.GitUserEmail, source, project.Id, Guid.NewGuid().ToString("N"), !legacy, paths, stashId, expectedHead, patch, project.ProviderRepositoryId, settingsChanges);
         RepositoryProviderResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
-        if (!legacy && result.ErrorCode == "auth_assertion_expired")
+        if (!legacy && !result.ResultUnknown && result.ErrorCode == "auth_assertion_expired")
         {
             // Re-read persisted authorization; retry only if the complete execution context remains unchanged.
             Project current = await _projects.GetRequiredAsync(projectName, cancellationToken).ConfigureAwait(false);
@@ -78,15 +83,43 @@ public sealed class ProviderRoutingService
     private static RepositoryProviderResult Failure(RepositoryOperation operation, string code, string message) =>
         new(false, operation.ContractName(), null, code, message);
 
-    private static bool IsMutation(RepositoryOperation operation) => operation is RepositoryOperation.Commit or RepositoryOperation.Push or RepositoryOperation.Pull or RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush;
+    /// <summary>設定要求を検証し、秘密のない型付き結果を返します。</summary>
+    public async Task<RepositorySettingsResult> ExecuteSettingsAsync(string project, IReadOnlyDictionary<string, System.Text.Json.JsonElement>? changes = null, CancellationToken cancellationToken = default)
+    {
+        RepositoryOperation operation = changes is null ? RepositoryOperation.SettingsGet : RepositoryOperation.SettingsUpdate;
+        RepositorySettingsChanges? validated;
+        try { validated = changes is null ? null : RepositorySettingsChanges.Create(changes); }
+        catch (ArgumentException) { return RepositorySettingsResult.Failure(project, operation, "repository_settings_invalid"); }
+        RepositoryProviderResult result = await ExecuteAsync(project, operation, cancellationToken: cancellationToken, settingsChanges: validated).ConfigureAwait(false);
+        return RepositorySettingsResult.Parse(project, operation, result);
+    }
 
-    private static void ValidateArguments(RepositoryOperation operation, string? message, string? branch, string? tag, string? source)
+    private static bool IsMutation(RepositoryOperation operation) => operation is RepositoryOperation.Commit or RepositoryOperation.CommitSelected or RepositoryOperation.Push or RepositoryOperation.Pull or RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush or RepositoryOperation.StashPush or RepositoryOperation.StashApply or RepositoryOperation.StashDrop;
+
+    private static void ValidateArguments(RepositoryOperation operation, string? message, string? branch, string? tag, string? source, string[]? paths, string? stashId, string? expectedHead, string? patch)
     {
         if (operation == RepositoryOperation.Commit) ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        if (operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete) ArgumentException.ThrowIfNullOrWhiteSpace(branch);
+        if (operation == RepositoryOperation.CommitSelected)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(message);
+            ArgumentNullException.ThrowIfNull(expectedHead);
+            ArgumentException.ThrowIfNullOrWhiteSpace(patch);
+            if (message.Length > 4096 || patch.Length > 4 * 1024 * 1024
+                || (expectedHead is not null && expectedHead.Length != 0 && (expectedHead.Length is < 40 or > 64 || !expectedHead.All(Uri.IsHexDigit))))
+                throw new ArgumentException("Selected commit arguments are invalid.");
+        }
+        if (operation == RepositoryOperation.StashPush) ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        if (operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch) ArgumentException.ThrowIfNullOrWhiteSpace(branch);
         if (operation == RepositoryOperation.BranchCreate) ValidateBranchSource(source);
         if (operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) ArgumentException.ThrowIfNullOrWhiteSpace(tag);
         if (operation == RepositoryOperation.TagCreate) ValidateBranchSource(source);
+        if (operation == RepositoryOperation.StashPush && message is { Length: > 256 }) throw new ArgumentException("Stash message must be 256 characters or fewer.", nameof(message));
+        if (operation is RepositoryOperation.StashApply or RepositoryOperation.StashDrop)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(stashId);
+            if (stashId.Length != 40 || !stashId.All(Uri.IsHexDigit)) throw new ArgumentException("Stash ID must be a full 40-character object ID.", nameof(stashId));
+        }
+        if (operation == RepositoryOperation.StashPush && paths is { Length: > 128 }) throw new ArgumentException("At most 128 paths may be selected.", nameof(paths));
     }
 
     private static void ValidateBranchSource(string? source)

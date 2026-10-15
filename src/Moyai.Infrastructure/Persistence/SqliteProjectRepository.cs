@@ -78,7 +78,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
                     description=$description, build_config_json=$build_config,
                     git_user_name=$git_name, git_user_email=$git_email, git_remote_name=$remote,
                     git_default_branch=$default_branch, updated_at=$updated, archived_at=$archived,
-                    revision=$revision
+                    revision=$revision, provider_repository_id=$provider_repository_id
                 WHERE id=$id AND revision=$expected_revision;
                 """;
             AddMutableParameters(command, project);
@@ -128,8 +128,8 @@ public sealed class SqliteProjectRepository : IProjectRepository
         await using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO projects(id,name,description,source_path,install_path,repository_url,repository_provider,build_provider,build_config_json,deploy_mode,git_user_name,git_user_email,git_remote_name,git_default_branch,created_at,updated_at,archived_at,revision)
-            VALUES($id,$name,$description,$source,$install,$repository_url,$repository_provider,$build_provider,$build_config,$deploy_mode,$git_name,$git_email,$remote,$default_branch,$created,$updated,$archived,$revision);
+            INSERT INTO projects(id,name,description,source_path,install_path,repository_url,repository_provider,build_provider,build_config_json,deploy_mode,git_user_name,git_user_email,git_remote_name,git_default_branch,created_at,updated_at,archived_at,revision,provider_repository_id)
+            VALUES($id,$name,$description,$source,$install,$repository_url,$repository_provider,$build_provider,$build_config,$deploy_mode,$git_name,$git_email,$remote,$default_branch,$created,$updated,$archived,$revision,$provider_repository_id);
             """;
         AddMutableParameters(command, project);
         command.Parameters.AddWithValue("$id", Format(project.Id));
@@ -150,8 +150,9 @@ public sealed class SqliteProjectRepository : IProjectRepository
         command.Parameters.AddWithValue("$build_config", Value(project.BuildConfigJson));
         command.Parameters.AddWithValue("$git_name", Value(project.GitUserName));
         command.Parameters.AddWithValue("$git_email", Value(project.GitUserEmail));
-        command.Parameters.AddWithValue("$remote", project.GitRemoteName);
+        command.Parameters.AddWithValue("$remote", Value(project.GitRemoteName));
         command.Parameters.AddWithValue("$default_branch", Value(project.GitDefaultBranch));
+        command.Parameters.AddWithValue("$provider_repository_id", Value(project.ProviderRepositoryId));
         command.Parameters.AddWithValue("$updated", Format(project.UpdatedAt));
         command.Parameters.AddWithValue("$archived", project.ArchivedAt is null ? DBNull.Value : Format(project.ArchivedAt.Value));
         command.Parameters.AddWithValue("$revision", project.Revision);
@@ -177,12 +178,12 @@ public sealed class SqliteProjectRepository : IProjectRepository
     }
 
     private static Project Read(SqliteDataReader reader) => Project.RestoreState(
-        Guid.Parse(reader.GetString(0), CultureInfo.InvariantCulture), reader.GetString(1), Optional(reader, 2), reader.GetString(3), Optional(reader, 4), reader.GetString(5), reader.GetString(6), reader.GetString(7), Optional(reader, 8), reader.GetString(9), Optional(reader, 10), Optional(reader, 11), reader.GetString(12), Optional(reader, 13), Parse(reader.GetString(14)), Parse(reader.GetString(15)), reader.IsDBNull(16) ? null : Parse(reader.GetString(16)), reader.GetInt64(17));
+        Guid.Parse(reader.GetString(0), CultureInfo.InvariantCulture), reader.GetString(1), Optional(reader, 2), reader.GetString(3), Optional(reader, 4), reader.GetString(5), reader.GetString(6), reader.GetString(7), Optional(reader, 8), reader.GetString(9), Optional(reader, 10), Optional(reader, 11), Optional(reader, 12), Optional(reader, 13), Parse(reader.GetString(14)), Parse(reader.GetString(15)), reader.IsDBNull(16) ? null : Parse(reader.GetString(16)), reader.GetInt64(17), Optional(reader, 18));
 
     private static object Value(string? value) => value is null ? DBNull.Value : value;
     private static string? Optional(SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
     private static string Format(Guid value) => value.ToString("D", CultureInfo.InvariantCulture);
     private static string Format(DateTimeOffset value) => value.ToString("O", CultureInfo.InvariantCulture);
     private static DateTimeOffset Parse(string value) => DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-    private const string SelectSql = "SELECT id,name,description,source_path,install_path,repository_url,repository_provider,build_provider,build_config_json,deploy_mode,git_user_name,git_user_email,git_remote_name,git_default_branch,created_at,updated_at,archived_at,revision FROM projects";
+    private const string SelectSql = "SELECT id,name,description,source_path,install_path,repository_url,repository_provider,build_provider,build_config_json,deploy_mode,git_user_name,git_user_email,git_remote_name,git_default_branch,created_at,updated_at,archived_at,revision,provider_repository_id FROM projects";
 }

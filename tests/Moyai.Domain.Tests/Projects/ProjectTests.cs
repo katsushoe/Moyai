@@ -11,7 +11,7 @@ public sealed class ProjectTests
     {
         Project project = Project.Create("Moyai", "source", "install", repositoryUrl, null, "csharp", "local", TimeProvider.System);
         Assert.Equal(expectedProvider, project.RepositoryProvider);
-        Assert.Equal("origin", project.GitRemoteName);
+        Assert.Null(project.GitRemoteName);
         Assert.Equal(1, project.Revision);
     }
 
@@ -43,5 +43,15 @@ public sealed class ProjectTests
         Assert.Equal("https://bitbucket.org/example/repo", project.RepositoryUrl);
         Assert.Equal("bitbucket", project.RepositoryProvider);
         Assert.Equal(2, project.Revision);
+    }
+
+    [Fact]
+    public void UpdateAllowsNullRemoteNameForAutomaticResolution()
+    {
+        Project project = Project.Create("Moyai", "source", null, "https://github.com/example/repo", null, "csharp", "server", TimeProvider.System);
+
+        project.Update("Moyai", null, null, null, null, null, null, null, null, TimeProvider.System);
+
+        Assert.Null(project.GitRemoteName);
     }
 }

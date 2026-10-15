@@ -64,7 +64,7 @@ public sealed class LifecycleService
         string? token = usesAssertion ? null : await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
         var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token,
             artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256, project.RepositoryUrl,
-            cancellation => IsSameContextAsync(project, cancellation));
+            cancellation => IsSameContextAsync(project, cancellation), project.ProviderRepositoryId);
         LifecycleResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         await _events.WriteAsync(project.Id, action, result, actorType, actorName, cancellationToken).ConfigureAwait(false);
         return result;

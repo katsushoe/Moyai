@@ -69,8 +69,13 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<Project> ProjectRename(string currentName, string name, long expectedRevision, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
         projects.RenameAsync(currentName, name, expectedRevision, actorType, actorName, cancellationToken);
 
+    /// <summary>Project名を保持したままProvider登録IDを設定または解除します。</summary>
+    [McpServerTool(Name = "project_provider_repository_set"), Description("Sets or clears the Provider Repository ID mapping without renaming the Project. Requires expectedRevision and records an audit event. Specify providerRepositoryId or clearMapping=true.")]
+    public Task<Project> ProjectProviderRepositorySet(string project, long expectedRevision, string? providerRepositoryId = null, bool clearMapping = false, string actorType = "client", string actorName = "unspecified", CancellationToken cancellationToken = default) =>
+        projects.SetProviderRepositoryAsync(project, expectedRevision, providerRepositoryId, clearMapping, actorType, actorName, cancellationToken);
+
     [McpServerTool(Name = "project_update"), Description("Updates a Moyai project using optimistic concurrency and records an audit event.")]
-    public Task<Project> ProjectUpdate(string currentName, string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
+    public Task<Project> ProjectUpdate(string currentName, string name, string? repositoryUrl, string? repositoryProvider, string? description, string? buildConfigJson, string? gitUserName, string? gitUserEmail, string? gitRemoteName, string? gitDefaultBranch, long expectedRevision, string actorType, string actorName, CancellationToken cancellationToken = default) =>
         projects.UpdateAsync(new UpdateProjectCommand(currentName, name, repositoryUrl, repositoryProvider, description, buildConfigJson, gitUserName, gitUserEmail, gitRemoteName, gitDefaultBranch, expectedRevision, actorType, actorName), cancellationToken);
 
     [McpServerTool(Name = "project_set_archived"), Description("Archives or restores a Moyai project using optimistic concurrency.")]
@@ -159,11 +164,29 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "provider_capabilities", ReadOnly = true), Description("Returns Repository Provider capabilities for negotiation before optional operations.")]
     public Task<RepositoryProviderResult> ProviderCapabilities(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.ProviderCapabilities, cancellationToken: cancellationToken));
 
+    /// <summary>Provider登録設定を読み取り、秘密を含まない結果を返します。</summary>
+    [McpServerTool(Name = "repository_settings_get", ReadOnly = true), Description("Reads eight non-secret registered Repository settings through the agreed Githubie assertion route. Does not change Git or Provider settings.")]
+    public Task<RepositorySettingsResult> RepositorySettingsGet(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, cancellationToken: cancellationToken));
+
+    /// <summary>指定設定だけをProviderの人による承認後に更新します。</summary>
+    [McpServerTool(Name = "repository_settings_update", Destructive = true), Description("Partially updates explicit settings through Githubie with repository.settings.write and Provider human approval. Omitted fields stay omitted; unknown outcomes require a read before another update.")]
+    public Task<RepositorySettingsResult> RepositorySettingsUpdate(string project, Dictionary<string, System.Text.Json.JsonElement> changes, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, changes ?? throw new ArgumentNullException(nameof(changes)), cancellationToken));
+
     [McpServerTool(Name = "repository_diff", ReadOnly = true), Description("Gets repository diff through the Provider configured for a Moyai-managed project.")]
     public Task<RepositoryProviderResult> RepositoryDiff(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Diff, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "repository_commit"), Description("Commits a Moyai-managed repository through its configured Provider using internal service authentication.")]
     public Task<RepositoryProviderResult> RepositoryCommit(string project, string message, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Commit, message, cancellationToken: cancellationToken));
+    [McpServerTool(Name = "repository_commit_selected"), Description("Commits only a selected unified diff patch using the configured repository Provider.")]
+    public Task<RepositoryProviderResult> RepositoryCommitSelected(string project, string message, string expectedHead, string patch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.CommitSelected, message, expectedHead: expectedHead, patch: patch, cancellationToken: cancellationToken));
+    [McpServerTool(Name = "repository_stash_push"), Description("Stashes all changes or changes under the selected repository-relative paths.")]
+    public Task<RepositoryProviderResult> RepositoryStashPush(string project, string message, string[]? paths = null, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashPush, message: message, cancellationToken: cancellationToken, paths: paths));
+    [McpServerTool(Name = "repository_stash_list", ReadOnly = true), Description("Lists saved repository stashes.")]
+    public Task<RepositoryProviderResult> RepositoryStashList(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashList, cancellationToken: cancellationToken));
+    [McpServerTool(Name = "repository_stash_apply"), Description("Applies a stash identified by its full object ID.")]
+    public Task<RepositoryProviderResult> RepositoryStashApply(string project, string stashId, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashApply, cancellationToken: cancellationToken, stashId: stashId));
+    [McpServerTool(Name = "repository_stash_drop"), Description("Drops a stash identified by its full object ID.")]
+    public Task<RepositoryProviderResult> RepositoryStashDrop(string project, string stashId, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.StashDrop, cancellationToken: cancellationToken, stashId: stashId));
 
     [McpServerTool(Name = "repository_push"), Description("Pushes a Moyai-managed repository through its configured Provider using internal service authentication.")]
     public Task<RepositoryProviderResult> RepositoryPush(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.Push, cancellationToken: cancellationToken));
@@ -179,6 +202,10 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
 
     [McpServerTool(Name = "branch_delete", Destructive = true), Description("Deletes an allowed branch through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken));
+
+    /// <summary>対応Providerで既存local branchへ切り替え、作成やfetchは行いません。</summary>
+    [McpServerTool(Name = "branch_switch", Destructive = true), Description("Switches to an existing local branch through the configured Provider with repository.branch.write. Requires explicit capability and a clean working tree; never fetches or creates branches.")]
+    public Task<RepositoryProviderResult> BranchSwitch(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchSwitch, branch: branch, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "tag_create"), Description("Creates a tag through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> TagCreate(string project, string tag, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.TagCreate, tag: tag, source: source, cancellationToken: cancellationToken));

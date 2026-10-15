@@ -1,5 +1,11 @@
 # Moyai設定
 
+## branch切替の認可（開発版1.3.12.0）
+
+Providerがbranch_switch対応を明示し、管理者が有効化を承認した後、各assertionToolScopesへgithub_branch_switch: [repository.branch.write]またはbuckettie_branch_switch: [repository.branch.write]を設定します。Buckettieの設定prefixはbitbucketのままで、この操作だけbuckettie_branch_switchへ解決します。BuckettieはMoyai連携モードが必要です。実装時に稼働scope・署名鍵・DB・サービスアカウントは変更しません。[ADR0013](docs/adr/0013-provider-branch-switch.md)を参照してください。
+
+設定Consumer（開発版1.3.11.0）はGithubieの`repository_settings_read/update` capabilityを必須とします。対応Provider版が利用可能になり所有者が許可した後、Assertion Tool scopeを`github_repository_settings_get: [repository.read]`、`github_repository_settings_update: [repository.settings.write]`として設定します。commit/push scopeやlegacy tokenで代替しません。実装で稼働設定は変更しません。Buckettie設定は合意待ちで拒否します。Providerが保存と人の承認を管理します。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+
 Repository認証の既定はES256 Assertionです。未構成時は操作を拒否します。[Provider認証設定・鍵初期化・移行手順](docs/specifications/provider-authentication-operations.md)を参照してください。静的Repository Tokenは最大7日の明示的な移行期間に限ります。
 
 [English](CONFIG.md) | [日本語](CONFIG.ja.md)
@@ -35,6 +41,14 @@ MCPクライアント登録は対象ユーザープロファイルを指定し�
 Server配備Targetの`kelpieTarget`にはKelpieSSHの不変Target IDを設定し、配備先Pathを指定します。配備ArtifactはSHA-256付きの単一Fileが必要です。Protocol v2の固定Scopeは[Provider認証の実装・運用Contract](docs/specifications/provider-authentication-operations.md)を参照してください。
 
 Projectの`build_config_json`では`configuration`と`artifacts`配列（`name`、`artifact_type`、Project相対の`file_path`）を指定します。配備先は既存のProject設定を使用します。
+
+## ProjectのProvider Repository対応付け
+
+Projectの `providerRepositoryId` はサービスJSONではなく `projects.provider_repository_id` に保存します。Moyai Project名とは別に、既存のProvider登録IDを指定します。現在のProject revisionを指定して `project_provider_repository_set` または `moyaictl project-provider-repository-set` で登録・更新し、`project_get`／Project一覧で照会します。[ADR 0011](docs/adr/0011-provider-repository-id.md)を参照してください。
+
+未設定の場合は互換性のためProviderの `repository` 引数へ従来どおりProject名を渡します。IDの大文字小文字を保持し、1～128文字のASCII英数字・アンダースコア・ハイフン・ドットだけを使い、先頭は英数字とします。`clearMapping=true` で明示解除できます。IDの省略／nullだけでは解除しません。通常のProject更新・configure・rename・archiveは対応付けを保持します。
+
+schema v7でnullable列を追加し、Project UUID・名前・revision・関連WorkItemを変更しません。既存の移行バックアップとトランザクション規則を使います。Repository操作とRepositoryを使うRelease操作は登録IDを使い、AssertionのUUID・正規化Repository URL・audience・scopeを維持します。対応付けの保存だけでProvider登録や別Repositoryへの認可を行わず、誤ったProvider対応付けは委譲時に拒否します。
 
 ## インストール・移行
 

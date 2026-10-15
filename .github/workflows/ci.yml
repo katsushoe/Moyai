@@ -30,6 +30,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Read product version
+        id: product-version
+        shell: pwsh
+        run: |
+          [xml]$buildProperties = Get-Content -LiteralPath .\Directory.Build.props -Raw
+          $productVersion = [string]$buildProperties.Project.PropertyGroup.Version
+          if ($productVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw 'Expected a four-part product version.' }
+          "version=$productVersion" >> $env:GITHUB_OUTPUT
+
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v5
         with:
@@ -49,12 +58,12 @@ jobs:
 
       - name: Build MSI installer
         shell: pwsh
-        run: .\scripts\Build-Installer.ps1 -Version 1.3.8.0
+        run: .\scripts\Build-Installer.ps1 -Version '${{ steps.product-version.outputs.version }}'
 
       - name: Upload MSI installer
         uses: actions/upload-artifact@v4
         with:
-          name: Moyai-1.3.8.0-win-x64
-          path: artifacts/installer/Moyai-1.3.8.0-x64.msi
+          name: Moyai-${{ steps.product-version.outputs.version }}-win-x64
+          path: artifacts/installer/Moyai-${{ steps.product-version.outputs.version }}-x64.msi
           if-no-files-found: error
           retention-days: 14

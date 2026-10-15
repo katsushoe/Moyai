@@ -43,25 +43,40 @@ public sealed class SqliteMigrationRunner
 
     private static async Task ApplyAsync(SqliteConnection connection, SqliteMigration migration, CancellationToken cancellationToken)
     {
-        await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        if (migration.DisableForeignKeys) await SetForeignKeysAsync(connection, false, cancellationToken).ConfigureAwait(false);
         try
         {
-            await using SqliteCommand command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = migration.Sql;
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            await using SqliteCommand versionCommand = connection.CreateCommand();
-            versionCommand.Transaction = transaction;
-            versionCommand.CommandText = "DELETE FROM schema_version; INSERT INTO schema_version(version) VALUES ($version);";
-            versionCommand.Parameters.AddWithValue("$version", migration.Version);
-            await versionCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await using SqliteCommand command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = migration.Sql;
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                await using SqliteCommand versionCommand = connection.CreateCommand();
+                versionCommand.Transaction = transaction;
+                versionCommand.CommandText = "DELETE FROM schema_version; INSERT INTO schema_version(version) VALUES ($version);";
+                versionCommand.Parameters.AddWithValue("$version", migration.Version);
+                await versionCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                throw;
+            }
         }
-        catch
+        finally
         {
-            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
+            if (migration.DisableForeignKeys) await SetForeignKeysAsync(connection, true, CancellationToken.None).ConfigureAwait(false);
         }
+    }
+
+    private static async Task SetForeignKeysAsync(SqliteConnection connection, bool enabled, CancellationToken cancellationToken)
+    {
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = enabled ? "PRAGMA foreign_keys=ON;" : "PRAGMA foreign_keys=OFF;";
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> GetVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)

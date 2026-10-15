@@ -4,6 +4,35 @@
 
 ## 未公開
 
+## 1.3.12.0 - 2026-10-14（開発ビルド）
+
+- Githubie/Buckettie経由で既存local branchへ切り替える、状態変更MCP/CLI操作を追加します。
+- 明示capabilityとProject単位のrepository.branch.writeを必須とし、branch拒否コードと結果不明を保持して自動再送しません。
+- 稼働設定・実Repositoryは変更していません。実Providerでのbranch切替受入は未完了です。
+
+## 1.3.11.0 - 2026-10-14（開発ビルド）
+
+- 合意済みGithubie契約の設定読取・部分更新をMCP/CLIへ追加し、省略とfalse/配列の明示値を保持します。
+- 設定capability、Project Assertion、専用write scope、Providerの人の承認を必須とし、未合意Buckettieとlegacy経路を拒否します。
+- 非秘密の登録設定8項目だけを返し、更新結果不明は自動再試行せず、再更新前に読取で確認します。
+- 稼働環境へ未導入・公開Release前です。両Providerの結合確認は未完了です。
+
+## 1.3.10.0 - 2026-10-14（開発ビルド）
+
+- schema v7でProject単位のnullable Provider Repository IDを保存します。未設定時は従来のProject名を使い、UUIDと関連データを維持します。
+- 楽観的排他制御と監査を使う `project_provider_repository_set`／`project-provider-repository-set` を追加し、対応付けの登録・更新・明示解除を提供します。
+- RepositoryとRepositoryを使うRelease Toolへ登録IDを転送し、Project名と署名付きUUID・正規化Repository URL・audience・scopeを維持します。
+- 開発ビルドの記録であり、稼働環境への導入や公開Releaseではありません。
+
+## 1.3.9.0 - 2026-10-08（ローカルパッケージ）
+
+- `Project.GitRemoteName`を省略可能にしました。schema v6で`projects`表を再構築し、保存済みの`origin`を`null`（自動解決）へ変換し、それ以外の名前は明示指定として保持します。
+- Providerが`remote_resolution` version 1／`repository_url`を表明した場合だけ、`gitRemoteName`をProviderの`remote`引数として転送します。対象はGithubie・Buckettieの`repository_status`とBuckettieの`repository_commit`です。Githubieのcommitとその他の操作には`remote`を送りません。
+- Providerのエラーコード`provider_remote_not_found`、`provider_remote_ambiguous`、`provider_remote_mismatch`をそのまま返します。
+- Build開始時に`local_head`をSource Commitとして読み取り、`dirty`／`is_dirty`がない場合は`working_tree_clean=false`をDirtyとして扱います。
+- 隔離AC37 runtime（2026-10-07／08）は、表示版1.3.8.0のままこのコードを実行していました。
+- ローカルインストール用パッケージであり、公開Releaseではありません。
+
 ## 1.3.8.0 - 2026-09-27（ローカルパッケージ）
 
 - BuckettieのRelease照会・作成・公開・取り下げにTool単位のProvider Assertionを付与し、旧方式の静的`release.write` Service Tokenを要求しないようにしました。
