@@ -25,8 +25,9 @@ public sealed class AssertionHttpHandler(HttpClient client, IAssertionIssuer iss
             using JsonDocument document = JsonDocument.Parse(body);
             if (document.RootElement.TryGetProperty("method", out JsonElement method) && method.GetString() == "tools/call")
             {
+                string? toolName = document.RootElement.GetProperty("params").GetProperty("name").GetString();
                 if (Interlocked.Exchange(ref _callSent, 1) != 0) throw new ProviderAuthenticationException("authentication_unavailable");
-                if (document.RootElement.GetProperty("params").GetProperty("name").GetString() != context.Tool)
+                if (toolName != context.Tool)
                     throw new ProviderAuthenticationException("auth_scope_denied");
                 SignedAssertion assertion = await issuer.IssueAsync(context, cancellationToken).ConfigureAwait(false);
                 KeyId = assertion.KeyId;
@@ -37,7 +38,11 @@ public sealed class AssertionHttpHandler(HttpClient client, IAssertionIssuer iss
                 outbound.Headers.Add("X-Moyai-Operation-Id", context.OperationId);
             }
         }
-        try { return await client.SendAsync(outbound, cancellationToken).ConfigureAwait(false); }
+        try
+        {
+            HttpResponseMessage response = await client.SendAsync(outbound, cancellationToken).ConfigureAwait(false);
+            return response;
+        }
         finally { outbound.Headers.Authorization = null; }
     }
 

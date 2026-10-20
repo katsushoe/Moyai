@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+## 1.3.13.1 - 2026-10-20 (local package)
+
+- Preserve the assertion request guard when a `tools/call` payload is malformed.
+- This entry describes a local installation package, not a public release.
+
 ## 1.3.12.0 - 2026-10-14 (development build)
 
 - Add destructive branch-switch MCP/CLI routing to existing local branches through Githubie or Buckettie.
