@@ -1,8 +1,14 @@
 # MCP Setup
 
+The development Githubie Settings extension accepts `changes.local_commit_branches` through the existing `repository_settings_update` object; no new MCP/CLI tool or scope is added. Values are exact replacement arrays, including explicit empty arrays. GET omits this optional field if the Provider omits it. Buckettie retains the common eight-field contract. Provider human approval and the installed Settings tool-scope mappings remain mandatory; source publication does not enable them.
+
+Buckettie Diff remote forwarding uses the existing `repository_diff` tool and `repository.read` assertion. There is no additional client input or scope grant: select a registered Project and verify its remote-resolution capability/configuration as described in [CONFIG](CONFIG.md). Explicit remote rejection never falls back to origin. Githubie Diff forwarding remains excluded; publish does not establish installed or live acceptance. See [ADR0016](docs/adr/0016-buckettie-diff-remote.md).
+
 [English](MCP_SETUP.md) | [日本語](MCP_SETUP.ja.md)
 
 ## Values and Placeholders
+
+Repository Settings uses the same `repository_settings_get/update` tools for both Githubie and Buckettie. The registered Project selects the Provider and Repository binding. Before enabling it, verify exact capability flags, assertion trust and dedicated read/write scopes in [CONFIG](CONFIG.md). Buckettie reads and updates require Moyai integration mode. Updates require Provider human approval; unknown outcomes need a separate read, never automatic replay. Publishing does not change installed configuration or scopes.
 
 | Value | How to obtain | Example | Change when |
 | :--- | :--- | :--- | :--- |

@@ -165,11 +165,11 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<RepositoryProviderResult> ProviderCapabilities(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.ProviderCapabilities, cancellationToken: cancellationToken));
 
     /// <summary>Provider登録設定を読み取り、秘密を含まない結果を返します。</summary>
-    [McpServerTool(Name = "repository_settings_get", ReadOnly = true), Description("Reads eight non-secret registered Repository settings through the agreed Githubie assertion route. Does not change Git or Provider settings.")]
+    [McpServerTool(Name = "repository_settings_get", ReadOnly = true), Description("Reads eight common registered Repository settings and Githubie's optional local_commit_branches through the Project-bound assertion route. Does not change Git or Provider settings.")]
     public Task<RepositorySettingsResult> RepositorySettingsGet(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, cancellationToken: cancellationToken));
 
     /// <summary>指定設定だけをProviderの人による承認後に更新します。</summary>
-    [McpServerTool(Name = "repository_settings_update", Destructive = true), Description("Partially updates explicit settings through Githubie with repository.settings.write and Provider human approval. Omitted fields stay omitted; unknown outcomes require a read before another update.")]
+    [McpServerTool(Name = "repository_settings_update", Destructive = true), Description("Partially updates agreed settings with repository.settings.write and Provider human approval. Githubie additionally accepts local_commit_branches as an exact replacement string array; Buckettie retains the eight common fields. Omitted fields stay omitted; unknown outcomes require a read before another update.")]
     public Task<RepositorySettingsResult> RepositorySettingsUpdate(string project, Dictionary<string, System.Text.Json.JsonElement> changes, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, changes ?? throw new ArgumentNullException(nameof(changes)), cancellationToken));
 
     [McpServerTool(Name = "repository_diff", ReadOnly = true), Description("Gets repository diff through the Provider configured for a Moyai-managed project.")]
@@ -197,8 +197,17 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "branch_list", ReadOnly = true), Description("Lists branches through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchList(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchList, cancellationToken: cancellationToken));
 
+    /// <summary>明示したsource/destinationでProviderへPR作成を要求します。</summary>
+    [McpServerTool(Name = "pull_request_create", Destructive = true, OpenWorld = true), Description("Creates a pull request on an explicit source/destination route through the configured Provider. Requires dedicated capability and Provider-specific PR write assertion. Does not alter route policy, push, merge or retry an unknown outcome.")]
+    public Task<PullRequestResult> PullRequestCreate(string project, string sourceBranch, string destinationBranch, string title, string description, bool draft, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecutePullRequestAsync(project, new(sourceBranch, destinationBranch, title, description, draft), cancellationToken));
+
     [McpServerTool(Name = "branch_create"), Description("Creates a branch through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchCreate(string project, string branch, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchCreate, branch: branch, source: source, cancellationToken: cancellationToken));
+
+    /// <summary>明示sourceからlocal branchだけを作成し、checkoutやremote操作は行いません。</summary>
+    [McpServerTool(Name = "branch_create_local", Destructive = true), Description("Creates only a local branch from an explicit local branch, tag or full 40-character SHA. Requires local_branch_create capability, Project-bound repository.branch.write and a clean tree; never checks out, fetches or creates a remote branch.")]
+    public Task<RepositoryProviderResult> BranchCreateLocal(string project, string branch, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchCreateLocal, branch: branch, source: source, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "branch_delete", Destructive = true), Description("Deletes an allowed branch through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken));

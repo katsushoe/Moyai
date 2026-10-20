@@ -51,9 +51,28 @@ public static class RepositoryProviderResponse
         };
     }
 
-    private static RepositoryProviderResult Failure(string operation, string? detail) =>
-        new(false, operation, null, operation == "branch_switch" ? RepositoryProviderContract.NormalizeBranchSwitchError(detail) : RepositoryProviderContract.NormalizeErrorCode(detail), detail,
-            operation is "repository_settings_update" or "branch_switch" && UnknownOutcome(detail));
+    private static RepositoryProviderResult Failure(string operation, string? detail)
+    {
+        if (operation is "branch_create_local" or "pull_request_create" && !HasTypedError(detail)) return Invalid(operation, detail ?? "Provider returned no error detail.");
+        return new(false, operation, null, operation switch
+        {
+            "branch_create_local" => RepositoryProviderContract.NormalizeLocalBranchError(detail),
+            "pull_request_create" => RepositoryProviderContract.NormalizeLocalBranchError(detail),
+            "branch_switch" => RepositoryProviderContract.NormalizeBranchSwitchError(detail),
+            _ => RepositoryProviderContract.NormalizeErrorCode(detail),
+        }, detail, operation is "repository_settings_update" or "branch_switch" or "branch_create_local" or "pull_request_create" && UnknownOutcome(detail));
+    }
+
+    private static bool HasTypedError(string? detail)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(detail ?? "null");
+            JsonElement code = document.RootElement.GetProperty("error").GetProperty("code");
+            return code.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(code.GetString());
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
 
     private static bool UnknownOutcome(string? detail)
     {
@@ -66,5 +85,5 @@ public static class RepositoryProviderResponse
     }
 
     private static RepositoryProviderResult Invalid(string operation, string detail) =>
-        new(false, operation, null, "provider_invalid_response", detail, operation is "repository_settings_update" or "branch_switch");
+        new(false, operation, null, "provider_invalid_response", detail, operation is "repository_settings_update" or "branch_switch" or "branch_create_local" or "pull_request_create");
 }

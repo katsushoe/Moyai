@@ -5,16 +5,22 @@ namespace Moyai.Application.Authentication;
 /// <summary>ClientがScopeを選択できないRepository操作ポリシーです。</summary>
 public static class RepositoryAssertionPolicy
 {
-    public static string Scope(RepositoryOperation operation) => operation switch
+    public static string Scope(RepositoryOperation operation, string? provider = null) => operation switch
     {
         RepositoryOperation.ProviderVersion or RepositoryOperation.ProviderCapabilities or RepositoryOperation.Status
             or RepositoryOperation.Diff or RepositoryOperation.BranchList or RepositoryOperation.StashList or RepositoryOperation.SettingsGet => "repository.read",
         RepositoryOperation.SettingsUpdate => "repository.settings.write",
+        RepositoryOperation.PullRequestCreate => provider switch
+        {
+            "githubie" or "githubbie" => "provider.githubie.pull_request.write",
+            "buckettie" => "provider.buckettie.pr_create",
+            _ => throw new ProviderAuthenticationException("auth_scope_denied"),
+        },
         RepositoryOperation.StashPush or RepositoryOperation.StashApply or RepositoryOperation.StashDrop => "repository.stash.write",
         RepositoryOperation.Commit or RepositoryOperation.CommitSelected => "repository.commit",
         RepositoryOperation.Push => "repository.push",
         RepositoryOperation.Pull => "repository.pull",
-        RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch => "repository.branch.write",
+        RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch or RepositoryOperation.BranchCreateLocal => "repository.branch.write",
         RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush => "repository.tag.write",
         _ => throw new ProviderAuthenticationException("auth_scope_denied"),
     };

@@ -1,10 +1,33 @@
 # Moyai設定
 
+## Buckettie Diffのremote指定（開発中）
+
+既存Projectの`gitRemoteName`が空白以外で、Providerが`remote_resolution`のversion1/mode `repository_url`を表明した場合だけ、同じ値をBuckettie Diffへ渡します。未設定/空白では能力確認を省略し、未対応/不正/取得失敗時は互換性のためremoteを省略します。省略した場合は指定名の検証済みとは扱いません。Githubie DiffはProviderの検証条件確認まで対象外です。新設定・既定値・DB移行・scope追加はなく、`repository.read`を使います。稼働設定やremoteは変更しません。[ADR0016](docs/adr/0016-buckettie-diff-remote.md)を参照してください。
+
+## Pull Request作成の認可（開発中）
+
+契約・対応表明の準備と運用者承認後、各Providerの`assertionToolScopes`へ正確な`"github_pr_create": ["provider.githubie.pull_request.write"]`、または`"bitbucket_pr_create": ["provider.buckettie.pr_create"]`を追加します。辞書値は文字列配列で、既定は項目なし・拒否です。既存read/commit/push権限では有効になりません。Githubieは`data.pr_create=true`、Buckettieは`data.operations.pr_create=true`とintegration_mode=moyaiを要求します。この操作の明示的な対応表明は担当側との合意・導入が必要で、Tool存在だけでは作成要求を送りません。最上位設定追加、稼働scopeやProvider許可経路の自動変更はありません。[ADR0015](docs/adr/0015-provider-pull-request-create.md)を参照してください。
+
+## ローカルブランチ作成の認可（開発中）
+
+Githubieが`data.local_branch_create=true`を返すことを確認した後、管理者は該当Providerの`assertionToolScopes`辞書へ`github_local_branch_create`を追加し、値に正確な文字列配列`["repository.branch.write"]`を指定できます。設定例：`"github_local_branch_create": ["repository.branch.write"]`。既定は項目なしで拒否します。汎用writeやリモートブランチ用の認可では有効になりません。最上位の新規キーはなく、実装時に稼働scope・鍵・アカウント・DBは変更しません。Buckettieの専用操作との対応付けは未確定のため未対応です。[ADR0014](docs/adr/0014-provider-local-branch-create.md)を参照してください。
+
 ## branch切替の認可（開発版1.3.12.0）
 
 Providerがbranch_switch対応を明示し、管理者が有効化を承認した後、各assertionToolScopesへgithub_branch_switch: [repository.branch.write]またはbuckettie_branch_switch: [repository.branch.write]を設定します。Buckettieの設定prefixはbitbucketのままで、この操作だけbuckettie_branch_switchへ解決します。BuckettieはMoyai連携モードが必要です。実装時に稼働scope・署名鍵・DB・サービスアカウントは変更しません。[ADR0013](docs/adr/0013-provider-branch-switch.md)を参照してください。
 
-設定Consumer（開発版1.3.11.0）はGithubieの`repository_settings_read/update` capabilityを必須とします。対応Provider版が利用可能になり所有者が許可した後、Assertion Tool scopeを`github_repository_settings_get: [repository.read]`、`github_repository_settings_update: [repository.settings.write]`として設定します。commit/push scopeやlegacy tokenで代替しません。実装で稼働設定は変更しません。Buckettie設定は合意待ちで拒否します。Providerが保存と人の承認を管理します。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+設定Consumerは合意済みのGithubie／Buckettie経路に対応します。真偽値の対応能力はGithubieが`data.repository_settings_read/update`、Buckettieが`data.operations.repository_settings_read/update`です。Buckettieは読取・更新ともMoyai連携モードを必要とします。対応版の準備と所有者の許可後、該当Providerの`assertionToolScopes`へ次の項目を追加します。既定は項目なしで拒否し、Upgradeで既存設定を保持します。commit/push scopeやlegacy tokenで代替せず、実装だけで稼働権限を追加しません。Providerが保存と人の承認を管理します。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+
+```json
+{
+  "bitbucket_repository_settings_get": ["repository.read"],
+  "bitbucket_repository_settings_update": ["repository.settings.write"]
+}
+```
+
+Githubieは同じscopeでTool名を`github_repository_settings_get`／`github_repository_settings_update`にします。この断片は最上位ではなく`assertionToolScopes`内の設定例です。管理者が確認して追加するもので、自動付与はしません.
+
+Githubie限定の`local_commit_branches`拡張も同じTool・scope・対応能力を使い、既定設定や権限を追加しません。指定した配列だけを置換し、Providerの承認を必要とします。Buckettieは共通8項目のままです。Settings Toolのscope対応付けがない場合はHTTP前、Providerが対応能力を返さない/falseの場合は能力照会後に`provider_capability_missing`となります。接続できるだけでは設定不足は解消しません。対象runtimeの設定と実行版を確認し、承認したscope変更は対象runtimeだけの再起動で反映します。
 
 Repository認証の既定はES256 Assertionです。未構成時は操作を拒否します。[Provider認証設定・鍵初期化・移行手順](docs/specifications/provider-authentication-operations.md)を参照してください。静的Repository Tokenは最大7日の明示的な移行期間に限ります。
 

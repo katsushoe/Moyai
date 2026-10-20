@@ -9,6 +9,8 @@ public static class RepositoryProviderContract
     public static string ToolName(string toolPrefix, RepositoryOperation operation) => operation switch
     {
         RepositoryOperation.ProviderVersion => "get_version",
+        RepositoryOperation.PullRequestCreate => $"{toolPrefix}_pr_create",
+        RepositoryOperation.BranchCreateLocal when string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) => "github_local_branch_create",
         RepositoryOperation.BranchSwitch when string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase) => "buckettie_branch_switch",
         _ => $"{toolPrefix}_{OperationName(operation)}",
     };
@@ -19,6 +21,17 @@ public static class RepositoryProviderContract
         var arguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId };
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
         if (request.Operation == RepositoryOperation.SettingsUpdate) arguments["changes"] = request.SettingsChanges?.Values ?? throw new ArgumentException("Settings changes are required.", nameof(request));
+        if (request.Operation == RepositoryOperation.PullRequestCreate)
+        {
+            PullRequestInput input = request.PullRequest ?? throw new ArgumentException("PR input is required.", nameof(request));
+            input.Validate();
+            bool github = string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase);
+            arguments[github ? "source_branch" : "sourceBranch"] = input.SourceBranch;
+            arguments[github ? "destination_branch" : "destinationBranch"] = input.DestinationBranch;
+            arguments["title"] = input.Title;
+            arguments["description"] = input.Description;
+            arguments["draft"] = input.Draft;
+        }
         if (supportsRemoteResolution && SupportsRemoteArgument(toolPrefix, request.Operation) && !string.IsNullOrWhiteSpace(request.RemoteName)) arguments["remote"] = request.RemoteName;
         if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message;
         if (request.Operation == RepositoryOperation.CommitSelected)
@@ -34,8 +47,8 @@ public static class RepositoryProviderContract
         }
         if (request.Operation is RepositoryOperation.StashApply or RepositoryOperation.StashDrop)
             arguments[string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) ? "stash_id" : "stashId"] = request.StashId;
-        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch) arguments["branch"] = request.Branch;
-        if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
+        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch or RepositoryOperation.BranchCreateLocal) arguments["branch"] = request.Branch;
+        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchCreateLocal) arguments["source"] = request.BranchSource;
         if (request.Operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) arguments["tag"] = request.Tag;
         if (request.Operation == RepositoryOperation.TagCreate)
         {
@@ -47,6 +60,46 @@ public static class RepositoryProviderContract
     }
 
     public static string OperationName(RepositoryOperation operation) => operation.ContractName();
+
+    /// <summary>Provider別の明示PR作成capabilityだけを確認します。</summary>
+    public static bool SupportsPullRequestCreate(string toolPrefix, string? output)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output ?? "null");
+            JsonElement data = document.RootElement.GetProperty("data");
+            if (string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase))
+                return data.GetProperty("operations").GetProperty("pr_create").ValueKind == JsonValueKind.True;
+            return string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) && data.GetProperty("pr_create").ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>専用のlocal branch作成能力だけを受理し、remote branch能力へ代替しません。</summary>
+    public static bool SupportsLocalBranchCreate(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output)) return false;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            JsonElement data = document.RootElement.GetProperty("data");
+            return data.TryGetProperty("local_branch_create", out JsonElement supported) && supported.ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>local branch作成の型付きProviderエラーコードを情報を落とさず保持します。</summary>
+    public static string NormalizeLocalBranchError(string? detail)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(detail ?? "null");
+            JsonElement code = document.RootElement.GetProperty("error").GetProperty("code");
+            if (code.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(code.GetString())) return code.GetString()!;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return NormalizeErrorCode(detail); }
+        return NormalizeErrorCode(detail);
+    }
 
     /// <summary>明示的なbranch切替能力だけを受理し、未指定や型不正では拒否します。</summary>
     public static bool SupportsBranchSwitch(string? output)
@@ -79,7 +132,7 @@ public static class RepositoryProviderContract
     }
 
     /// <summary>合意した設定Capabilityキーだけを確認します。</summary>
-    public static bool SupportsSettings(string? output, RepositoryOperation operation)
+    public static bool SupportsSettings(string? output, RepositoryOperation operation, string toolPrefix = "github")
     {
         string key = operation == RepositoryOperation.SettingsGet ? "repository_settings_read" : "repository_settings_update";
         if (string.IsNullOrWhiteSpace(output)) return false;
@@ -87,6 +140,8 @@ public static class RepositoryProviderContract
         {
             using JsonDocument document = JsonDocument.Parse(output);
             JsonElement data = document.RootElement.GetProperty("data");
+            if (string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase))
+                return data.GetProperty("operations").GetProperty(key).ValueKind == JsonValueKind.True;
             return data.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.True;
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
@@ -147,7 +202,7 @@ public static class RepositoryProviderContract
     public static bool SupportsRemoteArgument(string toolPrefix, RepositoryOperation operation) =>
         operation == RepositoryOperation.Status
         || operation == RepositoryOperation.CommitSelected
-        || (operation == RepositoryOperation.Commit && string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase));
+        || ((operation is RepositoryOperation.Commit or RepositoryOperation.Diff) && string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase));
 
     public static bool SupportsRemoteResolution(string? output)
     {
@@ -158,7 +213,7 @@ public static class RepositoryProviderContract
             return document.RootElement.ValueKind == JsonValueKind.Object
                 && document.RootElement.TryGetProperty("data", out JsonElement data) && data.ValueKind == JsonValueKind.Object
                 && data.TryGetProperty("remote_resolution", out JsonElement resolution) && resolution.ValueKind == JsonValueKind.Object
-                && resolution.TryGetProperty("version", out JsonElement version) && version.TryGetInt32(out int versionNumber) && versionNumber == 1
+                && resolution.TryGetProperty("version", out JsonElement version) && version.ValueKind == JsonValueKind.Number && version.TryGetInt32(out int versionNumber) && versionNumber == 1
                 && resolution.TryGetProperty("mode", out JsonElement mode) && mode.ValueKind == JsonValueKind.String
                 && string.Equals(mode.GetString(), "repository_url", StringComparison.Ordinal);
         }

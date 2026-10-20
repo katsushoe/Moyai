@@ -191,6 +191,11 @@ public sealed class McpRepositoryProviderTests
     [Theory]
     [InlineData("{\"data\":{\"remote_resolution\":{\"version\":1,\"mode\":\"repository_url\"}}}", true)]
     [InlineData("{\"data\":{\"remote_resolution\":{\"version\":2,\"mode\":\"repository_url\"}}}", false)]
+    [InlineData("{\"data\":{\"remote_resolution\":{\"version\":\"1\",\"mode\":\"repository_url\"}}}", false)]
+    [InlineData("{\"data\":{\"remote_resolution\":{\"version\":null,\"mode\":\"repository_url\"}}}", false)]
+    [InlineData("{\"data\":{\"remote_resolution\":{\"version\":true,\"mode\":\"repository_url\"}}}", false)]
+    [InlineData("{\"data\":{\"remote_resolution\":{\"version\":{},\"mode\":\"repository_url\"}}}", false)]
+    [InlineData("{\"data\":{\"remote_resolution\":null}}", false)]
     [InlineData("{\"data\":{\"remote_resolution\":{\"version\":1,\"mode\":\"other\"}}}", false)]
     [InlineData("{\"data\":{}}", false)]
     [InlineData("invalid", false)]
@@ -208,7 +213,10 @@ public sealed class McpRepositoryProviderTests
     [InlineData("github", RepositoryOperation.Status, true)]
     [InlineData("bitbucket", RepositoryOperation.Push, false)]
     [InlineData("bitbucket", RepositoryOperation.Pull, false)]
-    [InlineData("bitbucket", RepositoryOperation.Diff, false)]
+    [InlineData("bitbucket", RepositoryOperation.Diff, true)]
+    [InlineData("BITBUCKET", RepositoryOperation.Diff, true)]
+    [InlineData("github", RepositoryOperation.Diff, false)]
+    [InlineData("other", RepositoryOperation.Diff, false)]
     [InlineData("bitbucket", RepositoryOperation.BranchList, false)]
     public void CommonContractLimitsRemoteToSupportedOperations(string prefix, RepositoryOperation operation, bool expected)
     {

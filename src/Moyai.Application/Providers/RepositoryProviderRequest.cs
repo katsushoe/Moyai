@@ -23,7 +23,8 @@ public sealed record RepositoryProviderRequest(
     string? ExpectedHead = null,
     string? Patch = null,
     string? ProviderRepositoryId = null,
-    RepositorySettingsChanges? SettingsChanges = null)
+    RepositorySettingsChanges? SettingsChanges = null,
+    PullRequestInput? PullRequest = null)
 {
     /// <summary>Providerの登録IDを返します。未設定時は従来のProject名です。</summary>
     public string RepositoryId => ProviderRepositoryId ?? Project;

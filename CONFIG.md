@@ -1,5 +1,17 @@
 # Moyai configuration
 
+## Buckettie Diff remote selection (development)
+
+An existing Project `gitRemoteName` is forwarded unchanged to Buckettie Diff only when nonblank and the Provider advertises `remote_resolution` version1/mode `repository_url`. Unset/blank values skip negotiation; absent/invalid/failed/unsupported capability omits remote for compatibility, not proof that an explicit name was validated. Githubie Diff still omits remote pending Provider validation confirmation. No new setting, default, DB migration or scope; reuse `repository.read`. No installed config/remote mutation. See [ADR0016](docs/adr/0016-buckettie-diff-remote.md).
+
+## Pull request creation authorization (development)
+
+After capability/contract readiness and operator approval, add exact `assertionToolScopes` entries `"github_pr_create": ["provider.githubie.pull_request.write"]` or `"bitbucket_pr_create": ["provider.buckettie.pr_create"]` to the corresponding Provider. These are string-array dictionary values; default is absent and denied. Existing read/commit/push authorization does not enable them. Require `data.pr_create=true` for Githubie, `data.operations.pr_create=true` and integration_mode=moyai for Buckettie. Explicit operation flags are pending owner agreement/rollout; tool availability alone is insufficient. No top-level setting, installed scope or Provider allowed-route policy is changed automatically. See [ADR0015](docs/adr/0015-provider-pull-request-create.md).
+
+## Local-branch creation authorization (development)
+
+After Githubie advertises `data.local_branch_create=true`, an administrator may add `github_local_branch_create` to its `assertionToolScopes` dictionary with exact string-array value `["repository.branch.write"]`. Entry example: `"github_local_branch_create": ["repository.branch.write"]`. Default: absent and denied. Generic write/remote branch authorization does not enable this tool. No new top-level keys; implementation never edits installed scopes, keys, accounts or DB. Buckettie has no confirmed local-create mapping and remains unsupported. See [ADR0014](docs/adr/0014-provider-local-branch-create.md).
+
 ## Branch-switch authorization (development1.3.12.0)
 
 After the Provider runtime explicitly advertises branch_switch and the administrator authorizes enablement, configure github_branch_switch: [repository.branch.write] or buckettie_branch_switch: [repository.branch.write] in the respective assertionToolScopes. Buckettie's configured prefix remains bitbucket; only this operation resolves to buckettie_branch_switch. Require Moyai integration mode for Buckettie. Implementation does not edit installed scopes, signing keys, DB or service account. See [ADR0013](docs/adr/0013-provider-branch-switch.md).
@@ -48,7 +60,18 @@ Schema v7 adds the nullable column without changing Project UUIDs, names, revisi
 
 ## Installation and migration
 
-Settings Consumer (development1.3.11.0) requires Githubie capabilities `repository_settings_read/update`. Enable exact assertion Tool scopes `github_repository_settings_get: [repository.read]`, `github_repository_settings_update: [repository.settings.write]` only after a corresponding Provider runtime is available and its owner approves enablement. Do not substitute commit/push scope or legacy tokens. Implementation does not modify installed config. Buckettie settings remain disabled pending agreement. Provider owns persistence and human approval. See [ADR 0012](docs/adr/0012-repository-settings-consumer.md).
+Settings Consumer supports the agreed Githubie and Buckettie routes. Require boolean `data.repository_settings_read/update` for Githubie or `data.operations.repository_settings_read/update` for Buckettie; Buckettie additionally requires Moyai integration mode for reads and updates. After runtime readiness and owner approval, add the exact entries below to the corresponding Provider's `assertionToolScopes`. Defaults remain absent/denied; existing configuration is retained during upgrades. Do not substitute commit/push scopes or legacy tokens. Provider owns persistence and human approval; source implementation does not enable installed scopes. See [ADR0012](docs/adr/0012-repository-settings-consumer.md).
+
+```json
+{
+  "bitbucket_repository_settings_get": ["repository.read"],
+  "bitbucket_repository_settings_update": ["repository.settings.write"]
+}
+```
+
+For Githubie, use the same scopes with `github_repository_settings_get` and `github_repository_settings_update`. This fragment belongs inside `assertionToolScopes`, not at the configuration root. It is an operator-reviewed template, not an automatic grant.
+
+Githubie's optional `local_commit_branches` field uses these same tools/scopes/capability flags; it is not a new configuration default or grant. It replaces only the explicitly supplied list and requires Provider approval. Buckettie's contract remains eight fields. A missing Settings tool mapping returns `provider_capability_missing` before HTTP; a missing/false Provider capability returns that code after negotiation. Inspect the selected runtime's config and version before changing scopes; endpoint reachability alone cannot enable a missing map. Installed config is loaded at startup, so an approved mapping change requires restarting only the intended runtime.
 
 The MSI runs `config-init` before starting the automatic `Moyai` service under LocalService. Initial configuration is generated only when absent; a previously saved registry `McpUrl` is imported once. Existing JSON is validated and retained. Edit JSON as administrator, then use `service stop` and `service start`. The legacy MSI URL property/registry does not override an existing JSON file.
 

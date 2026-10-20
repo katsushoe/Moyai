@@ -41,7 +41,7 @@ public sealed class SqliteProjectQueryRepositoryTests
         using var fixture = new QueryFixture();
         QueryServices services = await fixture.CreateServicesAsync();
         Project project = await CreateProjectAsync(services.Projects);
-        DateTimeOffset since = DateTimeOffset.UtcNow.AddSeconds(-1);
+        DateTimeOffset since = project.CreatedAt.AddTicks(-1);
         WorkItem blocker = await services.Items.CreateAsync(new CreateWorkItemCommand("Moyai", WorkItemType.Bug, "Blocker", "agent", "codex"));
         WorkItem blocked = await services.Items.CreateAsync(new CreateWorkItemCommand("Moyai", WorkItemType.Feature, "Blocked", "agent", "codex"));
         await services.Collaboration.AddRelationAsync("Moyai", blocker.Key, blocked.Key, "blocks", "agent", "codex");
