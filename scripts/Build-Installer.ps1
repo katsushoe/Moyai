@@ -51,7 +51,9 @@ $publishProperties = @(
     "-p:AssemblyVersion=$assemblyVersion",
     "-p:FileVersion=$assemblyVersion",
     "-p:PublishSingleFile=false",
-    "--disable-build-servers"
+    "--disable-build-servers",
+    "-m:1",
+    "-p:UseSharedCompilation=false"
 )
 
 & dotnet publish (Join-Path $repositoryRoot "src\Moyai.Cli\Moyai.Cli.csproj") @publishProperties
@@ -64,7 +66,7 @@ if ($LASTEXITCODE -ne 0) { throw "Moyai.Mcp publish failed." }
 & dotnet publish (Join-Path $repositoryRoot "src\Moyai.Cli\Moyai.Cli.csproj") `
     --configuration Release --runtime win-x64 --self-contained true --output $clientSetupDirectory `
     "-p:Version=$Version" "-p:AssemblyVersion=$assemblyVersion" "-p:FileVersion=$assemblyVersion" `
-    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --disable-build-servers
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --disable-build-servers -m:1 -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) { throw "Client registration helper publish failed." }
 $clientSetupExecutable = Join-Path $clientSetupDirectory "moyaictl.exe"
 

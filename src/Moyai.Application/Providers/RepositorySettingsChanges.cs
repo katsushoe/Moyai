@@ -20,7 +20,7 @@ public sealed class RepositorySettingsChanges
         {
             bool valid = name switch
             {
-                "direct_push_branches" or "pull_branches" or "protected_branches" => value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(static item => item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString())),
+                "direct_push_branches" or "pull_branches" or "protected_branches" or "local_commit_branches" => value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(static item => item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString())),
                 "require_clean_working_tree" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
                 "tag_target_branch" or "tag_pattern" or "commit_author_name" or "commit_author_email" => value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()),
                 _ => false,

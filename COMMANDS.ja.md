@@ -1,5 +1,31 @@
 # Moyai Commands
 
+## MCP操作クライアント
+
+Windowsビルド・配布物には、`moyaictl.exe`と同じCLIアセンブリ・依存ファイルを使う実行名`moyaimcp.exe`を含めます。`moyaimcp --config "<path>" repository-status --project <登録名>`で稼働中サービスを呼び出します。`--config`はコマンド後にも指定でき、省略時は実行ファイルのディレクトリを基準に`../config/moyai.json`を使います。設定の`serverUrl`がサービス接続先です。`commands`はサービスのTool schemaを取得します。`--help`と`--version`は設定を読み込まずローカルのヘルプ・CLI版を返し、`version`はサービスの版を取得します。
+
+両実行名でコマンド、Project選択、承認、監査、出力、終了コードを維持します。成功は0、失敗は1で構造化エラーを標準エラーへ出力します。Provider操作では既存の本人承認を使います。サービスをホストするのは`Moyai.Mcp.exe`で、クライアントからの起動は明示的な`service start`で行います。別名exeは配布されたCLI依存ファイルと同じ場所に配置してください。[ADR0017](docs/adr/0017-mcp-command-client-alias.md)を参照してください。
+
+## Diffのremote指定（開発中）
+
+MCP `repository_diff(project)`／CLI `moyaictl repository-diff --project <name>`の入力は変えません。Buckettieは対応能力を確認できた場合に、Project設定の空白以外のgitRemoteNameをそのまま受け取ります。呼出側のremote/資格情報引数は追加しません。未対応/能力取得失敗時は既存の省略条件を維持し、Providerのremote不存在/曖昧/URL不一致はoriginへ退避せず保持します。日本語/BOM/改行/複数hunkは変更せず、比較先はローカルHEADのままです。Githubie向け転送は有効にしません。fetch/push/設定変更はなく、実受入・導入は別条件です。[ADR0016](docs/adr/0016-buckettie-diff-remote.md)を参照してください。
+
+## Pull Request作成（開発中）
+
+MCP `pull_request_create(project, sourceBranch, destinationBranch, title, description, draft)`、CLI例は`moyaictl pull-request-create --project Example --source-branch docs/proposal --destination-branch main --title "Docs update" --description "" --draft true`です。全6引数必須です。ブランチはliteral名、タイトルは空白以外を含む255文字以内で制御文字不可、説明は空文字可・32768文字以内でNUL不可、draftは明示boolです。develop/main/HEADを補完しません。
+
+Githubieは`github_pr_create`（`source_branch/destination_branch`）、Buckettieは`bitbucket_pr_create`（`sourceBranch/destinationBranch`）へ変換します。明示PR capability、専用PR Assertion scope、対応付け済みRepository/Project、Providerが許可した経路が必要です。BuckettieはMoyai連携モードを要求します。汎用read/commit/push権限とlegacy tokenでは作成できません。経路設定変更・push・merge・代替経路の実行は行いません。
+
+成功は`ok/operation/project/provider/pullRequest`を返します。共通データ例：`{"id":7,"title":"Docs update","sourceBranch":"docs/proposal","destinationBranch":"main","draft":null,"state":"open"}`。url/descriptionはnull可です。Githubieが返さないdraftは明示nullとし、Buckettieは返された値を保持します。失敗はcode/outcome/suggestedAction/providerDetailで、例は`project_not_found`、`pull_request_invalid`、`provider_capability_missing`、`auth_scope_denied`、`pull_request_route_not_allowed`です。CLI業務失敗はexit1。結果不明時はProviderのPRを別途読取確認してから再作成を判断し、自動再送しません。capability合意・稼働版導入・実外部受入は別条件です。[ADR0015](docs/adr/0015-provider-pull-request-create.md)を参照してください。
+
+## ローカルブランチ作成（開発中）
+
+MCP `branch_create_local(project, branch, source)`、CLI `moyaictl branch-create-local --project <name> --branch <new-local-branch> --source <local-branch|tag|full-SHA>`で、切替せず作成します。全引数必須で、`project`は登録済みProject名、`branch`は新規ローカル名、`source`はローカルブランチ名・タグ名・完全40桁16進commit SHAです。例：`moyaictl branch-create-local --project Example --branch docs/proposal --source v1.0.1.0`。暗黙HEAD補完、参照式、fetch/push、リモートブランチ作成、設定更新は行いません。
+
+Githubieの明示的な`data.local_branch_create=true`と、正確な`github_local_branch_create: [repository.branch.write]`のAssertion認可が必要です。Buckettieとlegacy経路は未対応で、リモート用`branch_create`へ代替しません。allowlist・policy/承認・clean状態・conflictなし・source存在・作成先未存在はProviderが検証します。変わるのは新規ローカル参照だけで、HEAD/現在ブランチ・upstream・commit・remote refs・index/worktreeは変更しません。
+
+結果は`RepositoryProviderResult`（`ok`、`operation`、`output`、`errorCode`、`errorMessage`、`resultUnknown`）です。成功例は`ok=true`、`operation=branch_create_local`で、JSON文字列`output`にGithubieの`data.name/source/current_branch/head_sha`を保持します。失敗例は委譲前の`provider_capability_missing`、Provider由来の`working_tree_dirty`・`unresolved_conflicts`・`branch_source_not_found`・`local_branch_already_exists`・`invalid_ref`です。CLI失敗はexit1です。送信後の結果不明ではProviderが提供するローカル参照の読取で別途確認し、再送しません。ソース実装と稼働版への導入・実Provider受入は別条件です。[ADR0014](docs/adr/0014-provider-local-branch-create.md)を参照してください。
+
 ## ローカルbranch切替（開発版1.3.12.0）
 
 MCP `branch_switch(project, branch)`、CLI `moyaictl branch-switch --project <name> --branch <existing-local-branch>`で登録Providerへ委譲します。Project識別情報・対応付け済みRepository ID・URLは保持し、`gitDefaultBranch`も更新しません。状態変更Toolで、明示capabilityと`github_branch_switch`/`buckettie_branch_switch`への`repository.branch.write`が必要です。BuckettieはMoyai連携モードを要求し、legacyは拒否します。
@@ -10,7 +36,9 @@ fetch・remote checkout・branch作成・source/remote引数の追加は行い�
 
 MCPは`repository_settings_get(project)`／`repository_settings_update(project, changes)`、CLIは`moyaictl repository-settings-get --project <name>`／`moyaictl repository-settings-update --project <name> --changes '<JSON object>'`です。必要に応じて`--config`を指定します。作者更新例は`{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`。CLIはサービスへ接続しDBを直接操作しません。
 
-合意済みGithubie経路のみ有効です。読取は登録8項目で作者未設定はnull。更新の省略は保持、falseは明示値、配列は置換です。空changes・未知項目・null・型不正・不正作者ペアを拒否します。policy検証と人の承認はProvider側です。型付き結果はok/operation/project/provider/settings/changedFields/approved/errorで、Provider生応答は返しません。認証・能力・設定エラーと安全な相関IDを保持し、更新成功にはapproved=trueが必須です。更新結果不明はerror.outcome=unknownとし、別の読取で確認してから再更新します。自動更新再試行、Git/稼働設定変更、直接/legacy代替は行いません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+Githubie限定の開発中拡張として`local_commit_branches`の配列置換に対応します。例: `moyaictl repository-settings-update --project Example --changes '{"local_commit_branches":["codex/docs-main-v1010","develop"]}'`。現在値を読み取り、保持する既存名を含めて指定します。省略は保持、`[]`は明示解除、null・型不正・空白要素は拒否します。大文字小文字や順序を変更せず、push許可やPR経路から推測しません。GETはGithubieが返した場合だけ追加項目を表示し、省略と空配列を区別します。Buckettieへの当該更新は拒否し、共通8項目は維持します。既存のProject-bound更新scopeとProviderの人による承認が必要で、例は更新許可や実機設定変更を意味しません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)の拡張節を参照してください。
+
+合意済みGithubie／Buckettie経路を実装しています。稼働設定への導入と実結合の完了は別条件です。正確な対応能力とAssertion scopeを必要とし、Buckettieは読取でもMoyai連携モードを確認します。読取は共通の登録8項目と上記Githubie限定の追加項目で、作者未設定はnullです。更新の省略は保持、falseは明示値、配列は置換です。空changes・未知項目・null・型不正・不正作者ペアを拒否します。Buckettie固有のpull_request_routesは対象8項目に含めません。policy検証と人の承認はProvider側です。型付き結果はok/operation/project/provider/settings/changedFields/approved/errorで、成功時のproviderはgithubieまたはbuckettieを示し、生応答は返しません。認証・能力・設定エラーと安全な相関IDを保持し、更新成功にはapproved=trueが必須です。更新結果不明はerror.outcome=unknownとし、別の読取で確認してから再更新します。自動更新再試行、Git/稼働設定変更、直接/legacy代替は行いません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください.
 
 Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`、`assertion-key-activate --kid <id> --trust-distribution-confirmed true [--overlap-seconds 86400]`、`assertion-key-revoke --kid <id>`、`assertion-protector-rotate`、`assertion-secret-rewrap`。すべてサービス経由で公開情報だけを返します。[運用Contract](docs/specifications/provider-authentication-operations.md)に状態遷移・エラー・移行・Trust配布条件を記載しています。
 

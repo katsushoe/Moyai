@@ -24,6 +24,8 @@ public enum RepositoryOperation
     SettingsGet,
     SettingsUpdate,
     BranchSwitch,
+    BranchCreateLocal,
+    PullRequestCreate,
 }
 
 /// <summary>Repository操作のProvider契約名を提供します。</summary>
@@ -44,6 +46,8 @@ public static class RepositoryOperationNames
         RepositoryOperation.BranchCreate => "branch_create",
         RepositoryOperation.BranchDelete => "branch_delete",
         RepositoryOperation.BranchSwitch => "branch_switch",
+        RepositoryOperation.BranchCreateLocal => "branch_create_local",
+        RepositoryOperation.PullRequestCreate => "pull_request_create",
         RepositoryOperation.TagCreate => "tag_create",
         RepositoryOperation.TagDelete => "tag_delete",
         RepositoryOperation.TagPush => "tag_push",

@@ -15,4 +15,18 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <Target Name="CreateMcpClientAlias" AfterTargets="Build" Condition="Exists('$(TargetDir)$(AssemblyName).exe')">
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).exe" DestinationFiles="$(TargetDir)moyaimcp.exe" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="$(TargetDir)moyaimcp.exe" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PublishMcpClientAlias" AfterTargets="Publish" Condition="Exists('$(PublishDir)$(AssemblyName).exe')">
+    <Copy SourceFiles="$(PublishDir)$(AssemblyName).exe" DestinationFiles="$(PublishDir)moyaimcp.exe" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="$(PublishDir)moyaimcp.exe" />
+    </ItemGroup>
+  </Target>
+
 </Project>

@@ -183,6 +183,100 @@ public sealed class ProviderRoutingServiceTests
         Assert.Equal(1, provider.Calls);
     }
 
+    [Theory]
+    [InlineData("develop")]
+    [InlineData("v1.0.1.0")]
+    [InlineData("0123456789abcdef0123456789abcdef01234567")]
+    public async Task LocalBranchCreationForwardsExplicitSourceAndProjectIdentity(string source)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, legacy: false, mapped: true);
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreateLocal, branch: "feature/local", source: source);
+        Assert.True(result.Ok);
+        RepositoryProviderRequest request = Assert.IsType<RepositoryProviderRequest>(provider.LastRequest);
+        Assert.Equal(RepositoryOperation.BranchCreateLocal, request.Operation);
+        Assert.Equal("feature/local", request.Branch);
+        Assert.Equal(source, request.BranchSource);
+        Assert.Equal("registered", request.RepositoryId);
+        Assert.NotEqual(Guid.Empty, request.ProjectId);
+        Assert.Equal("https://github.com/example/moyai", request.RepositoryUrl);
+        Assert.True(request.UseAssertion);
+        Assert.Null(request.ServiceToken);
+    }
+
+    [Theory]
+    [InlineData(null, "main")]
+    [InlineData("", "main")]
+    [InlineData("feature/local", null)]
+    [InlineData("feature/local", " ")]
+    [InlineData("feature/local", "HEAD")]
+    [InlineData("feature/local", "HEAD~1")]
+    [InlineData("feature/local", "main^2")]
+    [InlineData("feature/local", "refs/remotes/origin/main")]
+    [InlineData("feature/local", "-main")]
+    [InlineData("feature/local", "part.lock/next")]
+    [InlineData("feature/local", "main//next")]
+    [InlineData("feature/local", "main/.hidden")]
+    [InlineData("bad..branch", "main")]
+    [InlineData("HEAD", "main")]
+    public async Task LocalBranchCreationRejectsInvalidInputsBeforeDispatch(string? branch, string? source)
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, legacy: false);
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreateLocal, branch: branch, source: source));
+        Assert.Equal(0, provider.Calls);
+    }
+
+    [Fact]
+    public async Task LocalBranchCreationRejectsLegacyWriteToken()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreateLocal, branch: "feature/local", source: "main");
+        Assert.Equal("auth_scope_denied", result.ErrorCode);
+        Assert.Equal(0, provider.Calls);
+    }
+
+    [Fact]
+    public async Task LocalBranchCreationUnknownExpiryIsNotRetried()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, legacy: false);
+        provider.Next = new(false, "branch_create_local", null, "auth_assertion_expired", null, true);
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.BranchCreateLocal, branch: "feature/local", source: "main");
+        Assert.True(result.ResultUnknown);
+        Assert.Equal(1, provider.Calls);
+    }
+
+    [Fact]
+    public async Task PullRequestUsesMappedProjectContextAndDoesNotRetryUnknownResult()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, legacy: false, mapped: true);
+        provider.Next = new(false, "pull_request_create", null, "auth_assertion_expired", null, true);
+        var result = await service.ExecutePullRequestAsync("Moyai", new("docs/proposal", "main", "Title", "", false));
+        Assert.Equal("unknown", result.Error!.Outcome);
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal("registered", provider.LastRequest!.RepositoryId);
+        Assert.NotEqual(Guid.Empty, provider.LastRequest.ProjectId);
+        Assert.True(provider.LastRequest.UseAssertion);
+        Assert.Equal("docs/proposal", provider.LastRequest.PullRequest!.SourceBranch);
+        Assert.Null(provider.LastRequest.ServiceToken);
+    }
+
+    [Fact]
+    public async Task PullRequestRejectsUnknownProjectAndLegacyBeforeDispatch()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: true);
+        var input = new PullRequestInput("docs/proposal", "main", "Title", "", false);
+        var missing = await service.ExecutePullRequestAsync("Unknown", input);
+        Assert.Equal("project_not_found", missing.Error!.Code);
+        var legacy = await service.ExecutePullRequestAsync("Moyai", input);
+        Assert.Equal("auth_scope_denied", legacy.Error!.Code);
+        Assert.Equal(0, provider.Calls);
+    }
+
     private sealed class RoutingFixture : IAsyncDisposable
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-routing-{Guid.NewGuid():N}.db");
