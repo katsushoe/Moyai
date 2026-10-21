@@ -1,5 +1,11 @@
 # Moyai Commands
 
+## MCP command client
+
+Windows builds and packages include `moyaimcp.exe`, an executable alias of `moyaictl.exe` using the same CLI assembly and dependencies. Use `moyaimcp --config "<path>" repository-status --project <registered-name>` to call the running service. `--config` also works after the command; otherwise the default is `../config/moyai.json` relative to the executable directory. The file's `serverUrl` selects the service endpoint. `commands` queries its tool schemas. `--help` and `--version` return local help and CLI version without loading a configuration; `version` queries the service version.
+
+Both names preserve commands, Project selection, approval, audit, output and exit codes: success is 0, failures are 1 with a structured error on standard error. Provider operations retain their existing human approval requirements. `Moyai.Mcp.exe` hosts the service; the command client only starts it when explicitly requested with `service start`. Keep the alias beside the packaged CLI files. See [ADR0017](docs/adr/0017-mcp-command-client-alias.md).
+
 ## Diff remote selection (development)
 
 MCP `repository_diff(project)` / CLI `moyaictl repository-diff --project <name>` keep the same inputs. Buckettie can receive the Project's exact configured nonblank gitRemoteName after the supported remote-resolution capability is confirmed; caller-supplied remote/credentials are not added. Unsupported/failed capability preserves omission compatibility. Provider missing/ambiguous/mismatched-remote errors are preserved without origin fallback. Japanese/BOM/newline/multiple-hunk diff text is unchanged; this is local HEAD diff, not remote-branch comparison. Githubie Diff forwarding is not enabled. No fetch/push/config changes. Live acceptance and installation remain separate. See [ADR0016](docs/adr/0016-buckettie-diff-remote.md).

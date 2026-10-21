@@ -1,5 +1,11 @@
 # Moyai Commands
 
+## MCP操作クライアント
+
+Windowsビルド・配布物には、`moyaictl.exe`と同じCLIアセンブリ・依存ファイルを使う実行名`moyaimcp.exe`を含めます。`moyaimcp --config "<path>" repository-status --project <登録名>`で稼働中サービスを呼び出します。`--config`はコマンド後にも指定でき、省略時は実行ファイルのディレクトリを基準に`../config/moyai.json`を使います。設定の`serverUrl`がサービス接続先です。`commands`はサービスのTool schemaを取得します。`--help`と`--version`は設定を読み込まずローカルのヘルプ・CLI版を返し、`version`はサービスの版を取得します。
+
+両実行名でコマンド、Project選択、承認、監査、出力、終了コードを維持します。成功は0、失敗は1で構造化エラーを標準エラーへ出力します。Provider操作では既存の本人承認を使います。サービスをホストするのは`Moyai.Mcp.exe`で、クライアントからの起動は明示的な`service start`で行います。別名exeは配布されたCLI依存ファイルと同じ場所に配置してください。[ADR0017](docs/adr/0017-mcp-command-client-alias.md)を参照してください。
+
 ## Diffのremote指定（開発中）
 
 MCP `repository_diff(project)`／CLI `moyaictl repository-diff --project <name>`の入力は変えません。Buckettieは対応能力を確認できた場合に、Project設定の空白以外のgitRemoteNameをそのまま受け取ります。呼出側のremote/資格情報引数は追加しません。未対応/能力取得失敗時は既存の省略条件を維持し、Providerのremote不存在/曖昧/URL不一致はoriginへ退避せず保持します。日本語/BOM/改行/複数hunkは変更せず、比較先はローカルHEADのままです。Githubie向け転送は有効にしません。fetch/push/設定変更はなく、実受入・導入は別条件です。[ADR0016](docs/adr/0016-buckettie-diff-remote.md)を参照してください。

@@ -13,11 +13,15 @@ public sealed class CliFailureIntegrationTests
     private static readonly string[] RequiredArguments = ["project"];
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task CliWhenServiceReturnsBusinessStatusUsesCorrectExitAndStream(bool ok, bool structured)
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    public async Task CliWhenServiceReturnsBusinessStatusUsesCorrectExitAndStream(bool ok, bool structured, bool alias)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -57,8 +61,11 @@ public sealed class CliFailureIntegrationTests
         try
         {
             await File.WriteAllTextAsync(config, JsonSerializer.Serialize(new { serverUrl = app.Urls.Single(), requestTimeoutSeconds = 10 }));
-            var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            foreach (string argument in new[] { typeof(CliResponse).Assembly.Location, "repository-status", "--project", "Moyai", "--config", config }) start.ArgumentList.Add(argument);
+            var start = new ProcessStartInfo(ClientPath(alias ? "moyaimcp" : "moyaictl")) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            string[] arguments = alias
+                ? ["--config", config, "repository-status", "--project", "Moyai"]
+                : ["repository-status", "--project", "Moyai", "--config", config];
+            foreach (string argument in arguments) start.ArgumentList.Add(argument);
             using var process = new Process { StartInfo = start };
             Assert.True(process.Start());
             try
@@ -88,6 +95,45 @@ public sealed class CliFailureIntegrationTests
             Directory.Delete(directory);
             await app.StopAsync();
         }
+    }
+
+    [Theory]
+    [InlineData("moyaictl", "--help")]
+    [InlineData("moyaictl", "--version")]
+    [InlineData("moyaimcp", "--help")]
+    [InlineData("moyaimcp", "--version")]
+    public async Task LocalFlagsWorkWithoutConfigurationOrRunningService(string executable, string flag)
+    {
+        var start = new ProcessStartInfo(ClientPath(executable)) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        foreach (string argument in new[] { "--config", Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing.json"), flag }) start.ArgumentList.Add(argument);
+        using var process = new Process { StartInfo = start };
+        Assert.True(process.Start());
+        try
+        {
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await process.WaitForExitAsync(timeout.Token);
+            Assert.Equal(0, process.ExitCode);
+            Assert.Equal("", await stderr);
+            if (flag == "--version") Assert.Equal(typeof(CliResponse).Assembly.GetName().Version!.ToString(), (await stdout).Trim());
+            else Assert.Contains("MCP command client", await stdout, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); }
+        }
+    }
+
+    private static string ClientPath(string executable)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Moyai.slnx"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+        string configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
+        string path = Path.Combine(directory.FullName, "src", "Moyai.Cli", "bin", configuration, "net8.0-windows", executable + ".exe");
+        Assert.True(File.Exists(path), "Missing built CLI executable: " + path);
+        return path;
     }
 
     private static object BusinessResponse(bool ok, bool structured)

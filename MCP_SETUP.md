@@ -1,5 +1,7 @@
 # MCP Setup
 
+For command-line requests to the running MCP service, use `moyaimcp.exe --config "<moyai.json>" <command>`. It shares the `moyaictl.exe` implementation and packaged dependencies, including Provider approval and structured errors. `Moyai.Mcp.exe` is the service host. The Windows MSI includes both CLI names. `--help`/`--version` are local; `commands`/`version` query the configured service. See [commands](COMMANDS.md#mcp-command-client).
+
 The development Githubie Settings extension accepts `changes.local_commit_branches` through the existing `repository_settings_update` object; no new MCP/CLI tool or scope is added. Values are exact replacement arrays, including explicit empty arrays. GET omits this optional field if the Provider omits it. Buckettie retains the common eight-field contract. Provider human approval and the installed Settings tool-scope mappings remain mandatory; source publication does not enable them.
 
 Buckettie Diff remote forwarding uses the existing `repository_diff` tool and `repository.read` assertion. There is no additional client input or scope grant: select a registered Project and verify its remote-resolution capability/configuration as described in [CONFIG](CONFIG.md). Explicit remote rejection never falls back to origin. Githubie Diff forwarding remains excluded; publish does not establish installed or live acceptance. See [ADR0016](docs/adr/0016-buckettie-diff-remote.md).

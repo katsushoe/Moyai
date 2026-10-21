@@ -1,5 +1,7 @@
 # Moyai
 
+Windows packages provide `moyaimcp.exe` as the MCP command client alongside the compatible `moyaictl.exe`. Both use the same implementation and call the configured running service. See [CLI usage](COMMANDS.md#mcp-command-client) for configuration and help/version behavior.
+
 Projects can be created using only a name: `moyaictl.exe project-create --name Sample`. For automatic registration when missing, use `moyaictl.exe project-ensure --name Sample`; existing settings are preserved. Associate repository/build/deployment settings later with `project-configure --name Sample --expected-revision 1`. No source path is needed for Project creation or work tracking. See [the command contract](COMMANDS.md) and [ADR 0004](docs/adr/0004-name-only-projects.md).
 
 [English](README.md) | [日本語](README.ja.md)

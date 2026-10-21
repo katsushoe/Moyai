@@ -1,5 +1,7 @@
 # Moyai
 
+Windows配布物ではMCP操作クライアント`moyaimcp.exe`と、互換性を維持した`moyaictl.exe`を提供します。両者は同じ実装で、設定された稼働中サービスを呼び出します。設定とhelp/versionの使い方は[CLI仕様](COMMANDS.ja.md#mcp操作クライアント)を参照してください。
+
 `moyaictl.exe project-create --name Sample`で名前だけのProjectを作成できます。未登録時だけ自動作成する場合は`moyaictl.exe project-ensure --name Sample`を使います。登録済みの設定は保持します。Repository・ビルド・デプロイ設定は`project-configure --name Sample --expected-revision 1`で後から関連付けます。Project作成や作業項目の管理にパスは不要です。[コマンド仕様](COMMANDS.ja.md)と[ADR 0004](docs/adr/0004-name-only-projects.md)を参照してください。
 
 [English](README.md) | [日本語](README.ja.md)

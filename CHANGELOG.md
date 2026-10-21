@@ -2,7 +2,9 @@
 
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
-## Unreleased
+## 1.3.14.0 - 2026-10-21 (local package)
+
+- Add the `moyaimcp.exe` MCP command client alias, leading `--config`, and local `--version` while preserving `moyaictl` behavior.
 
 ## 1.3.13.1 - 2026-10-20 (local package)
 

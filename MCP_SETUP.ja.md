@@ -1,5 +1,7 @@
 # MCP Setup
 
+稼働中のMCPサービスへCLIから要求する場合は`moyaimcp.exe --config "<moyai.json>" <コマンド>`を使います。`moyaictl.exe`と実装・配布依存ファイルを共有し、Providerの本人承認と構造化エラーも同じです。サービスのホストは`Moyai.Mcp.exe`です。Windows MSIには両CLI実行名を含めます。`--help`／`--version`はローカル表示、`commands`／`version`は設定上のサービスへ問い合わせます。[コマンド仕様](COMMANDS.ja.md#mcp操作クライアント)を参照してください。
+
 開発中のGithubie Settings拡張は、既存`repository_settings_update`の`changes.local_commit_branches`を使います。MCP/CLIの新Toolやscopeは増やしません。指定配列で置換し、明示空配列も保持します。GETではProviderが省略した追加項目を出力しません。Buckettieは共通8項目の契約を維持します。Providerの人による承認と稼働設定のSettings Tool/scope対応付けが必要で、ソースのpublishだけでは有効化しません。
 
 Buckettie Diffのremote転送は既存`repository_diff`と`repository.read` Assertionを使います。Client引数や権限は増やさず、登録Projectと[CONFIG](CONFIG.ja.md)の設定/対応能力を確認します。明示remoteの拒否でoriginへ退避しません。Githubie向け転送は対象外で、publishだけで実機導入・受入済みとは扱いません。[ADR0016](docs/adr/0016-buckettie-diff-remote.md)を参照してください。
