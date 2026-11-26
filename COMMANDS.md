@@ -1,10 +1,37 @@
 # Moyai Commands
 
+## PR publication settings (development2.0.4.2)
+
+`repository-settings-get` also returns Githubie's `pr_publication_source_branches` and `pull_request_routes` when present. Old Provider omission remains absent; an explicit empty array remains `[]`. Update via the same connected CLI/MCP settings operation, for example:
+
+```powershell
+moyaictl repository-settings-update --project Example --changes '{"pr_publication_source_branches":["docs/topic"],"pull_request_routes":[{"source_branch":"develop","destination_branch":"main"},{"source_branch":"docs/topic","destination_branch":"main"}]}'
+```
+
+Read current settings first and include all entries to retain: each supplied array is a full replacement; omission preserves, `[]` clears, null/invalid entries and duplicates reject. Preserve case and order. The publication-source list is independent of ordinary commit permissions; no old values are imported. Githubie requires both source-list membership and an allowed exact route, rejects protected sources, and denies publication for missing/empty permission lists. Buckettie rejects these fields. Existing authentication/capability and Provider approval remain required. The example does not authorize a live update. See [ADR0012](docs/adr/0012-repository-settings-consumer.md).
+
+## Hosting branch protection (development2.0.3.0)
+
+Use `branch-protection-get`, `branch-protection-update` and `branch-protection-delete` with registered `--project` and exact `--branch`. Update takes `--edit <JSON>` (snake_case fields, null preserves) and optional `--create-if-missing true`. Changes require Provider Desktop approval and Moyai audit; unknown results are never automatically replayed. See [hosting protection](docs/branch-protection.md).
+
+## Runtime diagnostics (development 2.0.2.0)
+
+Run `moyaictl runtime-diagnostics [--project <registered-name>]` or MCP `runtime_diagnostics`. See [runtime diagnostics and tray control](docs/runtime-diagnostics.md).
+
+
+## PR read and merge (development2.0.1.0)
+
+MCP `pull_request_get(project, pullRequestId)` and CLI `moyaictl pull-request-get --project Example --pull-request-id 42` return the actual Provider PR snapshot. `project` is a registered Moyai Project name; `pullRequestId` is a positive Int64, bounded to2147483647 by Githubie before dispatch. The current implementation enables Githubie only; Buckettie state routing remains disabled.
+
+MCP `pull_request_merge(project, pullRequestId, strategy, expectedSourceCommit, message?)` corresponds to `moyaictl pull-request-merge --project Example --pull-request-id 42 --strategy merge --expected-source-commit <approved-full-40-hex-SHA>`. Require explicit user approval for that PR, strategy and SHA before calling. Strategy is required: repository_default (Provider null/default), merge, squash or rebase for Githubie. Common fast_forward is explicitly refused; no substitution is made. SHA hex case and nonblank optional message are preserved; omitted/null message retains Provider defaults, blank is rejected.
+
+Both routes require explicit capabilities and authenticated Provider access. Merge reads current PR state first and rejects source mismatch, draft/unavailable draft metadata and closed-unmerged state without mutation. An authenticated already-merged snapshot is an observation with no new merge request. Result fields are ok/operation/project/provider/pullRequest/error; snapshot includes id/url/state/sourceBranch/destinationBranch/sourceCommit/mergeCommit/draft (explicit null when unavailable). Errors include code/outcome/retryable/suggestedAction/correlationId/providerDetail. pending/unknown is never success and retryable is false. Use a separate authenticated get to reconcile; merge is never automatically replayed, including on assertion expiry. CLI failures use exit1. Installed older binaries and current scopes are unchanged by local publishing. See [ADR0018](docs/adr/0018-provider-pull-request-merge.md).
+
 ## MCP command client
 
-Windows builds and packages include `moyaimcp.exe`, an executable alias of `moyaictl.exe` using the same CLI assembly and dependencies. Use `moyaimcp --config "<path>" repository-status --project <registered-name>` to call the running service. `--config` also works after the command; otherwise the default is `../config/moyai.json` relative to the executable directory. The file's `serverUrl` selects the service endpoint. `commands` queries its tool schemas. `--help` and `--version` return local help and CLI version without loading a configuration; `version` queries the service version.
+Windows builds and packages include `moyaimcp.exe`, an executable alias of `moyaictl.exe` using the same CLI assembly and dependencies. Use `moyaimcp repository-status --project <registered-name>` to call the current user's running host. The sole configuration is `<INSTALLFOLDER>\config\moyai.json`. Optional `--config` before or after the command accepts only that same normalized path; other paths are rejected. The file's `serverUrl` selects that user's endpoint. `commands` queries tool schemas. `--help` and `--version` return local help and CLI version without loading a configuration; `version` queries the host version.
 
-Both names preserve commands, Project selection, approval, audit, output and exit codes: success is 0, failures are 1 with a structured error on standard error. Provider operations retain their existing human approval requirements. `Moyai.Mcp.exe` hosts the service; the command client only starts it when explicitly requested with `service start`. Keep the alias beside the packaged CLI files. See [ADR0017](docs/adr/0017-mcp-command-client-alias.md).
+Both names preserve business commands, Project selection, approval, audit, output and exit codes. `Moyai.Mcp.exe` runs in the logged-on user's session. `host start|stop|restart|status` manages its process through a current-user-only named pipe. `autostart enable|disable|status` manages logon startup separately; neither setting changes the other. Keep the alias beside the packaged CLI files. See [ADR0017](docs/adr/0017-mcp-command-client-alias.md) and [ADR0019](docs/adr/0019-user-session-mcp-host.md).
 
 ## Diff remote selection (development)
 
@@ -48,9 +75,11 @@ This document is the public command contract for `moyaictl.exe`. MCP tools use t
 
 ## Service connection and management
 
-All business commands, including `version`, connect to the service. `--config <path>` selects JSON settings. `commands` returns the running service's commands and input schemas. `help` works offline.
+All business commands, including `version`, connect to the service. Only `<INSTALLFOLDER>\config\moyai.json` supplies JSON settings; `--config` cannot select another file. `commands` returns the running service's commands and input schemas. `help` works offline.
 
-SCM commands are `service start`, `service stop`, `service pause`, `service resume`, `service register`, `service unregister`, and `service status`. Registration uses the adjacent MCP executable and configuration, Auto/LocalService and required directory permissions. Unregister requires Stopped. `config-init` creates initial JSON only when absent. Management commands use Windows SCM and never execute business logic or access SQLite directly.
+Host commands are `host start|stop|restart|status`; autostart commands are `autostart enable|disable|status`. `profile-init` initializes the canonical configuration when absent and user-scoped runtime directories and enables autostart for a new profile. `profile-uninstall` removes only the product-owned startup entry; user data remains. The old `service` command family is no longer supported. Management commands do not execute business logic or access SQLite directly.
+
+`host start` waits up to 60 seconds for readiness. A connected control response has its own 10-second limit. A timeout or a connection lost before the response does not establish that the host stopped: check `host status` before repeating a lifecycle command. `host restart` waits up to 15 seconds for the acknowledged process to exit and aborts without launching a replacement if exit is unconfirmed. See [ADR0019](docs/adr/0019-user-session-mcp-host.md).
 
 ## Command Groups
 
@@ -166,6 +195,8 @@ Review Provider targets before commit, push, pull, build, release, or deploy. `r
 
 Moyai v1 models exactly one Repository as part of each Project. It has no independent `repository-register` or `repository-unregister` command; archive the Project to stop using the association.
 # Repository branches
+
+For explicit fixed-SHA PR source publication, use the dedicated [create/status commands](docs/pr-source-publication.md). Both connect to the same user host; create requires an explicit draft boolean and original operation UUID. Ordinary pull-request-create does not publish a source branch.
 
 `branch_create` requires `project`, `branch`, and an explicit `source`. `source` must be a literal branch name or a full 40-character commit SHA. Moyai never substitutes `main`, `develop`, or the current `HEAD` when it is omitted.
 `tag_create` likewise requires `project`, `tag`, and an explicit literal branch or full commit SHA `source`; Moyai forwards it unchanged when the Provider supports explicit tag sources.

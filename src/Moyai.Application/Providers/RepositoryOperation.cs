@@ -26,6 +26,13 @@ public enum RepositoryOperation
     BranchSwitch,
     BranchCreateLocal,
     PullRequestCreate,
+    PullRequestGet,
+    PullRequestMerge,
+    PullRequestPublishCreate,
+    PullRequestPublishStatus,
+    BranchProtectionGet,
+    BranchProtectionUpdate,
+    BranchProtectionDelete,
 }
 
 /// <summary>Repository操作のProvider契約名を提供します。</summary>
@@ -48,6 +55,13 @@ public static class RepositoryOperationNames
         RepositoryOperation.BranchSwitch => "branch_switch",
         RepositoryOperation.BranchCreateLocal => "branch_create_local",
         RepositoryOperation.PullRequestCreate => "pull_request_create",
+        RepositoryOperation.PullRequestPublishCreate => "pull_request_publish_create",
+        RepositoryOperation.PullRequestPublishStatus => "pull_request_publish_status",
+        RepositoryOperation.PullRequestGet => "pull_request_get",
+        RepositoryOperation.PullRequestMerge => "pull_request_merge",
+        RepositoryOperation.BranchProtectionGet => "branch_protection_get",
+        RepositoryOperation.BranchProtectionUpdate => "branch_protection_update",
+        RepositoryOperation.BranchProtectionDelete => "branch_protection_delete",
         RepositoryOperation.TagCreate => "tag_create",
         RepositoryOperation.TagDelete => "tag_delete",
         RepositoryOperation.TagPush => "tag_push",

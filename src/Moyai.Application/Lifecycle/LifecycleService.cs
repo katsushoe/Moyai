@@ -48,9 +48,10 @@ public sealed class LifecycleService
         string providerName = ResolveProvider(project, action);
         if (!_providers.TryGetValue(providerName, out ILifecycleProvider? provider)
             && !(providerName == "server" && _providers.TryGetValue("kelpiessh", out provider)))
-            throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable.");
+            throw new ProviderRoutingException("provider_unavailable", $"Lifecycle provider '{providerName}' is unavailable. Use runtime_diagnostics to inspect loaded Providers and authentication modes.");
         bool usesAssertion = provider.UsesAssertion(action);
-        if (!usesAssertion && action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw)
+        bool usesOwner = provider.UsesWindowsOwnerAuthentication(action);
+        if (!usesAssertion && !usesOwner && action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw)
         {
             // Legacy移行期間外は静的Tokenを解決・送信せずに拒否します。
             try { _authentication.UseLegacy(_timeProvider); }
@@ -61,10 +62,10 @@ public sealed class LifecycleService
                 return rejected;
             }
         }
-        string? token = usesAssertion ? null : await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
+        string? token = usesAssertion || usesOwner ? null : await ResolveTokenAsync(project, action, cancellationToken).ConfigureAwait(false);
         var request = new LifecycleRequest(project.Name, project.SourcePath, project.InstallPath, action, version, artifactPath, notes, token,
             artifactPaths, providerReleaseId, tagName, commitHash, project.Id, deploymentId, kelpieTarget, destinationPath, artifactSha256, project.RepositoryUrl,
-            cancellation => IsSameContextAsync(project, cancellation), project.ProviderRepositoryId);
+            cancellation => IsSameContextAsync(project, cancellation), project.ProviderRepositoryId, usesOwner);
         LifecycleResult result = await provider.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         await _events.WriteAsync(project.Id, action, result, actorType, actorName, cancellationToken).ConfigureAwait(false);
         return result;

@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Tomlyn;
 using Tomlyn.Model;
@@ -32,22 +33,24 @@ public sealed class ClientRegistration
     }
 
     /// <summary>Atomically registers or removes an owned entry; optionally retains an MSI rollback journal.</summary>
-    public string Apply(bool configure, string? endpoint, bool transaction = false, string transactionId = "manual")
+    public string Apply(bool configure, string? endpoint, bool transaction = false, string transactionId = "manual", string? bearerToken = null)
     {
         if (configure) MoyaiSettings.ValidateUrl(endpoint ?? throw new ArgumentNullException(nameof(endpoint)));
+        if (bearerToken is not null) MoyaiSettings.ValidateApiToken(bearerToken);
         Directory.CreateDirectory(_stateDirectory);
         using var gate = new FileStream(Path.Combine(_stateDirectory, _client + ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         if (File.Exists(_journalPath)) throw new InvalidOperationException("Pending client transaction; run client-transaction with --phase rollback or commit first.");
         byte[]? original = Read(_configPath);
         byte[]? owner = Read(_ownerPath);
-        string? ownedUrl = owner is null ? null : JsonSerializer.Deserialize<string>(owner);
+        OwnerRecord? ownership = ReadOwner(owner);
+        var desired = new OwnerRecord(endpoint, TokenHash(bearerToken));
         string text = original is null ? "" : Encoding.UTF8.GetString(original).TrimStart('\uFEFF');
         (string updated, string status) = _client == "codex"
-            ? EditToml(text, configure, endpoint, ownedUrl)
-            : EditJson(text, configure, endpoint, ownedUrl);
+            ? EditToml(text, configure, desired, ownership, bearerToken)
+            : EditJson(text, configure, desired, ownership, bearerToken);
         if (status != "changed") return status;
         byte[] after = Encoding.UTF8.GetBytes(updated);
-        byte[]? nextOwner = configure ? JsonSerializer.SerializeToUtf8Bytes(endpoint) : null;
+        byte[]? nextOwner = configure ? (bearerToken is null ? JsonSerializer.SerializeToUtf8Bytes(endpoint) : JsonSerializer.SerializeToUtf8Bytes(desired)) : null;
         var journal = new Journal(original, after, owner, nextOwner, transactionId);
         WriteAtomic(_journalPath, JsonSerializer.SerializeToUtf8Bytes(journal));
         try
@@ -90,7 +93,7 @@ public sealed class ClientRegistration
         ReplaceChecked(path, after, before);
     }
 
-    private static (string, string) EditToml(string text, bool configure, string? endpoint, string? ownedUrl)
+    private static (string, string) EditToml(string text, bool configure, OwnerRecord desired, OwnerRecord? owner, string? token)
     {
         TomlTable root;
         var options = new TomlSerializerOptions { MetadataStore = new TomlMetadataStore() };
@@ -101,10 +104,18 @@ public sealed class ClientRegistration
             throw new InvalidOperationException("Codex mcp_servers must be a table.");
         var servers = value as TomlTable ?? new TomlTable();
         servers.TryGetValue("moyai", out object? existing);
-        bool Matches(string? url) => existing is TomlTable entry && entry.Count == 1 && entry.TryGetValue("url", out object? actual) && Equals(actual, url);
-        string status = Decide(configure, existing is not null, Matches(endpoint), Matches(ownedUrl), ownedUrl);
+        bool Matches(OwnerRecord? target) => target is not null && existing is TomlTable entry &&
+            entry.Count == (target.TokenHash is null ? 1 : 2) && entry.TryGetValue("url", out object? actual) && Equals(actual, target.Endpoint) &&
+            (target.TokenHash is null || (entry.TryGetValue("http_headers", out object? headers) && headers is TomlTable table && table.Count == 1 &&
+                table.TryGetValue("Authorization", out object? header) && HeaderMatches(header as string, target.TokenHash)));
+        string status = Decide(configure, existing is not null, Matches(desired), Matches(owner), owner?.Endpoint);
         if (status != "changed") return (text, status);
-        if (configure) servers["moyai"] = new TomlTable { ["url"] = endpoint! };
+        if (configure)
+        {
+            var entry = new TomlTable { ["url"] = desired.Endpoint! };
+            if (token is not null) entry["http_headers"] = new TomlTable { ["Authorization"] = "Bearer " + token };
+            servers["moyai"] = entry;
+        }
         else servers.Remove("moyai");
         root["mcp_servers"] = servers;
         string result = TomlSerializer.Serialize(root, options);
@@ -114,7 +125,7 @@ public sealed class ClientRegistration
         return (result, status);
     }
 
-    private static (string, string) EditJson(string text, bool configure, string? endpoint, string? ownedUrl)
+    private static (string, string) EditJson(string text, bool configure, OwnerRecord desired, OwnerRecord? owner, string? token)
     {
         JsonObject root;
         try { root = text.Length == 0 ? new JsonObject() : JsonNode.Parse(text) as JsonObject ?? throw new JsonException(); }
@@ -123,11 +134,18 @@ public sealed class ClientRegistration
             throw new InvalidOperationException("Claude mcpServers must be an object.");
         var servers = value as JsonObject ?? new JsonObject();
         servers.TryGetPropertyValue("moyai", out JsonNode? existing);
-        bool Matches(string? url) => existing is JsonObject entry && entry.Count == 2 &&
-            JsonNode.DeepEquals(entry["type"], JsonValue.Create("http")) && JsonNode.DeepEquals(entry["url"], JsonValue.Create(url));
-        string status = Decide(configure, existing is not null, Matches(endpoint), Matches(ownedUrl), ownedUrl);
+        bool Matches(OwnerRecord? target) => target is not null && existing is JsonObject entry && entry.Count == (target.TokenHash is null ? 2 : 3) &&
+            JsonNode.DeepEquals(entry["type"], JsonValue.Create("http")) && JsonNode.DeepEquals(entry["url"], JsonValue.Create(target.Endpoint)) &&
+            (target.TokenHash is null || (entry["headers"] is JsonObject headers && headers.Count == 1 &&
+                headers["Authorization"] is JsonValue header && header.TryGetValue<string>(out var headerValue) && HeaderMatches(headerValue, target.TokenHash)));
+        string status = Decide(configure, existing is not null, Matches(desired), Matches(owner), owner?.Endpoint);
         if (status != "changed") return (text, status);
-        if (configure) servers["moyai"] = new JsonObject { ["type"] = "http", ["url"] = endpoint };
+        if (configure)
+        {
+            var entry = new JsonObject { ["type"] = "http", ["url"] = desired.Endpoint };
+            if (token is not null) entry["headers"] = new JsonObject { ["Authorization"] = "Bearer " + token };
+            servers["moyai"] = entry;
+        }
         else servers.Remove("moyai");
         if (value is null) root["mcpServers"] = servers;
         return (root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n", status);
@@ -179,4 +197,18 @@ public sealed class ClientRegistration
     }
 
     private sealed record Journal(byte[]? Before, byte[] After, byte[]? OwnerBefore, byte[]? OwnerAfter, string TransactionId);
+    private sealed record OwnerRecord(string? Endpoint, string? TokenHash);
+
+    private static OwnerRecord? ReadOwner(byte[]? bytes)
+    {
+        if (bytes is null) return null;
+        using var document = JsonDocument.Parse(bytes);
+        return document.RootElement.ValueKind == JsonValueKind.String
+            ? new OwnerRecord(document.RootElement.GetString(), null)
+            : JsonSerializer.Deserialize<OwnerRecord>(bytes) ?? throw new InvalidOperationException("Invalid client ownership record.");
+    }
+
+    private static string? TokenHash(string? token) => token is null ? null : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    private static bool HeaderMatches(string? header, string hash) => header is not null && header.StartsWith("Bearer ", StringComparison.Ordinal)
+        && StringComparer.Ordinal.Equals(TokenHash(header[7..]), hash);
 }

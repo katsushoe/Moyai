@@ -21,7 +21,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(httpClientFactory);
-        if (!options.Endpoint.IsLoopback) throw new ArgumentException("Provider endpoint must use a loopback host.", nameof(options));
+        options.Validate();
         _options = options;
         _httpClientFactory = httpClientFactory;
         _issuer = issuer;
@@ -34,15 +34,24 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     public bool UsesAssertion(LifecycleAction action) =>
         UsesToolAssertion && action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw;
 
+    public bool UsesWindowsOwnerAuthentication(LifecycleAction action) => _options.UsesWindowsOwnerAuthentication
+        && action is LifecycleAction.ReleaseCreate or LifecycleAction.ReleasePublish or LifecycleAction.ReleaseWithdraw;
+
     public async Task<LifecycleResult> ExecuteAsync(LifecycleRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.UseWindowsOwnerAuthentication != UsesWindowsOwnerAuthentication(request.Action)
+            || request.UseWindowsOwnerAuthentication && request.ServiceToken is not null)
+            return new(false, OperationName(request.Action), null, "provider_authentication_mode_mismatch", "Provider authentication mode does not match the request.");
         if (IsKelpie && (request.Action is LifecycleAction.Deploy or LifecycleAction.DeployRollback))
             return await new KelpieLifecycleAdapter(_options, _httpClientFactory, _issuer, _audit)
                 .ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         try
         {
-            await using ToolCaller client = UsesToolAssertion
+            if (_options.UsesUserHost && !UsesToolAssertion && !request.UseWindowsOwnerAuthentication)
+                throw new ProviderAuthenticationException("authentication_unavailable");
+            await using ToolCaller client = request.UseWindowsOwnerAuthentication ? new WindowsOwnerToolCaller(this)
+                : UsesToolAssertion
                 ? new AssertionToolCaller(this, request)
                 : await LegacyToolCaller.CreateAsync(this, request, cancellationToken).ConfigureAwait(false);
             string operation = OperationName(request.Action);
@@ -85,6 +94,10 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             }
             return parsed;
         }
+        catch (UserHostConnectionException exception)
+        {
+            return new LifecycleResult(false, OperationName(request.Action), null, exception.Code, exception.Code);
+        }
         catch (ProviderAuthenticationException exception)
         {
             return new LifecycleResult(false, OperationName(request.Action), null, exception.Code, exception.Code);
@@ -92,7 +105,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         catch (HttpRequestException exception) when (McpRepositoryProvider.IsAuthenticationRejection(exception))
         {
             return new LifecycleResult(false, OperationName(request.Action), null, "provider_authentication_rejected",
-                $"Provider rejected authentication (HTTP {(int)exception.StatusCode!}); the operation was not executed.");
+                _options.UsesUserHost ? "Provider authentication failed; operation outcome may be unknown. Do not automatically retry." : $"Provider rejected authentication (HTTP {(int)exception.StatusCode!}); the operation was not executed.");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -100,7 +113,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException)
         {
-            return new LifecycleResult(false, OperationName(request.Action), null, "provider_auth_unavailable", exception.Message);
+            return new LifecycleResult(false, OperationName(request.Action), null, "provider_auth_unavailable", _options.UsesUserHost ? "Provider transport failed; operation outcome may be unknown. Do not automatically retry." : exception.Message);
         }
     }
 
@@ -110,7 +123,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
     }
 
     /// <summary>Repository ProviderのRelease系Toolは、Capabilityが構成されている場合にTool単位のAssertionを必須とします。</summary>
-    private bool UsesToolAssertion => (IsGithubie || IsBuckettie) && _capability is not null;
+    private bool UsesToolAssertion => !_options.UsesWindowsOwnerAuthentication && (IsGithubie || IsBuckettie) && _capability is not null;
 
     private bool IsGithubie => string.Equals(_options.ToolPrefix, "github", StringComparison.OrdinalIgnoreCase);
 
@@ -257,6 +270,43 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         public abstract ValueTask DisposeAsync();
     }
 
+    /// <summary>署名状態に依存せず、各Toolを検証済みowner接続で実行します。変更要求は再送しません。</summary>
+    private sealed class WindowsOwnerToolCaller(McpLifecycleProvider owner) : ToolCaller
+    {
+        public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public override async Task<LifecycleResult> CallAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
+        {
+            WindowsOwnerSession? session = null;
+            bool mutation = !(owner._options.UsesGithubieUserHost ? GithubieOwnerContract.IsRead(tool) : WindowsOwnerContract.IsRead(tool));
+            try
+            {
+                string repository = arguments.TryGetValue("repository", out object? value) && value is string name ? name : string.Empty;
+                session = await WindowsOwnerSession.ConnectAsync(owner._options, owner._httpClientFactory, repository, cancellationToken).ConfigureAwait(false);
+                CallToolResult response = await session.CallAsync(tool, arguments, cancellationToken).ConfigureAwait(false);
+                LifecycleResult parsed = LifecycleProviderResponse.Parse(operation, response);
+                string? raw = response.StructuredContent?.GetRawText() ?? response.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
+                bool unknown = parsed.ResultUnknown || mutation && (McpRepositoryProvider.OwnerOutcomeUnknown(raw, owner._options.UsesGithubieUserHost)
+                    || parsed.ErrorCode == "provider_invalid_response" && session.ToolDispatched);
+                return parsed with { Ok = parsed.Ok && !unknown, Output = session.Redact(parsed.Output),
+                    ErrorMessage = session.Redact(parsed.ErrorMessage), ResultUnknown = unknown,
+                    ErrorCode = unknown && parsed.ErrorCode is null ? "provider_result_unknown" : parsed.ErrorCode };
+            }
+            catch (ProviderAuthenticationException exception)
+            { return new(false, operation, null, exception.Code, exception.Code); }
+            catch (Exception exception) when (exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException
+                or OperationCanceledException or UserHostConnectionException or JsonException)
+            {
+                bool unknown = mutation && session is { ToolDispatched: true, RejectedBeforeDispatch: false };
+                string code = session?.PreDispatchErrorCode ?? (unknown ? "provider_result_unknown"
+                    : exception is UserHostConnectionException discovery ? discovery.Code : "provider_unavailable");
+                return new(false, operation, null, code,
+                    unknown ? "Provider operation outcome is unknown; do not automatically retry." : code, ResultUnknown: unknown);
+            }
+            finally { if (session is not null) await session.DisposeAsync().ConfigureAwait(false); }
+        }
+    }
+
     /// <summary>従来方式で1つのMCP接続を共有します。</summary>
     private sealed class LegacyToolCaller : ToolCaller
     {
@@ -268,7 +318,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (request.ServiceToken is not null) headers["Authorization"] = $"Bearer {request.ServiceToken}";
-            var transportOptions = new HttpClientTransportOptions { Endpoint = owner._options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
+            var transportOptions = new HttpClientTransportOptions { Endpoint = owner._options.Endpoint!, TransportMode = HttpTransportMode.StreamableHttp, AdditionalHeaders = headers };
             var caller = new LegacyToolCaller();
             try
             {
@@ -306,7 +356,7 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
         public override async Task<LifecycleResult> CallAsync(string tool, IReadOnlyDictionary<string, object?> arguments, string operation, CancellationToken cancellationToken)
         {
             LifecycleResult result = await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal)) return result;
+            if (owner._options.UsesUserHost || !string.Equals(result.ErrorCode, "auth_assertion_expired", StringComparison.Ordinal)) return result;
             if (request.RevalidateContext is not null && !await request.RevalidateContext(cancellationToken).ConfigureAwait(false))
                 return new LifecycleResult(false, operation, null, "auth_project_mismatch", "Authorization context changed.");
             return await CallOnceAsync(tool, arguments, operation, cancellationToken).ConfigureAwait(false);
@@ -323,18 +373,32 @@ public sealed class McpLifecycleProvider : ILifecycleProvider
             var context = new AssertionContext(capability.ProviderId, projectId, RepositoryAssertionPolicy.NormalizeRepository(request.RepositoryUrl),
                 tool, scopes, Guid.NewGuid().ToString("N"));
             capability.Require(context);
-            var transportOptions = new HttpClientTransportOptions { Endpoint = owner._options.Endpoint, TransportMode = HttpTransportMode.StreamableHttp };
-            using HttpClient providerClient = owner._httpClientFactory.CreateClient(owner.Name);
+            using var connection = new ProviderConnection(owner._options, owner._httpClientFactory);
+            var transportOptions = new HttpClientTransportOptions { Endpoint = connection.Endpoint, TransportMode = HttpTransportMode.StreamableHttp };
+            HttpClient providerClient = connection.Client;
             using var assertionHandler = new AssertionHttpHandler(providerClient, issuer, context, owner._audit);
             using var httpClient = new HttpClient(assertionHandler) { Timeout = Timeout.InfiniteTimeSpan };
-            await using var transport = new HttpClientTransport(transportOptions, httpClient);
-            await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
-            CallToolResult response = await client.CallToolAsync(tool, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
-            LifecycleResult parsed = LifecycleProviderResponse.Parse(operation, response);
-            parsed = parsed with { Output = assertionHandler.Redact(parsed.Output), ErrorMessage = assertionHandler.Redact(parsed.ErrorMessage) };
-            if (owner._audit is not null)
-                await owner._audit.WriteAsync(context, assertionHandler.KeyId, parsed.Ok ? "accepted" : parsed.ErrorCode ?? "provider_operation_failed", cancellationToken).ConfigureAwait(false);
-            return parsed;
+            try
+            {
+                await using var transport = new HttpClientTransport(transportOptions, httpClient);
+                await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
+                CallToolResult response = await client.CallToolAsync(tool, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+                LifecycleResult parsed = LifecycleProviderResponse.Parse(operation, response);
+                parsed = parsed with { Output = connection.Redact(assertionHandler.Redact(parsed.Output)), ErrorMessage = connection.Redact(assertionHandler.Redact(parsed.ErrorMessage)) };
+                if (owner._audit is not null)
+                    await owner._audit.WriteAsync(context, assertionHandler.KeyId, parsed.Ok ? "accepted" : parsed.ErrorCode ?? "provider_operation_failed", cancellationToken).ConfigureAwait(false);
+                return parsed;
+            }
+            catch (Exception exception) when (owner._options.UsesUserHost
+                && exception is HttpRequestException or TimeoutException or ModelContextProtocol.McpException or OperationCanceledException or UserHostConnectionException)
+            {
+                bool unknown = connection.ToolDispatched && !connection.OwnerGateRejected
+                    && scopes.Any(scope => scope != "repository.read");
+                string code = unknown ? "provider_result_unknown" : connection.OwnerGateRejected ? "provider_authentication_rejected"
+                    : exception is UserHostConnectionException discovery ? discovery.Code : "provider_unavailable";
+                return new LifecycleResult(false, operation, null, code,
+                    unknown ? "Provider operation outcome is unknown; do not automatically retry." : code, ResultUnknown: unknown);
+            }
         }
     }
 }

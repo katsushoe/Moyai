@@ -11,6 +11,37 @@ namespace Moyai.Mcp.Tests;
 public sealed class RepositorySettingsToolTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PublicationSettingsMcpOutputDistinguishesMissingAndEmpty(bool present)
+    {
+        var settings = new RepositorySettings(["develop"], ["develop"], ["main"], "main", "v.*", true, null, null,
+            PrPublicationSourceBranches: present ? [] : null, PullRequestRoutes: present ? [] : null);
+        JsonElement output = JsonSerializer.SerializeToElement(settings, McpJsonUtilities.DefaultOptions);
+        Assert.Equal(present ? 10 : 8, output.EnumerateObject().Count());
+        Assert.Equal(present, output.TryGetProperty("pr_publication_source_branches", out JsonElement sources));
+        Assert.Equal(present, output.TryGetProperty("pull_request_routes", out JsonElement routes));
+        if (present)
+        {
+            Assert.Empty(sources.EnumerateArray());
+            Assert.Empty(routes.EnumerateArray());
+        }
+    }
+
+    [Fact]
+    public void CliPublicationSettingsRetainNestedRoutesAndOmitUnspecifiedLists()
+    {
+        using JsonDocument schema = JsonDocument.Parse("""{"properties":{"project":{"type":"string"},"changes":{"type":"object"}},"required":["project","changes"]}""");
+        const string input = """{"pr_publication_source_branches":[],"pull_request_routes":[{"source_branch":"Docs/topic","destination_branch":"main"}]}""";
+        var arguments = CliArguments.Convert(CliArguments.Parse(["--project", "Display", "--changes", input]), schema.RootElement, "repository_settings_update");
+        JsonElement changes = Assert.IsType<JsonElement>(arguments["changes"]);
+        Assert.Equal(2, changes.EnumerateObject().Count());
+        Assert.Empty(changes.GetProperty("pr_publication_source_branches").EnumerateArray());
+        Assert.Equal("Docs/topic", changes.GetProperty("pull_request_routes")[0].GetProperty("source_branch").GetString());
+        Assert.False(changes.TryGetProperty("local_commit_branches", out _));
+    }
+
+    [Theory]
     [InlineData("githubie")]
     [InlineData("buckettie")]
     public void SettingsMcpJsonRetainsUnsetAuthors(string provider)

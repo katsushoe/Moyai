@@ -8,9 +8,20 @@ public static class RepositoryAssertionPolicy
     public static string Scope(RepositoryOperation operation, string? provider = null) => operation switch
     {
         RepositoryOperation.ProviderVersion or RepositoryOperation.ProviderCapabilities or RepositoryOperation.Status
-            or RepositoryOperation.Diff or RepositoryOperation.BranchList or RepositoryOperation.StashList or RepositoryOperation.SettingsGet => "repository.read",
+            or RepositoryOperation.Diff or RepositoryOperation.BranchList or RepositoryOperation.StashList or RepositoryOperation.SettingsGet
+            or RepositoryOperation.PullRequestPublishStatus or RepositoryOperation.PullRequestGet or RepositoryOperation.BranchProtectionGet => "repository.read",
+        RepositoryOperation.BranchProtectionUpdate or RepositoryOperation.BranchProtectionDelete => provider switch
+        {
+            "githubie" or "githubbie" => "provider.githubie.branch_protection.write",
+            _ => throw new ProviderAuthenticationException("auth_scope_denied"),
+        },
+        RepositoryOperation.PullRequestMerge => provider switch
+        {
+            "githubie" or "githubbie" => "provider.githubie.pull_request.merge",
+            _ => throw new ProviderAuthenticationException("auth_scope_denied"),
+        },
         RepositoryOperation.SettingsUpdate => "repository.settings.write",
-        RepositoryOperation.PullRequestCreate => provider switch
+        RepositoryOperation.PullRequestPublishCreate or RepositoryOperation.PullRequestCreate => provider switch
         {
             "githubie" or "githubbie" => "provider.githubie.pull_request.write",
             "buckettie" => "provider.buckettie.pr_create",
@@ -24,6 +35,12 @@ public static class RepositoryAssertionPolicy
         RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush => "repository.tag.write",
         _ => throw new ProviderAuthenticationException("auth_scope_denied"),
     };
+
+    public static IReadOnlyList<string> Scopes(RepositoryOperation operation, string provider) =>
+        operation == RepositoryOperation.PullRequestPublishCreate
+            ? provider is "githubie" or "githubbie" ? ["repository.push", "provider.githubie.pull_request.write"]
+                : throw new ProviderAuthenticationException("auth_scope_denied")
+            : [Scope(operation, provider)];
 
     public static string NormalizeRepository(string repositoryUrl)
     {

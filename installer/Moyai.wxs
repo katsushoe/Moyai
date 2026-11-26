@@ -1,44 +1,56 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="Moyai"
     Manufacturer="Akatsukisoft"
     Version="$(MoyaiVersion)"
     UpgradeCode="9DE89A0B-7437-44AD-AB9F-34B3A64CE2B7"
     Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Moyai is already installed." />
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of Moyai is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Binary Id="ClientSetup" SourceFile="$(ClientSetupExecutable)" />
+    <Binary Id="ConfigOwnerActions" SourceFile="$(ConfigOwnerActions)" />
+    <Icon Id="MoyaiIcon.ico" SourceFile="$(sys.SOURCEFILEDIR)..\src\Moyai.Tray\Assets\moyai.ico" />
+    <Property Id="ARPPRODUCTICON" Value="MoyaiIcon.ico" />
+    <Property Id="MOYAI_CONFIG_OWNER_ACCOUNT" Secure="yes" />
+    <CustomAction Id="ResolveConfigOwner" BinaryRef="ConfigOwnerActions" DllEntry="ResolveConfigurationOwner" Execute="immediate" Return="check" />
     <SetProperty Id="MOYAI_CLIENT_TRANSACTION" Value="[ProductCode]-[CLIENTPROCESSID]-[Date]-[Time]" Before="InstallInitialize" Sequence="execute" />
+    <SetProperty Id="MOYAI_PROFILE_TRANSACTION" Value="[ProductCode]" Before="InstallInitialize" Sequence="execute" />
     <Launch Condition="MOYAI_CLIENT_PROFILE OR (MOYAI_CODEX &lt;&gt; &quot;1&quot; AND MOYAI_CLAUDE &lt;&gt; &quot;1&quot;)" Message="Specify MOYAI_CLIENT_PROFILE when selecting an MCP client." />
     <Property Id="MOYAI_CLIENT_PROFILE" Secure="yes"><RegistrySearch Id="SavedClientProfile" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ClientProfile" Type="raw" Bitness="always64" /></Property>
     <Property Id="MOYAI_CODEX" Secure="yes"><RegistrySearch Id="SavedCodex" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ConfigureCodex" Type="raw" Bitness="always64" /></Property>
     <Property Id="MOYAI_CLAUDE" Secure="yes"><RegistrySearch Id="SavedClaude" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ConfigureClaude" Type="raw" Bitness="always64" /></Property>
-    <CustomAction Id="ConfigureCodex" BinaryRef="ClientSetup" ExeCommand="configure codex --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --config &quot;[ConfigFolder]moyai.json&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
+    <Property Id="MOYAI_CONFIG_OWNER_SID" Secure="yes"><RegistrySearch Id="SavedConfigOwner" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ConfigOwnerSid" Type="raw" Bitness="always64" /></Property>
+    <Property Id="INSTALLFOLDER" Secure="yes"><RegistrySearch Id="SavedInstallDirectory" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="InstallDirectory" Type="raw" Bitness="always64" /></Property>
+    <SetProperty Id="MOYAI_CONFIG_OWNER_SID" Value="[UserSID]" Before="CostFinalize" Sequence="both" Condition="NOT MOYAI_CONFIG_OWNER_SID" />
+    <CustomAction Id="ConfigureCodex" BinaryRef="ClientSetup" ExeCommand="configure codex --config &quot;[ConfigFolder]moyai.json&quot; --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
     <CustomAction Id="RollbackConfigureCodex" BinaryRef="ClientSetup" ExeCommand="client-transaction codex --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase rollback" Execute="rollback" Impersonate="yes" Return="check" />
     <CustomAction Id="CommitConfigureCodex" BinaryRef="ClientSetup" ExeCommand="client-transaction codex --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase commit" Execute="commit" Impersonate="yes" Return="check" />
-    <CustomAction Id="UnconfigureCodex" BinaryRef="ClientSetup" ExeCommand="unconfigure codex --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --config &quot;[ConfigFolder]moyai.json&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="UnconfigureCodex" BinaryRef="ClientSetup" ExeCommand="unconfigure codex --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
     <CustomAction Id="RollbackUnconfigureCodex" BinaryRef="ClientSetup" ExeCommand="client-transaction codex --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase rollback" Execute="rollback" Impersonate="yes" Return="check" />
     <CustomAction Id="CommitUnconfigureCodex" BinaryRef="ClientSetup" ExeCommand="client-transaction codex --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase commit" Execute="commit" Impersonate="yes" Return="check" />
-    <CustomAction Id="ConfigureClaude" BinaryRef="ClientSetup" ExeCommand="configure claude --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --config &quot;[ConfigFolder]moyai.json&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="ConfigureClaude" BinaryRef="ClientSetup" ExeCommand="configure claude --config &quot;[ConfigFolder]moyai.json&quot; --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
     <CustomAction Id="RollbackConfigureClaude" BinaryRef="ClientSetup" ExeCommand="client-transaction claude --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase rollback" Execute="rollback" Impersonate="yes" Return="check" />
     <CustomAction Id="CommitConfigureClaude" BinaryRef="ClientSetup" ExeCommand="client-transaction claude --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase commit" Execute="commit" Impersonate="yes" Return="check" />
-    <CustomAction Id="UnconfigureClaude" BinaryRef="ClientSetup" ExeCommand="unconfigure claude --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --config &quot;[ConfigFolder]moyai.json&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="UnconfigureClaude" BinaryRef="ClientSetup" ExeCommand="unconfigure claude --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --transaction" Execute="deferred" Impersonate="yes" Return="check" />
     <CustomAction Id="RollbackUnconfigureClaude" BinaryRef="ClientSetup" ExeCommand="client-transaction claude --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase rollback" Execute="rollback" Impersonate="yes" Return="check" />
     <CustomAction Id="CommitUnconfigureClaude" BinaryRef="ClientSetup" ExeCommand="client-transaction claude --profile &quot;[MOYAI_CLIENT_PROFILE]\.&quot; --transaction-id &quot;[MOYAI_CLIENT_TRANSACTION]&quot; --phase commit" Execute="commit" Impersonate="yes" Return="check" />
     <UI>
       <TextStyle Id="MoyaiNormal" FaceName="Segoe UI" Size="9" />
       <Property Id="DefaultUIFont" Value="MoyaiNormal" />
-      <Dialog Id="McpClientsDialog" Width="370" Height="230" Title="Moyai MCP setup">
+      <Dialog Id="McpClientsDialog" Width="370" Height="280" Title="Moyai MCP setup">
         <Control Id="Intro" Type="Text" X="15" Y="15" Width="340" Height="35" Text="Select MCP clients to configure for the user profile below. Existing settings are preserved. Restart clients after installation." />
         <Control Id="ProfileLabel" Type="Text" X="15" Y="58" Width="330" Height="15" Text="User profile directory (absolute path):" />
         <Control Id="Profile" Type="Edit" X="15" Y="76" Width="340" Height="18" Property="MOYAI_CLIENT_PROFILE" />
         <Control Id="Codex" Type="CheckBox" X="15" Y="110" Width="160" Height="18" Property="MOYAI_CODEX" CheckBoxValue="1" Text="Configure Codex" />
         <Control Id="Claude" Type="CheckBox" X="190" Y="110" Width="160" Height="18" Property="MOYAI_CLAUDE" CheckBoxValue="1" Text="Configure Claude Code" />
-        <Control Id="Note" Type="Text" X="15" Y="140" Width="340" Height="30" Text="Leave both unchecked to install the service only. For a non-default client config location, configure the client manually." />
-        <Control Id="Install" Type="PushButton" X="190" Y="195" Width="75" Height="20" Default="yes" Text="Install">
-          <Publish Event="EndDialog" Value="Return" Condition="MOYAI_CLIENT_PROFILE OR (NOT MOYAI_CODEX AND NOT MOYAI_CLAUDE)" />
+        <Control Id="Note" Type="Text" X="15" Y="140" Width="340" Height="30" Text="The user-session host and tray controller are installed. For a non-default client config location, configure the client manually." />
+        <Control Id="InstallDirectoryLabel" Type="Text" X="15" Y="178" Width="340" Height="15" Text="Installation directory:" />
+        <Control Id="InstallDirectory" Type="PathEdit" X="15" Y="196" Width="340" Height="18" Property="INSTALLFOLDER" />
+        <Control Id="Install" Type="PushButton" X="190" Y="245" Width="75" Height="20" Default="yes" Text="Install">
+          <Publish Event="SetTargetPath" Value="INSTALLFOLDER" Order="1" Condition="MOYAI_CLIENT_PROFILE OR (NOT MOYAI_CODEX AND NOT MOYAI_CLAUDE)" />
+          <Publish Event="EndDialog" Value="Return" Order="2" Condition="MOYAI_CLIENT_PROFILE OR (NOT MOYAI_CODEX AND NOT MOYAI_CLAUDE)" />
         </Control>
-        <Control Id="Cancel" Type="PushButton" X="280" Y="195" Width="75" Height="20" Cancel="yes" Text="Cancel">
+        <Control Id="Cancel" Type="PushButton" X="280" Y="245" Width="75" Height="20" Cancel="yes" Text="Cancel">
           <Publish Event="EndDialog" Value="Exit" />
         </Control>
       </Dialog>
@@ -46,9 +58,18 @@
         <Show Dialog="McpClientsDialog" Before="ExecuteAction" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
       </InstallUISequence>
     </UI>
-    <CustomAction Id="InitializeConfig" FileRef="CliExecutable" ExeCommand="config-init --config &quot;[ConfigFolder]moyai.json&quot;" Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="RollbackInitializeUserProfile" BinaryRef="ClientSetup" ExeCommand="profile-transaction --phase rollback --transaction-id &quot;[MOYAI_PROFILE_TRANSACTION]&quot;" Execute="rollback" Impersonate="yes" Return="check" />
+    <CustomAction Id="InitializeUserProfile" BinaryRef="ClientSetup" ExeCommand="profile-init --config &quot;[ConfigFolder]moyai.json&quot; --tray-path &quot;[BinFolder]tray\Moyai.Tray.exe&quot; --transaction-id &quot;[MOYAI_PROFILE_TRANSACTION]&quot;" Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="CommitInitializeUserProfile" BinaryRef="ClientSetup" ExeCommand="profile-transaction --phase commit --transaction-id &quot;[MOYAI_PROFILE_TRANSACTION]&quot;" Execute="commit" Impersonate="yes" Return="check" />
+    <CustomAction Id="RollbackRemoveUserProfile" BinaryRef="ClientSetup" ExeCommand="profile-transaction --phase rollback --transaction-id &quot;[MOYAI_PROFILE_TRANSACTION]&quot;" Execute="rollback" Impersonate="yes" Return="check" />
+    <CustomAction Id="RemoveUserAutostart" BinaryRef="ClientSetup" ExeCommand="profile-uninstall --tray-path &quot;[BinFolder]tray\Moyai.Tray.exe&quot; --transaction-id &quot;[MOYAI_PROFILE_TRANSACTION]&quot;" Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="CommitRemoveUserProfile" BinaryRef="ClientSetup" ExeCommand="profile-transaction --phase commit --transaction-id &quot;[MOYAI_PROFILE_TRANSACTION]&quot;" Execute="commit" Impersonate="yes" Return="check" />
     <InstallExecuteSequence>
-      <Custom Action="RollbackConfigureCodex" After="StartServices" Condition="MOYAI_CODEX = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="ResolveConfigOwner" Before="InstallInitialize" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="RollbackInitializeUserProfile" After="WriteRegistryValues" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="InitializeUserProfile" After="RollbackInitializeUserProfile" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="CommitInitializeUserProfile" After="InitializeUserProfile" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="RollbackConfigureCodex" After="CommitInitializeUserProfile" Condition="MOYAI_CODEX = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND NOT REMOVE~=&quot;ALL&quot;" />
       <Custom Action="ConfigureCodex" After="RollbackConfigureCodex" Condition="MOYAI_CODEX = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND NOT REMOVE~=&quot;ALL&quot;" />
       <Custom Action="CommitConfigureCodex" After="ConfigureCodex" Condition="MOYAI_CODEX = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND NOT REMOVE~=&quot;ALL&quot;" />
       <Custom Action="RollbackUnconfigureCodex" After="StopServices" Condition="MOYAI_CODEX = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
@@ -60,12 +81,11 @@
       <Custom Action="RollbackUnconfigureClaude" After="CommitUnconfigureCodex" Condition="MOYAI_CLAUDE = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="UnconfigureClaude" After="RollbackUnconfigureClaude" Condition="MOYAI_CLAUDE = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="CommitUnconfigureClaude" After="UnconfigureClaude" Condition="MOYAI_CLAUDE = &quot;1&quot; AND MOYAI_CLIENT_PROFILE AND REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
-      <Custom Action="InitializeConfig" Before="InstallServices" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="RollbackRemoveUserProfile" After="InstallInitialize" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RemoveUserAutostart" After="RollbackRemoveUserProfile" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="CommitRemoveUserProfile" After="RemoveUserAutostart" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
     </InstallExecuteSequence>
-    <SetDirectory Id="INSTALLFOLDER" Value="C:\Moyai" Sequence="both" />
-    <Property Id="MOYAI_MCP_URL" Value="http://127.0.0.1:43120" Secure="yes">
-      <RegistrySearch Id="SavedMcpUrl" Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="McpUrl" Type="raw" Bitness="always64" />
-    </Property>
+    <SetDirectory Id="INSTALLFOLDER" Value="[WindowsVolume]Moyai" Sequence="both" Condition="NOT INSTALLFOLDER" />
 
     <Feature Id="Complete" Title="Moyai" Level="1">
       <ComponentGroupRef Id="ProductFiles" />
@@ -82,27 +102,22 @@
         <Directory Id="DataFolder" Name="data" />
       </Directory>
     </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="MoyaiProgramMenuFolder" Name="Moyai" />
+    </StandardDirectory>
   </Fragment>
 
   <Fragment>
     <ComponentGroup Id="ProductFiles" Directory="BinFolder">
       <Files Include="$(PublishDirectory)\**">
-        <Exclude Files="$(PublishDirectory)\Moyai.Mcp.exe" />
         <Exclude Files="$(PublishDirectory)\moyaictl.exe" />
       </Files>
       <Component Id="CliProgram" Guid="9D4A1330-94FD-49EC-A921-1B3A3D4932AB">
         <File Id="CliExecutable" Source="$(PublishDirectory)\moyaictl.exe" KeyPath="yes" />
       </Component>
-      <Component Id="McpService" Guid="B53E9DA5-FD3B-4A18-97BA-7CB9AA75FB68">
-        <File Id="McpExecutable" Source="$(PublishDirectory)\Moyai.Mcp.exe" KeyPath="yes" />
-        <ServiceInstall Id="InstallMoyaiService" Name="Moyai" DisplayName="Moyai MCP"
-                        Description="Moyai loopback MCP server" Type="ownProcess" Start="auto"
-                        ErrorControl="normal" Account="NT AUTHORITY\LocalService" Vital="yes"
-                        Arguments="--config &quot;[ConfigFolder]moyai.json&quot;" />
-        <ServiceControl Id="ControlMoyaiService" Name="Moyai" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
-      </Component>
-      <Component Id="McpServiceSettings" Guid="D07774D4-A351-4D3D-A688-77CE6893F9DC" Permanent="yes" NeverOverwrite="yes">
-        <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="McpUrl" Type="string" Value="[MOYAI_MCP_URL]" KeyPath="yes" />
+      <Component Id="TrayShortcut" Directory="MoyaiProgramMenuFolder" Guid="D8BF3B5F-0185-414C-A337-28A8149A5353">
+        <Shortcut Id="MoyaiTrayShortcut" Name="Moyai" Target="[BinFolder]tray\Moyai.Tray.exe" WorkingDirectory="BinFolder" />
+        <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="TrayShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
@@ -111,20 +126,26 @@
         <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ClientProfile" Type="string" Value="[MOYAI_CLIENT_PROFILE]" KeyPath="yes" />
         <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ConfigureCodex" Type="string" Value="[MOYAI_CODEX]" />
         <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ConfigureClaude" Type="string" Value="[MOYAI_CLAUDE]" />
+        <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="ConfigOwnerSid" Type="string" Value="[MOYAI_CONFIG_OWNER_SID]" />
+        <RegistryValue Root="HKLM" Key="Software\Akatsukisoft\Moyai" Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" />
       </Component>
-      <Component Id="CreateConfigFolder" Directory="ConfigFolder" Guid="2E311E54-4488-4B68-A9A5-0328CD991DA6">
+      <Component Id="CreateConfigFolder" Directory="ConfigFolder" Guid="4F4F39AE-6333-4899-9254-2D9C8BC1552F">
         <CreateFolder>
-          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;BU)(A;OICI;GRGX;;;LS)" />
+        <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)" />
+        <util:PermissionEx User="[MOYAI_CONFIG_OWNER_ACCOUNT]" Inheritable="yes"
+          Read="yes" Traverse="yes" CreateFile="yes" CreateChild="yes" Delete="yes"
+          ReadAttributes="yes" ReadExtendedAttributes="yes" ReadPermission="yes"
+          WriteAttributes="yes" WriteExtendedAttributes="yes" Synchronize="yes" />
         </CreateFolder>
       </Component>
-      <Component Id="CreateLogsFolder" Directory="LogsFolder" Guid="99FC7854-B5A7-4C27-8557-EBA8EC0507C3">
+      <Component Id="CreateLogsFolder" Directory="LogsFolder" Guid="0CCB2B62-8F5A-473D-B5E2-BAF9FB66470C">
         <CreateFolder>
-          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)(A;OICI;0x1301BF;;;LS)" />
+        <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;LS)" />
         </CreateFolder>
       </Component>
-      <Component Id="CreateDataFolder" Directory="DataFolder" Guid="72CC2F57-1301-43DE-9298-E3C524126689">
+      <Component Id="CreateDataFolder" Directory="DataFolder" Guid="A2970C4D-D050-4517-A702-8E0AB0C2B155">
         <CreateFolder>
-          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;BU)(A;OICI;0x1301BF;;;LS)" />
+        <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301BF;;;LS)" />
         </CreateFolder>
       </Component>
     </ComponentGroup>

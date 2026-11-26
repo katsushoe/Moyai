@@ -4,5 +4,6 @@
 public interface IRepositoryProvider
 {
     string Name { get; }
+    bool UsesWindowsOwnerAuthentication => false;
     Task<RepositoryProviderResult> ExecuteAsync(RepositoryProviderRequest request, CancellationToken cancellationToken = default);
 }

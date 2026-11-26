@@ -14,6 +14,7 @@ public static class RepositoryProviderResponse
         string? text = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
         string? output = result.StructuredContent?.GetRawText() ?? text;
         string name = RepositoryProviderContract.OperationName(operation);
+        if (operation is RepositoryOperation.PullRequestPublishCreate or RepositoryOperation.PullRequestPublishStatus) return PublicationResponseParser.Parse(operation, result, output, text);
         if (result.IsError is true) return Failure(name, output);
         if (string.IsNullOrWhiteSpace(output)) return Invalid(name, "Provider returned no JSON result.");
 
@@ -21,6 +22,14 @@ public static class RepositoryProviderResponse
         {
             using JsonDocument document = JsonDocument.Parse(output);
             bool? ok = ReadStatus(document.RootElement);
+            if (operation is RepositoryOperation.PullRequestMerge or RepositoryOperation.BranchProtectionUpdate or RepositoryOperation.BranchProtectionDelete && result.StructuredContent is not null && text is not null)
+            {
+                using JsonDocument alternate = JsonDocument.Parse(text);
+                if (ReadStatus(alternate.RootElement) != ok) return Invalid(name, "Provider result channels disagree.");
+                if (operation is RepositoryOperation.BranchProtectionUpdate or RepositoryOperation.BranchProtectionDelete
+                    && !System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(output), System.Text.Json.Nodes.JsonNode.Parse(text)))
+                    return Invalid(name, "Provider mutation result channels disagree.");
+            }
             if (ok is false) return Failure(name, output);
             if (result.StructuredContent is not null && text is not null)
             {
@@ -53,14 +62,17 @@ public static class RepositoryProviderResponse
 
     private static RepositoryProviderResult Failure(string operation, string? detail)
     {
-        if (operation is "branch_create_local" or "pull_request_create" && !HasTypedError(detail)) return Invalid(operation, detail ?? "Provider returned no error detail.");
+        if (operation is "branch_create_local" or "pull_request_create" or "pull_request_get" or "pull_request_merge" or "branch_protection_get" or "branch_protection_update" or "branch_protection_delete" && !HasTypedError(detail)) return Invalid(operation, detail ?? "Provider returned no error detail.");
         return new(false, operation, null, operation switch
         {
             "branch_create_local" => RepositoryProviderContract.NormalizeLocalBranchError(detail),
             "pull_request_create" => RepositoryProviderContract.NormalizeLocalBranchError(detail),
+            "pull_request_get" or "pull_request_merge" => RepositoryProviderContract.NormalizeLocalBranchError(detail),
+            "branch_protection_get" or "branch_protection_update" or "branch_protection_delete" => RepositoryProviderContract.NormalizeLocalBranchError(detail),
             "branch_switch" => RepositoryProviderContract.NormalizeBranchSwitchError(detail),
             _ => RepositoryProviderContract.NormalizeErrorCode(detail),
-        }, detail, operation is "repository_settings_update" or "branch_switch" or "branch_create_local" or "pull_request_create" && UnknownOutcome(detail));
+        }, detail, operation is "repository_settings_update" or "branch_switch" or "branch_create_local" or "pull_request_create" or "pull_request_merge" && UnknownOutcome(detail)
+            || operation is "pull_request_merge" or "branch_protection_update" or "branch_protection_delete" && UnprovenMergeOutcome(detail));
     }
 
     private static bool HasTypedError(string? detail)
@@ -85,5 +97,17 @@ public static class RepositoryProviderResponse
     }
 
     private static RepositoryProviderResult Invalid(string operation, string detail) =>
-        new(false, operation, null, "provider_invalid_response", detail, operation is "repository_settings_update" or "branch_switch" or "branch_create_local" or "pull_request_create");
+        new(false, operation, null, "provider_invalid_response", detail, operation is "repository_settings_update" or "branch_switch" or "branch_create_local" or "pull_request_create" or "pull_request_merge" or "branch_protection_update" or "branch_protection_delete");
+
+    private static bool UnprovenMergeOutcome(string? detail)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(detail ?? "null");
+            JsonElement error = document.RootElement.GetProperty("error");
+            if (error.GetProperty("code").GetString() is "network_error" or "timeout" or "branch_protection_result_unknown") return true;
+            return error.GetProperty("outcome").GetString() is not ("not_executed" or "failed" or "pending");
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return true; }
+    }
 }

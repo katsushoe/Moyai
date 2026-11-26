@@ -1,12 +1,29 @@
 # SPEC.md Version
 
-1.0
+1.2
 
-2026.09.06
+2026.10.26
 
 # 変更履歴
 
+- 2026.10.26: Buckettie所有ユーザー認証Consumerの明示設定・能力確認・非再送をソース実装。隔離相互受入と実機切替は未完。
+
 - 2026.09.06: 初版。Provider 汎用の署名付き Assertion、暗号化 DB、Key Protector、鍵更新、移行およびテスト要件を定義。
+- 2026.10.25: 同一Windowsユーザーのアプリを信頼するGithubie/Buckettie連携方針を追加。契約・実装・有効化は未完であり、署名方式の既存実装と区別。
+
+# 同一Windowsユーザー信頼方式への移行方針
+
+2026-10-25、ユーザーご本人は同一Windowsユーザーのアプリを信頼する方針を採用しました。Githubie/BuckettieとのRepository・release操作は、所有ユーザー認証へ統一し、対象方式が実装・有効化された接続ではMoyaiのES256 Assertion・Issuer鍵配布・Project別署名scopeを必須としません。[ADR0023](../adr/0023-same-user-provider-trust.md)を決定の正本とします。
+
+これは現在の稼働版が署名不要になったという意味ではありません。現行の署名方式は移行成功まで使用します。入力・設定・能力通知・エラー・状態遷移と受入は両Provider担当と合意してから実装し、未合意の設定値を製品設定へ追加しません。署名を外しただけの静的HTTP接続やlegacy tokenへの切替で代用しません。
+
+Buckettieとの契約合意後、Provider単位の`authenticationMode="windows_owner"`を`buckettie_user_host_v1`接続に実装しました（既定`assertion`）。2.0.1.0以上・契約3・所有ユーザープロトコル1・明示対応tool/操作能力を業務dispatch前に確認します。全HTTPに所有セッション資格を付け、Authorization/Issuer/旧Tokenは使用せず、認証混在・静的接続へのfallbackを拒否します。変更操作の結果不明は再送せず、既知readだけ1回再接続できます。専用相互受入と実機切替は未完で、Githubieの所有ユーザー接続は未実装です。具体的な設定は[CONFIG](../../CONFIG.ja.md)を参照してください。
+
+認証では所有SID・非公開ACL・Provider/profile・稼働プロセス世代と既存セッション整合を確認し、別ユーザーと無認証の接続を拒否します。認証・能力不一致時に他方式へ自動fallbackせず、結果不明の変更操作は再送しません。同一ユーザーのアプリを個別に登録したり、署名scope相当のProject別委譲権限を作り直したりしません。
+
+Repository/branch制限・個別操作の本人承認・監査・外部サービス認証はProvider側に保持します。ProjectとRepository対応付けはrouting/audit contextです。Moyaiの受信HTTP認証・host制御・秘密情報の暗号化と、KelpieSSH等の他Providerは変更対象外です。既存DB・鍵・trust設定を移行前に削除しません。
+
+以下のAssertion・鍵管理の規定は、現行方式および移行対象外の接続に適用します。新方式については、対応ProviderとMoyaiの契約・実装・専用fixture検証・具体的な切替が完了して初めて有効化します。
 
 # 目的
 

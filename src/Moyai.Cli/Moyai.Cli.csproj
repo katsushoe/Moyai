@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Moyai.Mcp.Tests" />
     <ProjectReference Include="..\Moyai.Application\Moyai.Application.csproj" />
     <ProjectReference Include="..\Moyai.Configuration\Moyai.Configuration.csproj" />
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
   </ItemGroup>
 
   <PropertyGroup>

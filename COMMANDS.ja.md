@@ -1,10 +1,41 @@
 # Moyai Commands
 
+## PR公開設定（開発候補2.0.4.2）
+
+`repository-settings-get`は、Githubieが返す`pr_publication_source_branches`と`pull_request_routes`も表示します。旧Providerでの省略は省略のまま、明示的な空配列は`[]`のまま返します。同じホスト接続型CLI/MCPの設定更新を使います。
+
+```powershell
+moyaictl repository-settings-update --project Example --changes '{"pr_publication_source_branches":["docs/topic"],"pull_request_routes":[{"source_branch":"develop","destination_branch":"main"},{"source_branch":"docs/topic","destination_branch":"main"}]}'
+```
+
+先に現在値を読み、保持する全要素を含めてください。指定配列は全置換、省略は保持、`[]`は解除、null・型/値不正・重複は拒否します。大文字小文字と順序を保持します。公開元リストは通常commit許可と独立し、旧値を自動流用しません。Githubieは公開元リストと完全一致PR経路の両方を必要とし、保護元ブランチや空/未指定の許可を拒否します。Buckettieへ両項目は送信しません。既存の認証/能力確認とProviderの人による承認が必要で、例は実設定変更の許可を意味しません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+
+## PR source限定公開（開発候補2.0.4.0）
+
+専用の[pull-request-publish-create/status](docs/pr-source-publication.ja.md)を使います。createには`--draft true|false`と元のoperation UUIDを明示し、結果不明ならstatusで読取照合します。既存pull-request-createはsource branchを公開しません。
+
+## ホスティング側ブランチ保護（開発候補2.0.3.0）
+
+`branch-protection-get`、`branch-protection-update`、`branch-protection-delete` に登録済み `--project` とexactな `--branch` を指定します。更新には `--edit <JSON>`（snake_case、省略/nullは保持）、新規作成を許可する場合は `--create-if-missing true` を明示します。変更はProviderのDesktop承認とMoyai監査を必須とし、結果不明時は自動再送しません。[ブランチ保護](docs/branch-protection.ja.md)を参照してください。
+
+## 実行時診断（開発候補2.0.2.0）
+
+CLI `moyaictl runtime-diagnostics [--project <登録名>]` またはMCP `runtime_diagnostics` を使います。[診断とトレイ操作](docs/runtime-diagnostics.ja.md)を参照してください。
+
+
+## PR読取・マージ（開発版2.0.1.0）
+
+MCP `pull_request_get(project, pullRequestId)` / CLI `moyaictl pull-request-get --project Example --pull-request-id 42` はProviderの実測PR状態を返します。projectはMoyai登録名、IDは正のInt64ですがGithubieでは送信前に2147483647以下へ制限します。今回の実装対象はGithubieで、Buckettieの状態経路は無効です。
+
+MCP `pull_request_merge(project, pullRequestId, strategy, expectedSourceCommit, message?)` / CLI `moyaictl pull-request-merge --project Example --pull-request-id 42 --strategy merge --expected-source-commit <本人承認済み40桁SHA>` を追加します。実行前に対象PR・方式・SHAへの本人承認が必要です。方式は明示必須でrepository_default（Providerへnull）、merge、squash、rebaseに対応し、共通fast_forwardはGithubieでは拒否します。SHAの英字大小と非空白messageは保持し、省略/nullのmessageはProvider既定、空白だけは拒否します。
+
+明示能力と認証を確認し、事前読取の実source SHAが一致した場合だけマージを要求します。draft・draft情報欠落・closed未マージは送信前に拒否し、既マージは実測結果の観測として再マージしません。結果はok/operation/project/provider/pullRequest/errorを返し、PR情報に実測sourceCommit/mergeCommitとnullable draftを含みます。errorはcode/outcome/retryable/suggestedAction/correlationId/providerDetailを保持します。pending/unknownは成功ではなくretryable=falseです。別の認証付きgetで照合し、署名期限切れを含めマージは自動再送しません。CLIの業務失敗はexit1です。ローカルpublishだけでは旧実機版や設定は更新されません。[ADR0018](docs/adr/0018-provider-pull-request-merge.md)を参照してください。
+
 ## MCP操作クライアント
 
-Windowsビルド・配布物には、`moyaictl.exe`と同じCLIアセンブリ・依存ファイルを使う実行名`moyaimcp.exe`を含めます。`moyaimcp --config "<path>" repository-status --project <登録名>`で稼働中サービスを呼び出します。`--config`はコマンド後にも指定でき、省略時は実行ファイルのディレクトリを基準に`../config/moyai.json`を使います。設定の`serverUrl`がサービス接続先です。`commands`はサービスのTool schemaを取得します。`--help`と`--version`は設定を読み込まずローカルのヘルプ・CLI版を返し、`version`はサービスの版を取得します。
+Windowsビルド・配布物には、`moyaictl.exe`と同じCLIアセンブリ・依存ファイルを使う実行名`moyaimcp.exe`を含めます。`moyaimcp repository-status --project <登録名>`で稼働中サービスを呼び出します。設定は`<INSTALLFOLDER>\config\moyai.json`だけを使用します。コマンド前後の`--config`は正規化後に同じパスを指す場合だけ受理し、別ファイルは拒否します。設定の`serverUrl`がサービス接続先です。`commands`はサービスのTool schemaを取得します。`--help`と`--version`は設定を読み込まずローカルのヘルプ・CLI版を返し、`version`はサービスの版を取得します。
 
-両実行名でコマンド、Project選択、承認、監査、出力、終了コードを維持します。成功は0、失敗は1で構造化エラーを標準エラーへ出力します。Provider操作では既存の本人承認を使います。サービスをホストするのは`Moyai.Mcp.exe`で、クライアントからの起動は明示的な`service start`で行います。別名exeは配布されたCLI依存ファイルと同じ場所に配置してください。[ADR0017](docs/adr/0017-mcp-command-client-alias.md)を参照してください。
+両実行名で業務コマンド、Project選択、承認、監査、出力、終了コードを維持します。`Moyai.Mcp.exe`はログオンユーザーのsessionで稼働します。`host start|stop|restart|status`は現在のユーザーに限定したnamed pipe経由でプロセスを管理し、`autostart enable|disable|status`はログオン自動起動を別に管理します。一方の設定はもう一方を変更しません。[ADR0017](docs/adr/0017-mcp-command-client-alias.md)と[ADR0019](docs/adr/0019-user-session-mcp-host.md)を参照してください。
 
 ## Diffのremote指定（開発中）
 
@@ -50,9 +81,11 @@ Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`�
 
 ## サービス接続と管理
 
-全業務コマンド（`version`を含む）はサービスへ接続します。`--config <path>`でJSON設定を指定します。`commands`は稼働サービスのコマンド一覧と入力schemaを返します。`help`はサービス未起動でも使用できます。
+全業務コマンド（`version`を含む）はサービスへ接続します。JSON設定は`<INSTALLFOLDER>\config\moyai.json`に固定し、`--config`で別ファイルを選択できません。`commands`は稼働サービスのコマンド一覧と入力schemaを返します。`help`はサービス未起動でも使用できます。
 
-管理コマンドは`service start`、`service stop`、`service pause`、`service resume`、`service register`、`service unregister`、`service status`です。登録は同じbin内のMCP実行ファイルと設定を使用し、Auto／LocalServiceと必要なディレクトリ権限を設定します。登録解除前は停止が必要です。`config-init`は設定不在時だけ初期JSONを作成します。管理コマンドはWindows SCMを使用し、業務処理やDBへ直接アクセスしません。
+管理コマンドは`host start|stop|restart|status`、`autostart enable|disable|status`です。`profile-init`は未作成の正規設定とユーザー領域のDB/logディレクトリを初期化し、新規profileで自動起動を有効にします。`profile-uninstall`は製品所有の自動起動entryだけを削除し、ユーザーデータを保持します。旧`service`コマンド群はサポートしません。管理コマンドは業務処理やDBへ直接アクセスしません。
+
+`host start`はreadyを最大60秒待ちます。接続後の制御応答には独立した10秒の期限があります。タイムアウトや応答前の切断だけでは停止済みと判定できません。管理操作を繰り返す前に`host status`を確認してください。`host restart`は停止応答を返したプロセスの終了を最大15秒待ち、終了を確認できない場合は次のプロセスを起動せず中断します。[ADR0019](docs/adr/0019-user-session-mcp-host.md)を参照してください。
 
 ## Command Groups
 

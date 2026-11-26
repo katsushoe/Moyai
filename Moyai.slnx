@@ -5,7 +5,9 @@
     <Project Path="src/Moyai.Cli/Moyai.Cli.csproj" />
     <Project Path="src/Moyai.Domain/Moyai.Domain.csproj" />
     <Project Path="src/Moyai.Infrastructure/Moyai.Infrastructure.csproj" />
+    <Project Path="src/Moyai.InstallerActions/Moyai.InstallerActions.csproj" />
     <Project Path="src/Moyai.Mcp/Moyai.Mcp.csproj" />
+    <Project Path="src/Moyai.Tray/Moyai.Tray.csproj" />
     <Project Path="src/Moyai.ProviderAuthentication/Moyai.ProviderAuthentication.csproj" />
     <Project Path="src/Moyai.Presentation.Windows/Moyai.Presentation.Windows.csproj" />
   </Folder>

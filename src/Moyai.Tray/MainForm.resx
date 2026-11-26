@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="$this.Text" xml:space="preserve"><value>Moyai</value></data>
+  <data name="ServerStatus" xml:space="preserve"><value>Status</value></data>
+  <data name="McpServerMenu" xml:space="preserve"><value>MCP server</value></data>
+  <data name="ServerCheck" xml:space="preserve"><value>Check status</value></data>
+  <data name="ServerUnknown" xml:space="preserve"><value>Status: unknown</value></data>
+  <data name="ServerStarting" xml:space="preserve"><value>Status: starting...</value></data>
+  <data name="ServerStopping" xml:space="preserve"><value>Status: stopping...</value></data>
+  <data name="Server_Running" xml:space="preserve"><value>MCP server: running</value></data>
+  <data name="ServerRunningVersion" xml:space="preserve"><value>MCP server: running ({0})</value></data>
+  <data name="Server_NotResponding" xml:space="preserve"><value>MCP server: not responding</value></data>
+  <data name="Server_Error" xml:space="preserve"><value>MCP server: error</value></data>
+  <data name="Server_Stopped" xml:space="preserve"><value>MCP server: stopped</value></data>
+  <data name="ServerStopConfirm" xml:space="preserve"><value>Stopping the MCP server disconnects every Codex and Claude Code session that uses Moyai until it is started again. Stop the server?</value></data>
+  <data name="ServerStart" xml:space="preserve"><value>Start</value></data>
+  <data name="ServerStop" xml:space="preserve"><value>Stop</value></data>
+  <data name="StartHost" xml:space="preserve"><value>Start MCP host</value></data>
+  <data name="StopHost" xml:space="preserve"><value>Stop MCP host</value></data>
+  <data name="Autostart" xml:space="preserve"><value>Start at Windows logon</value></data>
+  <data name="ShowStatus" xml:space="preserve"><value>Show host status</value></data>
+  <data name="ExitTray" xml:space="preserve"><value>Exit tray (host keeps running)</value></data>
+  <data name="RestartHost" xml:space="preserve"><value>Restart MCP host</value></data>
+  <data name="Config_unchanged" xml:space="preserve"><value>Configuration matches the running host</value></data>
+  <data name="Config_restart_required" xml:space="preserve"><value>Configuration changed: restart the MCP host to apply</value></data>
+  <data name="Config_missing" xml:space="preserve"><value>Configuration file missing; host retains loaded settings</value></data>
+  <data name="Config_unavailable" xml:space="preserve"><value>Configuration comparison unavailable; check the file and host version</value></data>
+  <data name="Config_unknown" xml:space="preserve"><value>Show host status to refresh configuration state</value></data>
+  <data name="Host_running" xml:space="preserve"><value>MCP host is running</value></data>
+  <data name="Host_not_running" xml:space="preserve"><value>MCP host is stopped</value></data>
+  <data name="Host_stopping" xml:space="preserve"><value>MCP host is stopping</value></data>
+  <data name="Host_unavailable" xml:space="preserve"><value>Host status unavailable</value></data>
+  <data name="HostOperationFailed" xml:space="preserve"><value>The host operation could not be confirmed. Check host status before retrying. No operation was resent.</value></data>
+  <data name="HostStarted" xml:space="preserve"><value>Host started</value></data>
+  <data name="ConfigLoaded" xml:space="preserve"><value>Configuration loaded</value></data>
+  <data name="ConfigPath" xml:space="preserve"><value>Configuration file</value></data>
+  <data name="DatabasePath" xml:space="preserve"><value>Database</value></data>
+  <data name="HostStatusTitle" xml:space="preserve"><value>Moyai host status</value></data>
+  <data name="CannotOpenStartup" xml:space="preserve"><value>Cannot open logon startup settings.</value></data>
+  <data name="CannotStartCli" xml:space="preserve"><value>Could not start the Moyai CLI.</value></data>
+  <data name="CloseStatus" xml:space="preserve"><value>Close</value></data>
+  <data name="Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="SettingsUnavailable" xml:space="preserve"><value>Could not open Moyai settings. Check the configuration file and log.</value></data>
+  <data name="About" xml:space="preserve"><value>About Moyai</value></data>
+</root>

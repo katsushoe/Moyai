@@ -10,6 +10,43 @@ public sealed class ClientRegistrationTests : IDisposable
     private readonly string _profile = Path.Combine(Path.GetTempPath(), "Moyai-Client-" + Guid.NewGuid().ToString("N"));
     private const string Endpoint = "http://127.0.0.1:43120/mcp";
 
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void AuthenticationSupportsUpgradeRotationRollbackAndRemoval(string client)
+    {
+        var registration = new ClientRegistration(client, _profile);
+        registration.Apply(true, Endpoint);
+        byte[] legacy = File.ReadAllBytes(Config(client));
+        string token = new('A', 64);
+        Assert.Equal("configured", registration.Apply(true, Endpoint, true, "auth", token));
+        Assert.Contains("Bearer " + token, File.ReadAllText(Config(client)));
+        Assert.DoesNotContain(token, File.ReadAllText(Path.Combine(_profile, ".moyai", client + "-owner.json")));
+        registration.Finish("rollback", "auth");
+        Assert.Equal(legacy, File.ReadAllBytes(Config(client)));
+        registration.Apply(true, Endpoint, bearerToken: token);
+        Assert.Equal("unchanged", registration.Apply(true, Endpoint, bearerToken: token));
+        string replacement = new('B', 64);
+        Assert.Equal("configured", registration.Apply(true, Endpoint, bearerToken: replacement));
+        Assert.Contains("Bearer " + replacement, File.ReadAllText(Config(client)));
+        Assert.Equal("unconfigured", registration.Apply(false, null));
+    }
+
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void AuthenticationRefusesToOverwriteUserModifiedHeader(string client)
+    {
+        var registration = new ClientRegistration(client, _profile);
+        string token = new('A', 64);
+        registration.Apply(true, Endpoint, bearerToken: token);
+        string modified = File.ReadAllText(Config(client)).Replace(token, new string('B', 64), StringComparison.Ordinal);
+        File.WriteAllText(Config(client), modified);
+        Assert.Throws<InvalidOperationException>(() => registration.Apply(true, Endpoint, bearerToken: token));
+        Assert.Throws<InvalidOperationException>(() => registration.Apply(false, null));
+        Assert.Equal(modified, File.ReadAllText(Config(client)));
+    }
+
     public ClientRegistrationTests() => Directory.CreateDirectory(_profile);
     public void Dispose() => Directory.Delete(_profile, true);
     private string Config(string client) => client == "codex" ? Path.Combine(_profile, ".codex", "config.toml") : Path.Combine(_profile, ".claude.json");

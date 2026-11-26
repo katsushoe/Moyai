@@ -5,30 +5,20 @@ $ErrorActionPreference = 'Stop'
 $cli = (Resolve-Path -LiteralPath $ExecutablePath).Path
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('Moyai-ClientCli-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($testRoot)
-$profilePath = Join-Path $testRoot 'test user'
-[void][IO.Directory]::CreateDirectory($profilePath)
-$configPath = Join-Path $testRoot 'moyai.json'
-[IO.File]::WriteAllText($configPath, '{"databasePath":"unused.db","serverUrl":"http://127.0.0.1:43219"}')
 $checks = 0
-function Invoke-Registration([string[]]$Arguments) {
-    $output = & $cli @Arguments
-    if ($LASTEXITCODE -ne 0) { throw 'Client registration CLI failed.' }
-    $value = $output | ConvertFrom-Json
-    if (-not $value.ok) { throw 'Expected successful structured response.' }
-    return $value
-}
+# Library tests cover registration, ownership and rollback in temporary profiles.
+# The CLI itself must reject any profile other than the signed-in user's profile.
 foreach ($client in @('codex', 'claude')) {
-    $result = Invoke-Registration @('configure', $client, '--profile', $profilePath, '--config', $configPath, '--transaction', '--transaction-id', 'cli-test')
-    if ($result.status -ne 'configured') { throw 'Expected configured state.' }; $checks++
-    $path = if ($client -eq 'codex') { Join-Path $profilePath '.codex\config.toml' } else { Join-Path $profilePath '.claude.json' }
-    if ([IO.File]::ReadAllText($path) -notmatch '43219/mcp') { throw 'Endpoint did not follow service configuration.' }; $checks++
-    $null = Invoke-Registration @('client-transaction', $client, '--profile', $profilePath, '--phase', 'rollback', '--transaction-id', 'cli-test')
-    if (Test-Path -LiteralPath $path) { throw 'Rollback did not remove newly created client configuration.' }; $checks++
-    $null = Invoke-Registration @('configure', $client, '--profile', $profilePath, '--config', $configPath)
-    $result = Invoke-Registration @('configure', $client, '--profile', $profilePath, '--config', $configPath)
-    if ($result.status -ne 'unchanged') { throw 'Repeated configuration is not idempotent.' }; $checks++
-    $result = Invoke-Registration @('unconfigure', $client, '--profile', $profilePath, '--config', (Join-Path $testRoot 'missing.json'))
-    if ($result.status -ne 'unconfigured') { throw 'Unconfigure required a running service or configuration.' }; $checks++
+    foreach ($command in @('configure', 'unconfigure', 'client-transaction')) {
+        $arguments = @($command, $client, '--profile', $testRoot)
+        if ($command -eq 'client-transaction') { $arguments += @('--phase', 'rollback') }
+        $output = & $cli @arguments 2>&1
+        if ($LASTEXITCODE -ne 1) { throw 'A foreign profile was not rejected.' }
+        $response = ($output -join "`n") | ConvertFrom-Json
+        if ($response.ok -or $response.error.message -notmatch "current user's profile") { throw 'Unexpected profile rejection.' }
+        $checks++
+    }
 }
-if (Test-Path -LiteralPath (Join-Path $testRoot 'unused.db')) { throw 'Registration accessed the database.' }; $checks++
-Write-Output "PASS: $checks client CLI checks. Temporary evidence: $testRoot"
+if (@(Get-ChildItem -LiteralPath $testRoot -Force).Count -ne 0) { throw 'Profile rejection wrote files.' }
+$checks++
+Write-Output "PASS: $checks isolated client CLI profile-boundary checks. Temporary evidence: $testRoot"

@@ -10,6 +10,10 @@ public static class RepositoryProviderContract
     {
         RepositoryOperation.ProviderVersion => "get_version",
         RepositoryOperation.PullRequestCreate => $"{toolPrefix}_pr_create",
+        RepositoryOperation.PullRequestPublishCreate => "github_pr_publish_create",
+        RepositoryOperation.PullRequestPublishStatus => "github_pr_publish_status",
+        RepositoryOperation.PullRequestGet => $"{toolPrefix}_pr_get",
+        RepositoryOperation.PullRequestMerge => $"{toolPrefix}_pr_merge",
         RepositoryOperation.BranchCreateLocal when string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) => "github_local_branch_create",
         RepositoryOperation.BranchSwitch when string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase) => "buckettie_branch_switch",
         _ => $"{toolPrefix}_{OperationName(operation)}",
@@ -20,6 +24,55 @@ public static class RepositoryProviderContract
         ArgumentNullException.ThrowIfNull(request);
         var arguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId };
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
+        if (request.Operation is RepositoryOperation.PullRequestPublishCreate or RepositoryOperation.PullRequestPublishStatus)
+        {
+            if (toolPrefix != "github") throw new ArgumentException("Publication requires Githubie.");
+            string operationId = request.Publication?.OperationId ?? request.PublicationOperationId ?? "";
+            PullRequestPublicationInput.ValidateOperationId(operationId);
+            arguments["operation_id"] = Guid.Parse(operationId).ToString("D");
+            if (request.Operation == RepositoryOperation.PullRequestPublishCreate)
+            {
+                PullRequestPublicationInput input = request.Publication ?? throw new ArgumentException("Publication input required.");
+                input.Validate();
+                arguments["source_branch"] = input.SourceBranch;
+                arguments["destination_branch"] = input.DestinationBranch;
+                arguments["expected_source_sha"] = input.ExpectedSourceSha.ToLowerInvariant();
+                arguments["title"] = input.Title;
+                arguments["description"] = input.Description;
+                arguments["draft"] = input.Draft;
+            }
+            return arguments;
+        }
+        if (request.Operation is RepositoryOperation.BranchProtectionGet or RepositoryOperation.BranchProtectionUpdate or RepositoryOperation.BranchProtectionDelete)
+        {
+            if (toolPrefix != "github") throw new ArgumentException("Hosting protection contract is not enabled for this Provider.");
+            BranchProtectionEdit.ValidateBranch(request.Branch);
+            arguments["branch"] = request.Branch;
+            if (request.Operation == RepositoryOperation.BranchProtectionUpdate)
+            {
+                BranchProtectionEdit edit = request.ProtectionEdit ?? throw new ArgumentException("Edit required.");
+                edit.Validate();
+                arguments["edit"] = edit;
+                arguments["create_if_missing"] = request.CreateProtectionIfMissing;
+            }
+        }
+        if (request.Operation is RepositoryOperation.PullRequestGet or RepositoryOperation.PullRequestMerge)
+        {
+            if (toolPrefix != "github") throw new ArgumentException("PR state contract is not enabled for this Provider.");
+            long id = request.PullRequestMerge?.PullRequestId ?? request.PullRequestRead?.PullRequestId ?? 0;
+            new PullRequestReadInput(id).Validate();
+            if (id > int.MaxValue) throw new ArgumentException("Githubie PR ID must fit Int32.");
+            arguments["pull_request_number"] = id;
+            if (request.Operation == RepositoryOperation.PullRequestMerge)
+            {
+                PullRequestMergeInput input = request.PullRequestMerge ?? throw new ArgumentException("Merge input is required.");
+                input.Validate();
+                if (input.Strategy == "fast_forward") throw new ArgumentException("Githubie does not support fast_forward.");
+                arguments["merge_strategy"] = input.Strategy == "repository_default" ? null : input.Strategy;
+                arguments["message"] = input.Message;
+                arguments["expected_source_commit_sha"] = input.ExpectedSourceCommit;
+            }
+        }
         if (request.Operation == RepositoryOperation.SettingsUpdate) arguments["changes"] = request.SettingsChanges?.Values ?? throw new ArgumentException("Settings changes are required.", nameof(request));
         if (request.Operation == RepositoryOperation.PullRequestCreate)
         {
@@ -60,6 +113,34 @@ public static class RepositoryProviderContract
     }
 
     public static string OperationName(RepositoryOperation operation) => operation.ContractName();
+
+    /// <summary>ホスティング保護の明示capabilityだけを受理します。</summary>
+    public static bool SupportsBranchProtection(string? output, RepositoryOperation operation)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output ?? "null");
+            string flag = operation == RepositoryOperation.BranchProtectionGet ? "branch_protection_read" : "branch_protection_write";
+            return document.RootElement.GetProperty("ok").ValueKind == JsonValueKind.True
+                && document.RootElement.GetProperty("data").GetProperty(flag).ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>PRの明示能力を確認し、作成や他操作の能力から推測しません。</summary>
+    public static bool SupportsPullRequestState(string? output, bool merge)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output ?? "null");
+            JsonElement root = document.RootElement;
+            JsonElement data = root.GetProperty("data");
+            return root.GetProperty("ok").ValueKind == JsonValueKind.True
+                && data.GetProperty("pr_get").ValueKind == JsonValueKind.True
+                && (!merge || data.GetProperty("pr_merge").ValueKind == JsonValueKind.True);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
 
     /// <summary>Provider別の明示PR作成capabilityだけを確認します。</summary>
     public static bool SupportsPullRequestCreate(string toolPrefix, string? output)

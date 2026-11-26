@@ -21,6 +21,8 @@ public sealed class RepositorySettingsChanges
             bool valid = name switch
             {
                 "direct_push_branches" or "pull_branches" or "protected_branches" or "local_commit_branches" => value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(static item => item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString())),
+                "pr_publication_source_branches" => ValidPublicationSources(value),
+                "pull_request_routes" => ValidPullRequestRoutes(value),
                 "require_clean_working_tree" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
                 "tag_target_branch" or "tag_pattern" or "commit_author_name" or "commit_author_email" => value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()),
                 _ => false,
@@ -34,5 +36,42 @@ public sealed class RepositorySettingsChanges
             && (!System.Net.Mail.MailAddress.TryCreate(email.GetString(), out var address) || address.Address != email.GetString()))
             throw new ArgumentException("Commit author email is invalid.", nameof(changes));
         return new RepositorySettingsChanges(new System.Collections.ObjectModel.ReadOnlyDictionary<string, JsonElement>(values));
+    }
+
+    internal static bool ValidPublicationSources(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array) return false;
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String || item.GetString() is not { Length: > 0 and <= 255 } branch
+                || branch == "@" || branch.StartsWith('-') || branch.StartsWith("refs/", StringComparison.Ordinal)
+                || branch.Contains("..", StringComparison.Ordinal) || branch.Contains("@{", StringComparison.Ordinal)
+                || branch.Split('/').Any(static part => part.Length == 0 || part.StartsWith('.') || part.EndsWith('.')
+                    || part.EndsWith(".lock", StringComparison.OrdinalIgnoreCase))
+                || branch.Any(static character => char.IsWhiteSpace(character) || char.IsControl(character) || "~^:?*[\\".Contains(character, StringComparison.Ordinal))
+                || !names.Add(branch)) return false;
+        }
+        return true;
+    }
+
+    internal static bool ValidPullRequestRoutes(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array) return false;
+        var routes = new HashSet<(string Source, string Destination)>();
+        foreach (JsonElement item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object || item.EnumerateObject().Count() != 2
+                || !item.TryGetProperty("source_branch", out JsonElement source) || !item.TryGetProperty("destination_branch", out JsonElement destination)
+                || !RouteBranch(source, out string from) || !RouteBranch(destination, out string to)
+                || !routes.Add((from, to))) return false;
+        }
+        return true;
+    }
+
+    private static bool RouteBranch(JsonElement value, out string branch)
+    {
+        branch = value.ValueKind == JsonValueKind.String ? value.GetString()! : "";
+        return !string.IsNullOrWhiteSpace(branch) && !branch.StartsWith('-') && branch.IndexOfAny([' ', '\t', '\r', '\n']) < 0;
     }
 }

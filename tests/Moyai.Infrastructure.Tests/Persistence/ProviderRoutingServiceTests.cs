@@ -277,6 +277,56 @@ public sealed class ProviderRoutingServiceTests
         Assert.Equal(0, provider.Calls);
     }
 
+    [Fact]
+    public async Task OwnerRouteSkipsLegacyTokenAndDoesNotRetryAssertionExpiry()
+    {
+        await using var fixture = new RoutingFixture();
+        (ProviderRoutingService service, RecordingProvider provider) = await fixture.CreateAsync(issueToken: false, mapped: true);
+        provider.UsesWindowsOwnerAuthentication = true;
+        provider.Next = new(false, "commit", null, "auth_assertion_expired", null);
+        RepositoryProviderResult result = await service.ExecuteAsync("Moyai", RepositoryOperation.Commit, message: "Owner fixture");
+        Assert.Equal("auth_assertion_expired", result.ErrorCode);
+        Assert.Equal(1, provider.Calls);
+        Assert.True(provider.LastRequest!.UseWindowsOwnerAuthentication);
+        Assert.False(provider.LastRequest.UseAssertion);
+        Assert.Null(provider.LastRequest.ServiceToken);
+        Assert.Equal("registered", provider.LastRequest.RepositoryId);
+        Assert.NotEqual(Guid.Empty, provider.LastRequest.ProjectId);
+    }
+
+    [Fact]
+    public async Task MergeUsesMappedContextAndNeverRetriesEvenKnownAssertionExpiry()
+    {
+        await using var fixture = new RoutingFixture();
+        var (service, provider) = await fixture.CreateAsync(issueToken: false, legacy: false, mapped: true);
+        provider.Next = new(false, "pull_request_merge", null, "auth_assertion_expired", null);
+        var result = await service.ExecutePullRequestStateAsync("Moyai", new(42), new(42, "merge", new string('a', 40)));
+        Assert.False(result.Ok);
+        Assert.False(result.Error!.Retryable);
+        Assert.Equal("not_executed", result.Error.Outcome);
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal("registered", provider.LastRequest!.RepositoryId);
+        Assert.True(provider.LastRequest.UseAssertion);
+        Assert.Null(provider.LastRequest.ServiceToken);
+        Assert.NotEqual(Guid.Empty, provider.LastRequest.ProjectId);
+        Assert.Equal(42, provider.LastRequest.PullRequestMerge!.PullRequestId);
+    }
+
+    [Fact]
+    public async Task MergeRejectsInvalidInputMissingProjectAndLegacyWithoutDispatch()
+    {
+        await using var fixture = new RoutingFixture();
+        var (service, provider) = await fixture.CreateAsync(issueToken: true);
+        var input = new PullRequestMergeInput(42, "merge", new string('a', 40));
+        var invalid = await service.ExecutePullRequestStateAsync("Moyai", new(43), input);
+        Assert.Equal("pull_request_invalid", invalid.Error!.Code);
+        var missing = await service.ExecutePullRequestStateAsync("Unknown", new(42), input);
+        Assert.Equal("project_not_found", missing.Error!.Code);
+        var legacy = await service.ExecutePullRequestStateAsync("Moyai", new(42), input);
+        Assert.Equal("auth_scope_denied", legacy.Error!.Code);
+        Assert.Equal(0, provider.Calls);
+    }
+
     private sealed class RoutingFixture : IAsyncDisposable
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"moyai-routing-{Guid.NewGuid():N}.db");
@@ -311,6 +361,7 @@ public sealed class ProviderRoutingServiceTests
     private sealed class RecordingProvider : IRepositoryProvider
     {
         public string Name => "githubbie";
+        public bool UsesWindowsOwnerAuthentication { get; set; }
         public RepositoryProviderRequest? LastRequest { get; private set; }
         public RepositoryProviderResult? Next { get; set; }
         public int Calls { get; private set; }

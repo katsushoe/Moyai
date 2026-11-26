@@ -3,6 +3,11 @@ using System.Text.Json.Serialization;
 
 namespace Moyai.Application.Providers;
 
+/// <summary>Providerが登録した完全一致のPR経路です。</summary>
+public sealed record RepositoryPullRequestRoute(
+    [property: JsonPropertyName("source_branch")] string SourceBranch,
+    [property: JsonPropertyName("destination_branch")] string DestinationBranch);
+
 /// <summary>Provider登録値だけを返す設定結果です。</summary>
 public sealed record RepositorySettings(
     [property: JsonPropertyName("direct_push_branches")] string[] DirectPushBranches,
@@ -13,7 +18,9 @@ public sealed record RepositorySettings(
     [property: JsonPropertyName("require_clean_working_tree")] bool RequireCleanWorkingTree,
     [property: JsonPropertyName("commit_author_name"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? CommitAuthorName,
     [property: JsonPropertyName("commit_author_email"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? CommitAuthorEmail,
-    [property: JsonPropertyName("local_commit_branches"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? LocalCommitBranches = null);
+    [property: JsonPropertyName("local_commit_branches"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? LocalCommitBranches = null,
+    [property: JsonPropertyName("pr_publication_source_branches"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? PrPublicationSourceBranches = null,
+    [property: JsonPropertyName("pull_request_routes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RepositoryPullRequestRoute[]? PullRequestRoutes = null);
 
 /// <summary>秘密を含むProvider生応答を公開しない共通エラーです。</summary>
 public sealed record RepositorySettingsError(string Code, string Outcome, string SuggestedAction, string? CorrelationId = null);
@@ -46,13 +53,16 @@ public sealed record RepositorySettingsResult(bool Ok, string Operation, string 
                 settings.GetProperty("tag_pattern").GetString() ?? throw new JsonException(), settings.GetProperty("require_clean_working_tree").GetBoolean(),
                 settings.GetProperty("commit_author_name").GetString(), settings.GetProperty("commit_author_email").GetString(),
                 isGithubie && settings.TryGetProperty("local_commit_branches", out _)
-                    ? ReadArray(settings, "local_commit_branches") : null);
+                    ? ReadArray(settings, "local_commit_branches") : null,
+                ReadPublicationSources(settings, isGithubie), ReadPullRequestRoutes(settings, isGithubie));
             bool update = operation == RepositoryOperation.SettingsUpdate;
             if (update && data.GetProperty("approved").ValueKind != JsonValueKind.True)
                 return Failure(project, operation, "provider_invalid_response", true);
             string[] changed = update ? ReadArray(data, "changed_fields") : [];
             if (changed.Any(name => name is not ("direct_push_branches" or "pull_branches" or "protected_branches" or "tag_target_branch" or "tag_pattern" or "require_clean_working_tree" or "commit_author_name" or "commit_author_email")
-                && !(name == "local_commit_branches" && isGithubie && parsed.LocalCommitBranches is not null)))
+                && !(name == "local_commit_branches" && isGithubie && parsed.LocalCommitBranches is not null)
+                && !(name == "pr_publication_source_branches" && isGithubie && parsed.PrPublicationSourceBranches is not null)
+                && !(name == "pull_request_routes" && isGithubie && parsed.PullRequestRoutes is not null)))
                 throw new JsonException();
             string canonicalProvider = provider switch
             {
@@ -69,6 +79,21 @@ public sealed record RepositorySettingsResult(bool Ok, string Operation, string 
     }
 
     private static string[] ReadArray(JsonElement element, string name) => element.GetProperty(name).EnumerateArray().Select(static value => value.GetString() ?? throw new JsonException()).ToArray();
+
+    private static string[]? ReadPublicationSources(JsonElement settings, bool githubie)
+    {
+        if (!githubie || !settings.TryGetProperty("pr_publication_source_branches", out JsonElement value)) return null;
+        if (!RepositorySettingsChanges.ValidPublicationSources(value)) throw new JsonException();
+        return value.EnumerateArray().Select(static item => item.GetString()!).ToArray();
+    }
+
+    private static RepositoryPullRequestRoute[]? ReadPullRequestRoutes(JsonElement settings, bool githubie)
+    {
+        if (!githubie || !settings.TryGetProperty("pull_request_routes", out JsonElement value)) return null;
+        if (!RepositorySettingsChanges.ValidPullRequestRoutes(value)) throw new JsonException();
+        return value.EnumerateArray().Select(static route => new RepositoryPullRequestRoute(
+            route.GetProperty("source_branch").GetString()!, route.GetProperty("destination_branch").GetString()!)).ToArray();
+    }
 
     private static string? ReadCorrelation(string? detail)
     {

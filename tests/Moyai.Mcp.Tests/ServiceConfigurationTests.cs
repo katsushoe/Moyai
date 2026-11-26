@@ -10,14 +10,14 @@ public sealed class ServiceConfigurationTests
     [InlineData("http://localhost:43120")]
     [InlineData("http://127.0.0.1:43120")]
     [InlineData("https://[::1]:43120")]
-    public void ConfigurationAcceptsLoopback(string url) => new MoyaiSettings { ServerUrl = url }.Validate();
+    public void ConfigurationAcceptsLoopback(string url) => new MoyaiSettings { ServerUrl = url, ApiToken = new string('A', 64) }.Validate();
 
     [Theory]
     [InlineData("http://example.com")]
     [InlineData("file:///test.db")]
     [InlineData("http://user:secret@localhost")]
     [InlineData("")]
-    public void ConfigurationRejectsUnsafeEndpoint(string url) => Assert.Throws<InvalidOperationException>(() => new MoyaiSettings { ServerUrl = url }.Validate());
+    public void ConfigurationRejectsUnsafeEndpoint(string url) => Assert.Throws<InvalidOperationException>(() => new MoyaiSettings { ServerUrl = url, ApiToken = new string('A', 64) }.Validate());
 
     [Fact]
     public void LoadResolvesDatabaseAgainstConfigDirectory()
@@ -27,7 +27,7 @@ public sealed class ServiceConfigurationTests
         string path = Path.Combine(directory, "moyai.json");
         try
         {
-            File.WriteAllText(path, "{\"databasePath\":\"state.db\",\"serverUrl\":\"http://localhost:4444\"}");
+            File.WriteAllText(path, JsonSerializer.Serialize(new { databasePath = "state.db", serverUrl = "http://localhost:4444", apiToken = new string('A', 64) }));
             var settings = MoyaiSettings.Load(path);
             Assert.Equal(Path.Combine(directory, "state.db"), settings.DatabasePath);
             Assert.False(File.Exists(settings.DatabasePath));
@@ -60,12 +60,48 @@ public sealed class ServiceConfigurationTests
     }
 
     [Fact]
-    public void PauseAndResumePreserveAdmissionState()
+    public void OperationalConfigurationIsFixedAndRuntimeStateRemainsUserScoped()
     {
-        var admission = new ServiceAdmission();
-        Assert.False(admission.IsPaused);
-        admission.Pause(); Assert.True(admission.IsPaused);
-        admission.Pause(); Assert.True(admission.IsPaused);
-        admission.Resume(); Assert.False(admission.IsPaused);
+        string profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Akatsukisoft", "Moyai");
+        Assert.True(Path.IsPathFullyQualified(MoyaiSettings.DefaultPath));
+        Assert.Equal("moyai.json", Path.GetFileName(MoyaiSettings.DefaultPath));
+        Assert.Equal("config", Path.GetFileName(Path.GetDirectoryName(MoyaiSettings.DefaultPath)));
+        Assert.Equal(Path.Combine(profile, "data", "moyai.db"), new MoyaiSettings().DatabasePath);
+        Assert.Equal(Path.Combine(profile, "logs"), MoyaiSettings.DefaultLogDirectory);
+    }
+
+    [Fact]
+    public void OperationalConfigurationAcceptsOnlyCanonicalAliases()
+    {
+        string canonical = MoyaiSettings.DefaultPath;
+        foreach (string? path in new[] { null, canonical, canonical.ToLowerInvariant(),
+            Path.Combine(Path.GetDirectoryName(canonical)!, "..", "config", "moyai.json") })
+            Assert.Equal(canonical, MoyaiSettings.ResolveOperationalPath(path));
+    }
+
+    [Theory]
+    [InlineData(@"D:\Apps\Moyai\bin", @"D:\Apps\Moyai\config\moyai.json")]
+    [InlineData(@"D:\Apps\Moyai\bin\host", @"D:\Apps\Moyai\config\moyai.json")]
+    [InlineData(@"D:\Apps\Moyai\bin\tray", @"D:\Apps\Moyai\config\moyai.json")]
+    [InlineData(@"E:\My Apps\もやい\bin\host", @"E:\My Apps\もやい\config\moyai.json")]
+    public void UnregisteredPackageUsesItsInstallationDirectory(string binaryDirectory, string expected)
+        => Assert.Equal(expected, OperationalConfigurationPath.Resolve(binaryDirectory));
+
+    [Fact]
+    public void EmbeddedInstallerHelperUsesRegisteredInstallationRatherThanExtractionDirectory()
+        => Assert.Equal(@"E:\My Apps\もやい\config\moyai.json",
+            OperationalConfigurationPath.Resolve(@"D:\Temp\MSI-helper", @"E:\My Apps\もやい"));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("relative")]
+    public void InvalidRegisteredInstallationFailsWithoutFallback(string directory)
+        => Assert.Throws<InvalidOperationException>(() => OperationalConfigurationPath.Resolve(@"D:\Temp\MSI-helper", directory));
+
+    [Fact]
+    public void OperationalConfigurationRejectsProfileAndOtherFiles()
+    {
+        Assert.Throws<ArgumentException>(() => MoyaiSettings.ResolveOperationalPath(Path.Combine(MoyaiSettings.ProfileDirectory, "config", "moyai.json")));
+        Assert.Throws<ArgumentException>(() => MoyaiSettings.ResolveOperationalPath(Path.Combine(Path.GetTempPath(), "moyai.json")));
     }
 }

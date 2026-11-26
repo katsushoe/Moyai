@@ -12,7 +12,7 @@ Users need a recognizable MCP command client name while retaining the existing `
 
 Build and publish `moyaimcp.exe` as a byte-identical copy of the Windows `moyaictl.exe` apphost in the same directory. Both resolve the same CLI assembly and dependencies; single-file publishing copies the complete executable. No second application, command dispatch implementation or service host is introduced. The MSI's existing publish-file harvest includes the additional executable.
 
-Both names accept `--config <path>` before or after the command. Business commands read `serverUrl` from that configuration and call the running service's MCP tools and schemas. Existing management commands retain their Windows SCM or local configuration responsibilities. Explicit `service start` remains a management operation. `--help` and `--version` run locally without loading a configuration or connecting; `version` continues to query the service.
+Both names accept `--config <path>` before or after the command. Business commands read `serverUrl` from that configuration and call the current user's MCP host tools and schemas. Host process and autostart management use `host` and `autostart` commands; the Windows SCM command family is superseded by ADR 0019. `--help` and `--version` run locally without loading a configuration or connecting; `version` queries the host.
 
 ## Alternatives
 

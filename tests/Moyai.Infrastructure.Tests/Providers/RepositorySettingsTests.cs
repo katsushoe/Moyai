@@ -14,6 +14,39 @@ public sealed class RepositorySettingsTests
     private static readonly string[] MainBranches = ["main"];
     private static readonly string[] CleanChangedFields = ["require_clean_working_tree"];
     private static readonly string[] LocalCommitChangedFields = ["local_commit_branches"];
+
+    [Theory]
+    [InlineData(false, "local_commit_branches")]
+    [InlineData(true, "local_commit_branches")]
+    [InlineData(false, "pr_publication_source_branches")]
+    [InlineData(true, "pr_publication_source_branches")]
+    [InlineData(false, "pull_request_routes")]
+    [InlineData(true, "pull_request_routes")]
+    public async Task CanonicalGithubieOwnerSettingsRetainBindingAndExplicitFields(bool update, string field)
+    {
+        await using var fixture = new Fixture();
+        ProviderRoutingService routing = await fixture.CreateAsync("githubie");
+        fixture.Provider.UsesWindowsOwnerAuthentication = true;
+        fixture.Provider.Next = new(true, update ? "repository_settings_update" : "repository_settings_get",
+            PublicationSettingsJson(field, "[]"), null, null);
+        var result = await routing.ExecuteSettingsAsync("Display", update ? Changes("{\"" + field + "\":[]}") : null);
+        Assert.True(result.Ok);
+        Assert.Equal("githubie", result.Provider);
+        Assert.Equal(update, result.Approved);
+        Assert.NotNull(result.Settings);
+        Assert.Equal(1, fixture.Provider.Calls);
+        Assert.True(fixture.Provider.Last!.UseWindowsOwnerAuthentication);
+        Assert.False(fixture.Provider.Last.UseAssertion);
+        Assert.Null(fixture.Provider.Last.ServiceToken);
+        Assert.Equal("registered", fixture.Provider.Last.RepositoryId);
+        Assert.NotEqual(Guid.Empty, fixture.Provider.Last.ProjectId);
+        if (update)
+        {
+            Assert.Equal(field, Assert.Single(result.ChangedFields));
+            Assert.Equal(field, Assert.Single(fixture.Provider.Last.SettingsChanges!.Values).Key);
+        }
+        else Assert.Empty(result.ChangedFields);
+    }
     [Theory]
     [InlineData("{}")]
     [InlineData("{\"token\":\"secret\"}")]
@@ -164,6 +197,136 @@ public sealed class RepositorySettingsTests
     public static Dictionary<string, JsonElement> Changes(string json) => JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!;
 
     [Theory]
+    [InlineData("pr_publication_source_branches", "null")]
+    [InlineData("pr_publication_source_branches", "{}")]
+    [InlineData("pr_publication_source_branches", "[null]")]
+    [InlineData("pr_publication_source_branches", "[\"docs/topic\",\"docs/topic\"]")]
+    [InlineData("pr_publication_source_branches", "[\"docs/*\"]")]
+    [InlineData("pr_publication_source_branches", "[\"refs/heads/topic\"]")]
+    [InlineData("pr_publication_source_branches", "[\".hidden/topic\"]")]
+    [InlineData("pr_publication_source_branches", "[\"topic.lock\"]")]
+    [InlineData("pr_publication_source_branches", "[\"topic..other\"]")]
+    [InlineData("pr_publication_source_branches", "[\"topic branch\"]")]
+    [InlineData("pull_request_routes", "null")]
+    [InlineData("pull_request_routes", "[null]")]
+    [InlineData("pull_request_routes", "[\"topic\"]")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":\"topic\"}]")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":null,\"destination_branch\":\"main\"}]")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":\"\",\"destination_branch\":\"main\"}]")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":\"-topic\",\"destination_branch\":\"main\"}]")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":\"topic\",\"destination_branch\":\"main\",\"token\":\"hidden\"}]")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":\"topic\",\"destination_branch\":\"main\"},{\"source_branch\":\"topic\",\"destination_branch\":\"main\"}]")]
+    public void PublicationSettingsRejectInvalidInput(string name, string value) =>
+        Assert.Throws<ArgumentException>(() => RepositorySettingsChanges.Create(Changes("{\"" + name + "\":" + value + "}")));
+
+    [Theory]
+    [InlineData("pr_publication_source_branches", "[]")]
+    [InlineData("pr_publication_source_branches", "[\"docs/topic\",\"Docs/topic\"]")]
+    [InlineData("pull_request_routes", "[]")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":\"docs/topic\",\"destination_branch\":\"main\"},{\"source_branch\":\"Docs/topic\",\"destination_branch\":\"main\"}]")]
+    public async Task GithubiePublicationSettingsPreserveExactInputAndReturnedChange(string name, string value)
+    {
+        await using var fixture = new Fixture();
+        ProviderRoutingService routing = await fixture.CreateAsync();
+        fixture.Provider.Next = new(true, "repository_settings_update", PublicationSettingsJson(name, value), null, null);
+        var result = await routing.ExecuteSettingsAsync("Display", Changes("{\"" + name + "\":" + value + "}"));
+        Assert.True(result.Ok);
+        Assert.True(result.Approved);
+        Assert.Equal(name, Assert.Single(result.ChangedFields));
+        Assert.Equal(value, fixture.Provider.Last!.SettingsChanges!.Values[name].GetRawText());
+        Assert.Single(fixture.Provider.Last.SettingsChanges.Values);
+        Assert.True(fixture.Provider.Last.UseAssertion);
+        Assert.NotEqual(Guid.Empty, fixture.Provider.Last.ProjectId);
+        var arguments = RepositoryProviderContract.Arguments("github", fixture.Provider.Last);
+        Assert.Equal("registered", arguments["repository"]);
+        Assert.Equal(2, arguments.Count);
+        Assert.Equal(1, fixture.Provider.Calls);
+        JsonElement settings = JsonSerializer.SerializeToElement(result.Settings);
+        Assert.Equal(value, settings.GetProperty(name).GetRawText());
+        Assert.False(settings.TryGetProperty("local_commit_branches", out _));
+    }
+
+    [Theory]
+    [InlineData("pr_publication_source_branches")]
+    [InlineData("pull_request_routes")]
+    public async Task BuckettiePublicationSettingsAreRejectedBeforeDispatch(string name)
+    {
+        await using var fixture = new Fixture();
+        ProviderRoutingService routing = await fixture.CreateAsync("bitbucket");
+        var result = await routing.ExecuteSettingsAsync("Display", Changes("{\"" + name + "\":[]}"));
+        Assert.False(result.Ok);
+        Assert.Equal("repository_settings_invalid", result.Error!.Code);
+        Assert.Equal("not_executed", result.Error.Outcome);
+        Assert.Equal(0, fixture.Provider.Calls);
+    }
+
+    [Theory]
+    [InlineData("pr_publication_source_branches", "null")]
+    [InlineData("pr_publication_source_branches", "[\"topic\",\"topic\"]")]
+    [InlineData("pull_request_routes", "null")]
+    [InlineData("pull_request_routes", "[{\"source_branch\":\"topic\"}]")]
+    public void InvalidPublicationSettingsResponseIsNotAccepted(string name, string value)
+    {
+        string json = PublicationSettingsJson(name, value);
+        var get = RepositorySettingsResult.Parse("Display", RepositoryOperation.SettingsGet, new(true, "repository_settings_get", json, null, null));
+        Assert.False(get.Ok);
+        Assert.Equal("not_executed", get.Error!.Outcome);
+        var update = RepositorySettingsResult.Parse("Display", RepositoryOperation.SettingsUpdate, new(true, "repository_settings_update", json, null, null));
+        Assert.False(update.Ok);
+        Assert.Equal("unknown", update.Error!.Outcome);
+    }
+
+    [Theory]
+    [InlineData("pr_publication_source_branches")]
+    [InlineData("pull_request_routes")]
+    public void ChangedPublicationFieldRequiresReturnedRegisteredValue(string name)
+    {
+        using JsonDocument original = JsonDocument.Parse(SuccessJson(true));
+        var settings = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(original.RootElement.GetProperty("data").GetProperty("settings").GetRawText())!;
+        string json = JsonSerializer.Serialize(new { ok = true, data = new { settings, approved = true, changed_fields = new[] { name } } });
+        var result = RepositorySettingsResult.Parse("Display", RepositoryOperation.SettingsUpdate, new(true, "repository_settings_update", json, null, null));
+        Assert.False(result.Ok);
+        Assert.Equal("unknown", result.Error!.Outcome);
+    }
+
+    [Fact]
+    public void BuckettieGetDoesNotExposeGithubiePublicationFields()
+    {
+        string json = PublicationSettingsJson("pr_publication_source_branches", "[]");
+        var result = RepositorySettingsResult.Parse("Display", RepositoryOperation.SettingsGet, new(true, "repository_settings_get", json, null, null), "buckettie");
+        Assert.True(result.Ok);
+        Assert.Null(result.Settings!.PrPublicationSourceBranches);
+        Assert.Null(result.Settings.PullRequestRoutes);
+        Assert.DoesNotContain("pr_publication_source_branches", JsonSerializer.Serialize(result.Settings));
+    }
+
+    private static string PublicationSettingsJson(string name, string value)
+    {
+        using JsonDocument original = JsonDocument.Parse(SuccessJson(true));
+        var settings = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(original.RootElement.GetProperty("data").GetProperty("settings").GetRawText())!;
+        using JsonDocument field = JsonDocument.Parse(value);
+        settings[name] = field.RootElement.Clone();
+        return JsonSerializer.Serialize(new { ok = true, data = new { settings, approved = true, changed_fields = new[] { name } } });
+    }
+
+    [Fact]
+    public void PublicationSourcePolicyRefusalRemainsNotExecutedAndNonRetryable()
+    {
+        string operation = RepositoryOperation.PullRequestPublishCreate.ContractName();
+        string json = JsonSerializer.Serialize(new { ok = false, operation, data = (object?)null,
+            error = new { code = "publication_source_not_allowed", outcome = "not_executed", correlation_id = "fixture-refusal" } });
+        var context = new PublicationRequestContext(Guid.NewGuid().ToString("D"), "docs/topic", "main", new string('a', 40));
+        var result = PullRequestPublicationResult.Parse("Display", "githubie", RepositoryOperation.PullRequestPublishCreate,
+            context, new(false, operation, json, "publication_source_not_allowed", json));
+        Assert.False(result.Ok);
+        Assert.Equal("publication_source_not_allowed", result.Error!.Code);
+        Assert.Equal("not_executed", result.Error.Outcome);
+        Assert.False(result.Error.Retryable);
+        Assert.False(result.RequiresReconciliation);
+        Assert.False(result.ProviderDataAvailable);
+    }
+
+    [Theory]
     [InlineData("null")]
     [InlineData("true")]
     [InlineData("1")]
@@ -298,6 +461,7 @@ public sealed class RepositorySettingsTests
     private sealed class Provider : IRepositoryProvider
     {
         public string Name { get; set; } = "githubbie";
+        public bool UsesWindowsOwnerAuthentication { get; set; }
         public int Calls { get; private set; }
         public RepositoryProviderRequest? Last { get; private set; }
         public RepositoryProviderResult Next { get; set; } = new(true, "repository_settings_update", SuccessJson(true), null, null);
@@ -322,7 +486,7 @@ public sealed class RepositorySettingsTests
             var projects = new ProjectService(repository, TimeProvider.System);
             await projects.CreateAsync(new CreateProjectCommand("Display", "source", null, "https://github.com/example/repo.git", provider));
             await projects.SetProviderRepositoryAsync("Display", 1, "registered", false, "test", "test");
-            Provider.Name = provider == "bitbucket" ? "buckettie" : "githubbie";
+            Provider.Name = provider switch { "bitbucket" => "buckettie", "githubie" => "githubie", _ => "githubbie" };
             return new(repository, new SqliteServiceTokenRepository(db), [Provider], TimeProvider.System,
                 legacy ? new RepositoryAuthentication("legacy", DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddHours(1)) : null);
         }
