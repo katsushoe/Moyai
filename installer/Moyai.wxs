@@ -54,6 +54,43 @@
           <Publish Event="EndDialog" Value="Exit" />
         </Control>
       </Dialog>
+      <!-- Windows Installer requires these dialogs; without them an upgrade while Moyai is running fails with errors 2803/2867. -->
+      <Property Id="ErrorDialog" Value="MoyaiErrorDialog" />
+      <Property Id="MOYAI_RM_OPTION" Value="UseRM" />
+      <Dialog Id="MoyaiErrorDialog" Width="270" Height="105" Title="Moyai" ErrorDialog="yes">
+        <Control Id="ErrorText" Type="Text" X="15" Y="12" Width="240" Height="60" TabSkip="no" Text="Information text" />
+        <Control Id="Y" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="Yes"><Publish Event="EndDialog" Value="ErrorYes" /></Control>
+        <Control Id="A" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="Cancel"><Publish Event="EndDialog" Value="ErrorAbort" /></Control>
+        <Control Id="C" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="Cancel"><Publish Event="EndDialog" Value="ErrorCancel" /></Control>
+        <Control Id="I" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="Ignore"><Publish Event="EndDialog" Value="ErrorIgnore" /></Control>
+        <Control Id="N" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="No"><Publish Event="EndDialog" Value="ErrorNo" /></Control>
+        <Control Id="O" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="OK"><Publish Event="EndDialog" Value="ErrorOk" /></Control>
+        <Control Id="R" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="Retry"><Publish Event="EndDialog" Value="ErrorRetry" /></Control>
+      </Dialog>
+      <Dialog Id="MsiRMFilesInUse" Width="370" Height="270" Title="Moyai" KeepModeless="yes">
+        <Control Id="Text" Type="Text" X="15" Y="15" Width="340" Height="45" Text="Moyai programs that this setup needs to update are running. Close them automatically and continue, or continue without closing them (a restart may then be required). Closing Moyai disconnects its MCP sessions; start Moyai again from the Start menu after setup." />
+        <Control Id="List" Type="ListBox" X="15" Y="65" Width="340" Height="110" Property="FileInUseProcess" Sunken="yes" TabSkip="yes" />
+        <Control Id="ShutdownOption" Type="RadioButtonGroup" X="15" Y="185" Width="340" Height="40" Property="MOYAI_RM_OPTION">
+          <RadioButtonGroup Property="MOYAI_RM_OPTION">
+            <RadioButton Value="UseRM" X="0" Y="0" Width="340" Height="17" Text="Close the programs automatically and continue (recommended)" />
+            <RadioButton Value="DontUseRM" X="0" Y="20" Width="340" Height="17" Text="Do not close the programs (a restart may be required)" />
+          </RadioButtonGroup>
+        </Control>
+        <Control Id="OK" Type="PushButton" X="190" Y="240" Width="75" Height="20" Default="yes" Text="OK">
+          <Publish Event="RMShutdownAndRestart" Value="0" Condition="MOYAI_RM_OPTION = &quot;UseRM&quot;" />
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="280" Y="240" Width="75" Height="20" Cancel="yes" Text="Cancel">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+      <Dialog Id="FilesInUse" Width="370" Height="270" Title="Moyai" KeepModeless="yes">
+        <Control Id="Text" Type="Text" X="15" Y="15" Width="340" Height="45" Text="The following programs are using files that this setup needs to update. Close them and click Retry, click Ignore to continue (a restart may then be required), or click Exit to cancel setup." />
+        <Control Id="List" Type="ListBox" X="15" Y="65" Width="340" Height="150" Property="FileInUseProcess" Sunken="yes" TabSkip="yes" />
+        <Control Id="Retry" Type="PushButton" X="100" Y="240" Width="75" Height="20" Default="yes" Text="Retry"><Publish Event="EndDialog" Value="Retry" /></Control>
+        <Control Id="Ignore" Type="PushButton" X="190" Y="240" Width="75" Height="20" Text="Ignore"><Publish Event="EndDialog" Value="Ignore" /></Control>
+        <Control Id="Exit" Type="PushButton" X="280" Y="240" Width="75" Height="20" Cancel="yes" Text="Exit"><Publish Event="EndDialog" Value="Exit" /></Control>
+      </Dialog>
       <InstallUISequence>
         <Show Dialog="McpClientsDialog" Before="ExecuteAction" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
       </InstallUISequence>

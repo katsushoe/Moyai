@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.1.0.3
+
+- Fixed the installer failing with Windows Installer errors 2803/2867 when Moyai is running during an upgrade. The setup now shows a files-in-use dialog that can close the running Moyai programs automatically, and an error dialog.
+
 ## 2.1.0.2
 
 - Githubie owner mode no longer compares the Githubie executable's SHA-256, so updating Githubie at the same path no longer stops Moyai with `discovery_runtime_mismatch`. Path, process image, owner, session, liveness, profile and ACL checks remain. `runtimeSha256` is deprecated and ignored (CR-2026-11-27).
