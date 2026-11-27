@@ -165,11 +165,11 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     public Task<RepositoryProviderResult> ProviderCapabilities(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.ProviderCapabilities, cancellationToken: cancellationToken));
 
     /// <summary>Provider登録設定を読み取り、秘密を含まない結果を返します。</summary>
-    [McpServerTool(Name = "repository_settings_get", ReadOnly = true), Description("Reads eight non-secret registered Repository settings through the agreed Githubie assertion route. Does not change Git or Provider settings.")]
+    [McpServerTool(Name = "repository_settings_get", ReadOnly = true), Description("Reads eight common registered Repository settings and Githubie's optional local_commit_branches, pr_publication_source_branches and pull_request_routes through the Project-bound authenticated route. Absent and empty arrays remain distinct.")]
     public Task<RepositorySettingsResult> RepositorySettingsGet(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, cancellationToken: cancellationToken));
 
     /// <summary>指定設定だけをProviderの人による承認後に更新します。</summary>
-    [McpServerTool(Name = "repository_settings_update", Destructive = true), Description("Partially updates explicit settings through Githubie with repository.settings.write and Provider human approval. Omitted fields stay omitted; unknown outcomes require a read before another update.")]
+    [McpServerTool(Name = "repository_settings_update", Destructive = true), Description("Partially updates agreed settings with repository.settings.write and Provider human approval. Githubie additionally accepts local_commit_branches, pr_publication_source_branches and pull_request_routes as exact replacement arrays; routes contain source_branch and destination_branch. Omission preserves, empty clears, null is rejected; Buckettie retains eight common fields. Unknown outcomes require a read before another update.")]
     public Task<RepositorySettingsResult> RepositorySettingsUpdate(string project, Dictionary<string, System.Text.Json.JsonElement> changes, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteSettingsAsync(project, changes ?? throw new ArgumentNullException(nameof(changes)), cancellationToken));
 
     [McpServerTool(Name = "repository_diff", ReadOnly = true), Description("Gets repository diff through the Provider configured for a Moyai-managed project.")]
@@ -197,8 +197,54 @@ public sealed class MoyaiTools(ProjectService projects, ProjectQueryService quer
     [McpServerTool(Name = "branch_list", ReadOnly = true), Description("Lists branches through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchList(string project, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchList, cancellationToken: cancellationToken));
 
+    /// <summary>明示したsource/destinationでProviderへPR作成を要求します。</summary>
+    [McpServerTool(Name = "pull_request_create", Destructive = true, OpenWorld = true), Description("Creates a pull request on an explicit source/destination route through the configured Provider. Requires dedicated capability and verified Windows-owner authentication or a Provider-specific PR write assertion, according to the configured authentication mode. Provider policy and approval remain required. Does not alter route policy, push, merge or retry an unknown outcome.")]
+    public Task<PullRequestResult> PullRequestCreate(string project, string sourceBranch, string destinationBranch, string title, string description, bool draft, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecutePullRequestAsync(project, new(sourceBranch, destinationBranch, title, description, draft), cancellationToken));
+
+    /// <summary>登録ProjectのPRを認証付きで読み取り、実測source SHAを返します。</summary>
+    [McpServerTool(Name = "pull_request_get", ReadOnly = true, Destructive = false, OpenWorld = true), Description("Reads an actual PR snapshot through the configured Provider. Requires explicit pr_get capability and authenticated access. Buckettie PR state routing is not enabled.")]
+    public Task<PullRequestStateResult> PullRequestGet(string project, long pullRequestId, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecutePullRequestStateAsync(project, new(pullRequestId), cancellationToken: cancellationToken));
+
+    /// <summary>ホスティング側のclassic exact-branch保護を読み取ります。</summary>
+    [McpServerTool(Name = "branch_protection_get", ReadOnly = true, Destructive = false, OpenWorld = true), Description("Reads a registered Project's classic exact-branch hosting protection through Githubie. Requires explicit capability and authenticated access. A missing/inaccessible rule is not proof the branch is unprotected; rulesets and Provider protected_branches are separate.")]
+    public Task<BranchProtectionResult> BranchProtectionGet(string project, string branch, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecuteBranchProtectionAsync(project, branch, RepositoryOperation.BranchProtectionGet, cancellationToken: cancellationToken));
+
+    /// <summary>指定項目だけを更新し、Provider承認とMoyai監査を必須にします。</summary>
+    [McpServerTool(Name = "branch_protection_update", Destructive = true, OpenWorld = true), Description("Updates only explicitly supplied hosting protection fields; null preserves existing values. createIfMissing must be explicit for creation. Requires Githubie capability, owner or dedicated branch-protection assertion authority, Provider Desktop approval and Moyai durable audit. Never automatically replays; independently read after unknown outcomes.")]
+    public Task<BranchProtectionResult> BranchProtectionUpdate(string project, string branch, BranchProtectionEdit edit, bool createIfMissing = false, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecuteBranchProtectionAsync(project, branch, RepositoryOperation.BranchProtectionUpdate, edit, createIfMissing, cancellationToken));
+
+    /// <summary>classic ruleだけを削除し、rulesetの解除を意味しません。</summary>
+    [McpServerTool(Name = "branch_protection_delete", Destructive = true, OpenWorld = true), Description("Deletes only the classic exact-branch protection rule, through Githubie Desktop approval and Moyai audit. Does not alter rulesets or Provider push policy. Requires explicit capability and dedicated authority. Unknown outcomes are not replayed; reconcile with a separate read.")]
+    public Task<BranchProtectionResult> BranchProtectionDelete(string project, string branch, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecuteBranchProtectionAsync(project, branch, RepositoryOperation.BranchProtectionDelete, cancellationToken: cancellationToken));
+
+    /// <summary>承認対象SHAを事前照合し、PRマージを一度だけ要求します。</summary>
+    [McpServerTool(Name = "pull_request_merge", Destructive = true, OpenWorld = true), Description("Merges only after explicit user approval for the PR, strategy and full expectedSourceCommit SHA. Requires authenticated preflight, explicit pr_get/pr_merge capabilities and dedicated merge authority. Unknown outcomes are never replayed; reconcile with pull_request_get. Buckettie routing is not enabled.")]
+    public Task<PullRequestStateResult> PullRequestMerge(string project, long pullRequestId, string strategy, string expectedSourceCommit, string? message = null, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecutePullRequestStateAsync(project, new(pullRequestId), new(pullRequestId, strategy, expectedSourceCommit, message), cancellationToken));
+
+    /// <summary>固定SHAだけを公開し、部分結果を保持します。</summary>
+    [McpServerTool(Name = "pull_request_publish_create", Destructive = true, OpenWorld = true), Description("Explicitly publishes only the approved fixed source SHA and creates a PR through Githubie owner approval. Select project from list_projects. Requires both publication capabilities; assertion mode requires push and PR-write scopes. Keep the supplied operationId across failures. Never automatically resend; inspect pull_request_publish_status for unknown outcomes.")]
+    public Task<PullRequestPublicationResult> PullRequestPublishCreate(string project, string sourceBranch, string destinationBranch,
+        string expectedSourceSha, string title, string operationId, bool draft, string description = "", CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecutePublicationAsync(project, operationId,
+            new(sourceBranch, destinationBranch, expectedSourceSha, title, operationId, draft, description), cancellationToken));
+
+    /// <summary>同じUUIDの永続結果を読取照合します。</summary>
+    [McpServerTool(Name = "pull_request_publish_status", ReadOnly = true, Destructive = false, OpenWorld = true), Description("Reads or reconciles a Githubie publication operation using its original explicit UUID; never creates a branch or PR. Select the registered project with list_projects. Preserves partial publication/PR states, including unknown outcomes.")]
+    public Task<PullRequestPublicationResult> PullRequestPublishStatus(string project, string operationId, CancellationToken cancellationToken = default) =>
+        WithConfigurationErrors(() => routing.ExecutePublicationAsync(project, operationId, cancellationToken: cancellationToken));
+
     [McpServerTool(Name = "branch_create"), Description("Creates a branch through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchCreate(string project, string branch, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchCreate, branch: branch, source: source, cancellationToken: cancellationToken));
+
+    /// <summary>明示sourceからlocal branchだけを作成し、checkoutやremote操作は行いません。</summary>
+    [McpServerTool(Name = "branch_create_local", Destructive = true), Description("Creates only a local branch from an explicit local branch, tag or full 40-character SHA. Requires local_branch_create capability, Project-bound repository.branch.write and a clean tree; never checks out, fetches or creates a remote branch.")]
+    public Task<RepositoryProviderResult> BranchCreateLocal(string project, string branch, string source, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchCreateLocal, branch: branch, source: source, cancellationToken: cancellationToken));
 
     [McpServerTool(Name = "branch_delete", Destructive = true), Description("Deletes an allowed branch through the Project Repository Provider.")]
     public Task<RepositoryProviderResult> BranchDelete(string project, string branch, CancellationToken cancellationToken = default) => WithConfigurationErrors(() => routing.ExecuteAsync(project, RepositoryOperation.BranchDelete, branch: branch, cancellationToken: cancellationToken));

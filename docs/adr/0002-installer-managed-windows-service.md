@@ -2,7 +2,7 @@
 
 ## Status
 
-Service installation remains accepted. Configuration and CLI ownership are superseded by [ADR 0003](0003-service-owned-state-and-cli.md). Live installation, upgrade, uninstall and reboot validation remain required before release.
+Superseded by [ADR 0019](0019-user-session-mcp-host.md): the host now runs in the logged-on user's session with per-user state and tray startup controls. This ADR remains historical rationale for the previous service model.
 
 ## Context
 

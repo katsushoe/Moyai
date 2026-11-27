@@ -227,7 +227,7 @@ internal sealed class KelpieLifecycleAdapter
         {
             var transportOptions = new HttpClientTransportOptions
             {
-                Endpoint = _options.Endpoint,
+                Endpoint = _options.Endpoint!,
                 TransportMode = HttpTransportMode.StreamableHttp,
                 AdditionalHeaders = new Dictionary<string, string>(),
             };

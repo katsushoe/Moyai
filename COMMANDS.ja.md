@@ -1,5 +1,62 @@
 # Moyai Commands
 
+## PR公開設定（開発候補2.0.4.2）
+
+`repository-settings-get`は、Githubieが返す`pr_publication_source_branches`と`pull_request_routes`も表示します。旧Providerでの省略は省略のまま、明示的な空配列は`[]`のまま返します。同じホスト接続型CLI/MCPの設定更新を使います。
+
+```powershell
+moyaictl repository-settings-update --project Example --changes '{"pr_publication_source_branches":["docs/topic"],"pull_request_routes":[{"source_branch":"develop","destination_branch":"main"},{"source_branch":"docs/topic","destination_branch":"main"}]}'
+```
+
+先に現在値を読み、保持する全要素を含めてください。指定配列は全置換、省略は保持、`[]`は解除、null・型/値不正・重複は拒否します。大文字小文字と順序を保持します。公開元リストは通常commit許可と独立し、旧値を自動流用しません。Githubieは公開元リストと完全一致PR経路の両方を必要とし、保護元ブランチや空/未指定の許可を拒否します。Buckettieへ両項目は送信しません。既存の認証/能力確認とProviderの人による承認が必要で、例は実設定変更の許可を意味しません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+
+## PR source限定公開（開発候補2.0.4.0）
+
+専用の[pull-request-publish-create/status](docs/pr-source-publication.ja.md)を使います。createには`--draft true|false`と元のoperation UUIDを明示し、結果不明ならstatusで読取照合します。既存pull-request-createはsource branchを公開しません。
+
+## ホスティング側ブランチ保護（開発候補2.0.3.0）
+
+`branch-protection-get`、`branch-protection-update`、`branch-protection-delete` に登録済み `--project` とexactな `--branch` を指定します。更新には `--edit <JSON>`（snake_case、省略/nullは保持）、新規作成を許可する場合は `--create-if-missing true` を明示します。変更はProviderのDesktop承認とMoyai監査を必須とし、結果不明時は自動再送しません。[ブランチ保護](docs/branch-protection.ja.md)を参照してください。
+
+## 実行時診断（開発候補2.0.2.0）
+
+CLI `moyaictl runtime-diagnostics [--project <登録名>]` またはMCP `runtime_diagnostics` を使います。[診断とトレイ操作](docs/runtime-diagnostics.ja.md)を参照してください。
+
+
+## PR読取・マージ（開発版2.0.1.0）
+
+MCP `pull_request_get(project, pullRequestId)` / CLI `moyaictl pull-request-get --project Example --pull-request-id 42` はProviderの実測PR状態を返します。projectはMoyai登録名、IDは正のInt64ですがGithubieでは送信前に2147483647以下へ制限します。今回の実装対象はGithubieで、Buckettieの状態経路は無効です。
+
+MCP `pull_request_merge(project, pullRequestId, strategy, expectedSourceCommit, message?)` / CLI `moyaictl pull-request-merge --project Example --pull-request-id 42 --strategy merge --expected-source-commit <本人承認済み40桁SHA>` を追加します。実行前に対象PR・方式・SHAへの本人承認が必要です。方式は明示必須でrepository_default（Providerへnull）、merge、squash、rebaseに対応し、共通fast_forwardはGithubieでは拒否します。SHAの英字大小と非空白messageは保持し、省略/nullのmessageはProvider既定、空白だけは拒否します。
+
+明示能力と認証を確認し、事前読取の実source SHAが一致した場合だけマージを要求します。draft・draft情報欠落・closed未マージは送信前に拒否し、既マージは実測結果の観測として再マージしません。結果はok/operation/project/provider/pullRequest/errorを返し、PR情報に実測sourceCommit/mergeCommitとnullable draftを含みます。errorはcode/outcome/retryable/suggestedAction/correlationId/providerDetailを保持します。pending/unknownは成功ではなくretryable=falseです。別の認証付きgetで照合し、署名期限切れを含めマージは自動再送しません。CLIの業務失敗はexit1です。ローカルpublishだけでは旧実機版や設定は更新されません。[ADR0018](docs/adr/0018-provider-pull-request-merge.md)を参照してください。
+
+## MCP操作クライアント
+
+Windowsビルド・配布物には、`moyaictl.exe`と同じCLIアセンブリ・依存ファイルを使う実行名`moyaimcp.exe`を含めます。`moyaimcp repository-status --project <登録名>`で稼働中サービスを呼び出します。設定は`<INSTALLFOLDER>\config\moyai.json`だけを使用します。コマンド前後の`--config`は正規化後に同じパスを指す場合だけ受理し、別ファイルは拒否します。設定の`serverUrl`がサービス接続先です。`commands`はサービスのTool schemaを取得します。`--help`と`--version`は設定を読み込まずローカルのヘルプ・CLI版を返し、`version`はサービスの版を取得します。
+
+両実行名で業務コマンド、Project選択、承認、監査、出力、終了コードを維持します。`Moyai.Mcp.exe`はログオンユーザーのsessionで稼働します。`host start|stop|restart|status`は現在のユーザーに限定したnamed pipe経由でプロセスを管理し、`autostart enable|disable|status`はログオン自動起動を別に管理します。一方の設定はもう一方を変更しません。[ADR0017](docs/adr/0017-mcp-command-client-alias.md)と[ADR0019](docs/adr/0019-user-session-mcp-host.md)を参照してください。
+
+## Diffのremote指定（開発中）
+
+MCP `repository_diff(project)`／CLI `moyaictl repository-diff --project <name>`の入力は変えません。Buckettieは対応能力を確認できた場合に、Project設定の空白以外のgitRemoteNameをそのまま受け取ります。呼出側のremote/資格情報引数は追加しません。未対応/能力取得失敗時は既存の省略条件を維持し、Providerのremote不存在/曖昧/URL不一致はoriginへ退避せず保持します。日本語/BOM/改行/複数hunkは変更せず、比較先はローカルHEADのままです。Githubie向け転送は有効にしません。fetch/push/設定変更はなく、実受入・導入は別条件です。[ADR0016](docs/adr/0016-buckettie-diff-remote.md)を参照してください。
+
+## Pull Request作成（開発中）
+
+MCP `pull_request_create(project, sourceBranch, destinationBranch, title, description, draft)`、CLI例は`moyaictl pull-request-create --project Example --source-branch docs/proposal --destination-branch main --title "Docs update" --description "" --draft true`です。全6引数必須です。ブランチはliteral名、タイトルは空白以外を含む255文字以内で制御文字不可、説明は空文字可・32768文字以内でNUL不可、draftは明示boolです。develop/main/HEADを補完しません。
+
+Githubieは`github_pr_create`（`source_branch/destination_branch`）、Buckettieは`bitbucket_pr_create`（`sourceBranch/destinationBranch`）へ変換します。明示PR capability、専用PR Assertion scope、対応付け済みRepository/Project、Providerが許可した経路が必要です。BuckettieはMoyai連携モードを要求します。汎用read/commit/push権限とlegacy tokenでは作成できません。経路設定変更・push・merge・代替経路の実行は行いません。
+
+成功は`ok/operation/project/provider/pullRequest`を返します。共通データ例：`{"id":7,"title":"Docs update","sourceBranch":"docs/proposal","destinationBranch":"main","draft":null,"state":"open"}`。url/descriptionはnull可です。Githubieが返さないdraftは明示nullとし、Buckettieは返された値を保持します。失敗はcode/outcome/suggestedAction/providerDetailで、例は`project_not_found`、`pull_request_invalid`、`provider_capability_missing`、`auth_scope_denied`、`pull_request_route_not_allowed`です。CLI業務失敗はexit1。結果不明時はProviderのPRを別途読取確認してから再作成を判断し、自動再送しません。capability合意・稼働版導入・実外部受入は別条件です。[ADR0015](docs/adr/0015-provider-pull-request-create.md)を参照してください。
+
+## ローカルブランチ作成（開発中）
+
+MCP `branch_create_local(project, branch, source)`、CLI `moyaictl branch-create-local --project <name> --branch <new-local-branch> --source <local-branch|tag|full-SHA>`で、切替せず作成します。全引数必須で、`project`は登録済みProject名、`branch`は新規ローカル名、`source`はローカルブランチ名・タグ名・完全40桁16進commit SHAです。例：`moyaictl branch-create-local --project Example --branch docs/proposal --source v1.0.1.0`。暗黙HEAD補完、参照式、fetch/push、リモートブランチ作成、設定更新は行いません。
+
+Githubieの明示的な`data.local_branch_create=true`と、正確な`github_local_branch_create: [repository.branch.write]`のAssertion認可が必要です。Buckettieとlegacy経路は未対応で、リモート用`branch_create`へ代替しません。allowlist・policy/承認・clean状態・conflictなし・source存在・作成先未存在はProviderが検証します。変わるのは新規ローカル参照だけで、HEAD/現在ブランチ・upstream・commit・remote refs・index/worktreeは変更しません。
+
+結果は`RepositoryProviderResult`（`ok`、`operation`、`output`、`errorCode`、`errorMessage`、`resultUnknown`）です。成功例は`ok=true`、`operation=branch_create_local`で、JSON文字列`output`にGithubieの`data.name/source/current_branch/head_sha`を保持します。失敗例は委譲前の`provider_capability_missing`、Provider由来の`working_tree_dirty`・`unresolved_conflicts`・`branch_source_not_found`・`local_branch_already_exists`・`invalid_ref`です。CLI失敗はexit1です。送信後の結果不明ではProviderが提供するローカル参照の読取で別途確認し、再送しません。ソース実装と稼働版への導入・実Provider受入は別条件です。[ADR0014](docs/adr/0014-provider-local-branch-create.md)を参照してください。
+
 ## ローカルbranch切替（開発版1.3.12.0）
 
 MCP `branch_switch(project, branch)`、CLI `moyaictl branch-switch --project <name> --branch <existing-local-branch>`で登録Providerへ委譲します。Project識別情報・対応付け済みRepository ID・URLは保持し、`gitDefaultBranch`も更新しません。状態変更Toolで、明示capabilityと`github_branch_switch`/`buckettie_branch_switch`への`repository.branch.write`が必要です。BuckettieはMoyai連携モードを要求し、legacyは拒否します。
@@ -10,7 +67,9 @@ fetch・remote checkout・branch作成・source/remote引数の追加は行い�
 
 MCPは`repository_settings_get(project)`／`repository_settings_update(project, changes)`、CLIは`moyaictl repository-settings-get --project <name>`／`moyaictl repository-settings-update --project <name> --changes '<JSON object>'`です。必要に応じて`--config`を指定します。作者更新例は`{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`。CLIはサービスへ接続しDBを直接操作しません。
 
-合意済みGithubie経路のみ有効です。読取は登録8項目で作者未設定はnull。更新の省略は保持、falseは明示値、配列は置換です。空changes・未知項目・null・型不正・不正作者ペアを拒否します。policy検証と人の承認はProvider側です。型付き結果はok/operation/project/provider/settings/changedFields/approved/errorで、Provider生応答は返しません。認証・能力・設定エラーと安全な相関IDを保持し、更新成功にはapproved=trueが必須です。更新結果不明はerror.outcome=unknownとし、別の読取で確認してから再更新します。自動更新再試行、Git/稼働設定変更、直接/legacy代替は行いません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください。
+Githubie限定の開発中拡張として`local_commit_branches`の配列置換に対応します。例: `moyaictl repository-settings-update --project Example --changes '{"local_commit_branches":["codex/docs-main-v1010","develop"]}'`。現在値を読み取り、保持する既存名を含めて指定します。省略は保持、`[]`は明示解除、null・型不正・空白要素は拒否します。大文字小文字や順序を変更せず、push許可やPR経路から推測しません。GETはGithubieが返した場合だけ追加項目を表示し、省略と空配列を区別します。Buckettieへの当該更新は拒否し、共通8項目は維持します。既存のProject-bound更新scopeとProviderの人による承認が必要で、例は更新許可や実機設定変更を意味しません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)の拡張節を参照してください。
+
+合意済みGithubie／Buckettie経路を実装しています。稼働設定への導入と実結合の完了は別条件です。正確な対応能力とAssertion scopeを必要とし、Buckettieは読取でもMoyai連携モードを確認します。読取は共通の登録8項目と上記Githubie限定の追加項目で、作者未設定はnullです。更新の省略は保持、falseは明示値、配列は置換です。空changes・未知項目・null・型不正・不正作者ペアを拒否します。Buckettie固有のpull_request_routesは対象8項目に含めません。policy検証と人の承認はProvider側です。型付き結果はok/operation/project/provider/settings/changedFields/approved/errorで、成功時のproviderはgithubieまたはbuckettieを示し、生応答は返しません。認証・能力・設定エラーと安全な相関IDを保持し、更新成功にはapproved=trueが必須です。更新結果不明はerror.outcome=unknownとし、別の読取で確認してから再更新します。自動更新再試行、Git/稼働設定変更、直接/legacy代替は行いません。[ADR0012](docs/adr/0012-repository-settings-consumer.md)を参照してください.
 
 Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`、`assertion-key-activate --kid <id> --trust-distribution-confirmed true [--overlap-seconds 86400]`、`assertion-key-revoke --kid <id>`、`assertion-protector-rotate`、`assertion-secret-rewrap`。すべてサービス経由で公開情報だけを返します。[運用Contract](docs/specifications/provider-authentication-operations.md)に状態遷移・エラー・移行・Trust配布条件を記載しています。
 
@@ -22,9 +81,11 @@ Provider認証管理: `assertion-key-prepare`、`assertion-key-get --kid <id>`�
 
 ## サービス接続と管理
 
-全業務コマンド（`version`を含む）はサービスへ接続します。`--config <path>`でJSON設定を指定します。`commands`は稼働サービスのコマンド一覧と入力schemaを返します。`help`はサービス未起動でも使用できます。
+全業務コマンド（`version`を含む）はサービスへ接続します。JSON設定は`<INSTALLFOLDER>\config\moyai.json`に固定し、`--config`で別ファイルを選択できません。`commands`は稼働サービスのコマンド一覧と入力schemaを返します。`help`はサービス未起動でも使用できます。
 
-管理コマンドは`service start`、`service stop`、`service pause`、`service resume`、`service register`、`service unregister`、`service status`です。登録は同じbin内のMCP実行ファイルと設定を使用し、Auto／LocalServiceと必要なディレクトリ権限を設定します。登録解除前は停止が必要です。`config-init`は設定不在時だけ初期JSONを作成します。管理コマンドはWindows SCMを使用し、業務処理やDBへ直接アクセスしません。
+管理コマンドは`host start|stop|restart|status`、`autostart enable|disable|status`です。`profile-init`は未作成の正規設定とユーザー領域のDB/logディレクトリを初期化し、新規profileで自動起動を有効にします。`profile-uninstall`は製品所有の自動起動entryだけを削除し、ユーザーデータを保持します。旧`service`コマンド群はサポートしません。管理コマンドは業務処理やDBへ直接アクセスしません。
+
+`host start`はreadyを最大60秒待ちます。接続後の制御応答には独立した10秒の期限があります。タイムアウトや応答前の切断だけでは停止済みと判定できません。管理操作を繰り返す前に`host status`を確認してください。`host restart`は停止応答を返したプロセスの終了を最大15秒待ち、終了を確認できない場合は次のプロセスを起動せず中断します。[ADR0019](docs/adr/0019-user-session-mcp-host.md)を参照してください。
 
 ## Command Groups
 

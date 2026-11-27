@@ -4,10 +4,14 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.12" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.8" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Moyai.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Moyai.ProviderConsumerAcceptance" />
+    <InternalsVisibleTo Include="Moyai.OwnerConsumerAcceptance" />
+    <InternalsVisibleTo Include="Moyai.GithubieOwnerConsumerAcceptance" />
   </ItemGroup>
 
   <ItemGroup>

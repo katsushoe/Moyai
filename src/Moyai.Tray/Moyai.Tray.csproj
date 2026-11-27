@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon>Assets\moyai.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- アイコンの元データと生成手順は docs/design/icon を参照 -->
+    <EmbeddedResource Include="Assets\moyai.ico" LogicalName="Moyai.Tray.Assets.moyai.ico" />
+    <EmbeddedResource Include="Assets\moyai_tray.ico" LogicalName="Moyai.Tray.Assets.moyai_tray.ico" />
+    <EmbeddedResource Include="Assets\moyai_tray_white.ico" LogicalName="Moyai.Tray.Assets.moyai_tray_white.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Moyai.Mcp.Tests" />
+    <ProjectReference Include="../Moyai.Configuration/Moyai.Configuration.csproj" />
+  </ItemGroup>
+</Project>

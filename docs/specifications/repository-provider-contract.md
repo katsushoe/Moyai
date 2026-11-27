@@ -1,5 +1,43 @@
 # Repository Provider Contract
 
+## Githubie publication-settings Consumer correction (2.0.4.2)
+
+The existing settings operations additionally accept `pr_publication_source_branches` as a unique exact branch string array and `pull_request_routes` as a unique array of `{source_branch,destination_branch}` objects. Fields and branch case/order are preserved; omit to preserve, `[]` to clear, explicit null/type/value errors and duplicates reject. Only supplied fields are forwarded. Branch rules match Githubie's respective publication-source and route-settings validators. Both optional GET properties are exposed only when Githubie supplies them, independently, retaining old-Provider compatibility and visible empty arrays. Successful Githubie `changed_fields` may include either only when its registered value is returned. Buckettie updates reject these fields before dispatch and do not expose them on GET.
+
+No new settings capability or default permission is implied. Use existing settings scopes, Project/Repository context and Provider human approval/persistence. New publication authorization is source-list AND exact-route permission, protected-source refusal, default deny and no automatic local-commit-list migration. Existing arrays require full replacement review including retained entries. `publication_source_not_allowed` remains a typed `not_executed` refusal; no automatic mutation replay and partial/unknown/status reconciliation remain unchanged. Local correction/regression does not establish actual Provider/live-GitHub acceptance. See [ADR0012](../adr/0012-repository-settings-consumer.md).
+
+## PR source publication extension (development2.0.4.0)
+
+Dedicated pull_request_publish_create/status map only to Githubie github_pr_publish_create/status. Create requires explicit sourceBranch/destinationBranch/full expectedSourceSha/title/D-format operationId/draft; description defaults to empty. Status sends only registered repository and original operation_id. Both explicit capability flags are required for create; status needs only its own flag. Owner mode requires schema1 owner tools/session; assertion create requires both repository.push and provider.githubie.pull_request.write, status repository.read. No legacy tokens, permission widening or automatic retry is allowed. Validate operation/UUID/route/SHA and preserve safe partial data on failures; unknown/unverified payloads never prove effects. See [ADR0026](../adr/0026-pr-source-publication-consumer.md), [English](../pr-source-publication.md) and [日本語](../pr-source-publication.ja.md). Provider/Desktop/live acceptance remains separate.
+
+## Hosting branch protection extension (development2.0.3.0)
+
+Common branch_protection_get/update/delete map to Githubie github_branch_protection_get(repository,branch), github_branch_protection_update(repository,branch,edit,create_if_missing) and github_branch_protection_delete(repository,branch). Require exact branch, explicit branch_protection_read/write and authenticated owner/tool membership or repository.read/dedicated provider.githubie.branch_protection.write assertions. Legacy and unsupported Providers are refused; unsupported Provider capability projection is false. Mutation audit intent precedes dispatch and final outcome follows; no automatic mutation retry, including assertion expiry. Output is a typed common policy projection and safe error code/outcome/action/correlation only. Provider owns partial-policy preservation, Desktop approval, second-read/concurrency and hosting permissions. Rulesets and Provider protected_branches are distinct. See [ADR0025](../adr/0025-hosting-branch-protection.md) and [English](../branch-protection.md)/[日本語](../branch-protection.ja.md). Installed/real acceptance remains separate.
+
+## Buckettie Diff remote forwarding extension (development)
+
+Only Buckettie Diff additionally receives an exact nonblank Project.gitRemoteName as `remote` after a successful `remote_resolution` version1/mode `repository_url` capability lookup. Missing/blank remote skips negotiation; absent/malformed/failed/unsupported capability omits the argument for compatibility. Omission does not prove validation of an explicit remote. Reuse mapped repository identity and repository.read assertions; preserve raw diff text and Provider remote errors, without origin fallback after rejection. Diff remains a local HEAD working-tree comparison, not remote-branch diff. Githubie Diff remains excluded pending confirmation of its remote-validation semantics. No new CLI/MCP input, DB field or scope is introduced. Source implementation is not installed/live acceptance. See [ADR0016](../adr/0016-buckettie-diff-remote.md).
+
+## PR state and merge extension (development2.0.1.0)
+
+Common `pull_request_get` and `pull_request_merge` resolve the registered Project/Provider repository mapping. Githubie dispatch uses `github_pr_get(repository,pull_request_number)` and `github_pr_merge(repository,pull_request_number,merge_strategy,message,expected_source_commit_sha)`. Positive PR IDs must fit Int32 for Githubie, merge SHA is full40-hex and the strategy is explicit. repository_default maps to null, fast_forward is rejected. Buckettie state dispatch is not enabled following Provider discontinuation.
+
+Require strict `ok=true` plus `data.pr_get=true`, and `data.pr_merge=true` for merge. Signed read/merge use exact repository.read / provider.githubie.pull_request.merge grants; owner mode requires the verified schema1 session and generation headers, both advertised owner operation membership and tools/list entries. Legacy tokens and generic PR-create/write/push authority cannot substitute.
+
+Merge performs an authenticated PR read before any mutation, compares actual source_commit_sha to the approved SHA, and fails closed for source/identity mismatch, draft or unavailable draft metadata, or closed-unmerged state. Already-merged results are observations with an actual merge SHA, without a mutation. A normal success must be an actual merged snapshot with matching ID/source SHA/route; malformed, lost or unproven post-dispatch results are unknown, typed pending remains pending. Never automatically replay merge, including assertion-expired failures. Common errors preserve code/outcome/correlation/detail with retryable=false. Separate authenticated get is used for operator reconciliation. Real Provider acceptance/installation remains separate. See [ADR0018](../adr/0018-provider-pull-request-merge.md).
+
+## Pull request creation extension (development)
+
+Consumer `pull_request_create(project, sourceBranch, destinationBranch, title, description, draft)` has no default branch/draft. Githubie uses `github_pr_create` with snake_case route arguments and `provider.githubie.pull_request.write`. Buckettie uses `bitbucket_pr_create` with camelCase route arguments, `provider.buckettie.pr_create` and Moyai integration mode. Both receive repository/title/description/draft. Require successful explicit capability `data.pr_create=true` (Githubie) or `data.operations.pr_create=true` (Buckettie); these enablement keys still require Provider agreement/rollout.
+
+Use mapped registration ID and Project-bound assertion, never generic commit/push rights or legacy. Provider owns allowed routes/protection/approval; no policy changes, push, merge or fallback. Common result fields and Provider-specific output mapping are defined in [ADR0015](../adr/0015-provider-pull-request-create.md). Preserve typed rejection code/outcome/detail; lost/malformed post-dispatch result is unknown, never automatically replayed. Real PR acceptance requires a separately approved disposable target.
+
+## Local branch creation extension (development)
+
+MCP `branch_create_local(project, branch, source)` creates only a local branch without checkout. Githubie mapping: `github_local_branch_create`; exact scope: `repository.branch.write` with Project-bound assertions; required capability: successful `data.local_branch_create=true`. `repository` is the mapped ID; branch/source are required and unchanged. Source is a literal local branch/tag or full40-hex SHA, not HEAD or a revision expression. No default/source/remote fallback.
+
+Provider rejects dirty tree, unresolved conflicts, source absence and duplicate branch before mutation. Success adds only the local ref and preserves current branch/HEAD, remote refs, commits, index/worktree, upstream and repository/Project settings. Preserve raw success metadata and exact typed errors. Malformed/lost post-dispatch responses are unknown, never automatically replayed. Buckettie is unsupported until its dedicated contract is confirmed. Runtime capability/scopes and disposable real-Provider acceptance are separate gates. See [ADR0014](../adr/0014-provider-local-branch-create.md).
+
 ## Local branch switch extension (development1.3.12.0)
 
 Moyai branch_switch(project, branch) requires an explicit boolean data.branch_switch capability (or Buckettie data.operations.branch_switch), exact repository.branch.write scope, and Project-bound assertions. Resolve registered ID using providerRepositoryId while preserving UUID/URL. Githubie tool is github_branch_switch; Buckettie tool is buckettie_branch_switch despite the configured bitbucket prefix, and requires Moyai integration mode.
@@ -8,17 +46,23 @@ Only repository/branch arguments are sent. Provider validates existing local bra
 
 ## Settings Consumer extension (development1.3.11.0)
 
-Githubie settings agreement is recorded in [ADR0012](../adr/0012-repository-settings-consumer.md). This implementation is not installed and is not a confirmed Buckettie contract. Only Githubie settings routing is enabled; other Providers and legacy authentication are rejected before dispatch.
+Both Providers' agreed Settings Consumer routes are recorded in [ADR0012](../adr/0012-repository-settings-consumer.md). Source implementation does not establish installed enablement or real-Provider acceptance. Other Providers and legacy authentication are rejected before dispatch.
 
-Consumer operations are `repository_settings_get(project)` and `repository_settings_update(project, changes)`; Provider tools are `github_repository_settings_get/update`, exact capability keys `repository_settings_read/update`, read scope `repository.read` and update scope `repository.settings.write` plus Provider human approval. Preserve mapped registration ID and signed UUID/URL/tool context. Forward only explicit changes; omission preserves, false is explicit, arrays replace. Null/unknown/wrong-type/empty changes and incomplete authors are rejected. Provider remains the policy/persistence authority.
+Consumer operations are `repository_settings_get(project)` and `repository_settings_update(project, changes)`. Githubie tools are `github_repository_settings_get/update`, with exact boolean capability keys `data.repository_settings_read/update`; Buckettie tools are `bitbucket_repository_settings_get/update`, with `data.operations.repository_settings_read/update`. Buckettie requires `integration_mode=moyai` for both operations. Read scope is `repository.read`; update is `repository.settings.write` plus Provider human approval. Preserve mapped registration ID and signed UUID/URL/tool context. Forward only repository and explicit changes; omission preserves, false is explicit, arrays replace. Null/unknown/wrong-type/empty changes and incomplete authors are rejected. Additional Provider fields such as Buckettie's pull_request_routes are not editable here. Provider remains the policy/persistence authority.
 
-Return only eight registered settings, actual changed fields and affirmative approval on update success. Preserve settings/authentication errors with safe correlation IDs; do not expose raw Provider output. Update response loss or invalid post-dispatch response is unknown, not a known rejection. No automatic update replay; obtain a separate read before deciding another update. Provider admission rejection remains fail-closed. CONFIG/COMMANDS describe setup and symmetric CLI JSON input.
+Return the eight common registered settings, plus Githubie's optional `local_commit_branches` when present, actual changed fields and affirmative approval on update success. The Githubie-only extension accepts an exact string-array replacement, including `[]`; omission preserves and null/wrong-type/blank elements are rejected. Do not derive it from push/PR permissions. Missing Provider output omits the optional property for backward compatibility; explicit empty output remains `[]`. Githubie `changed_fields` may name this field only when its registered value is returned. Buckettie updates reject the extension before dispatch and retain the eight-field contract. Unrelated extra GET fields remain ignored, not editable. Preserve settings/authentication errors with safe correlation IDs; do not expose raw Provider output. Update response loss or invalid post-dispatch response is unknown, not a known rejection. No automatic update replay; obtain a separate read before deciding another update. Provider admission rejection remains fail-closed. CONFIG/COMMANDS describe setup and symmetric CLI JSON input. See the 2026-10-20 extension in [ADR0012](../adr/0012-repository-settings-consumer.md).
 
 状態: 確定（2026-09-27、ユーザー承認）
 対象: Moyaiから委譲されるRepository Provider（Githubie、Buckettie、今後追加するProvider）
 関連: [Provider Consumer Contract](provider-authentication-consumer-contract.md)、`src/Moyai.Infrastructure/Providers/RepositoryProviderContract.cs`、CR `CR-2026-09-27-provider-git-remote-resolution`
 
 本書は、Providerの認証以外の共通契約を定めます。認証・認可はProvider Consumer Contractを正本とします。
+
+## 選択commit patchの受け渡し
+
+`repository_diff`はProviderが生成した結果をMCPのJSON文字列として返します。Moyaiはunified diffを生成・編集・改行変換せず、Provider応答を`RepositoryProviderResult.Output`へ保持します。`repository_commit_selected`も受け取ったpatch文字列をJSON引数`patch`へそのまま渡します。UTF-8本文、日本語、BOM、複数hunkの内容をMoyai側で正規化しません。
+
+差分の妥当性検証、expected HEADとの照合、staged changeの拒否、patch適用とcommitの原子性はProviderの責務です。MoyaiはProvider capabilityが明示された場合だけ選択commitを呼び出し、`selected_commit_patch_invalid`、`expected_head_mismatch`、`staged_changes_present`を呼び出し元へ識別可能なまま返します。Moyaiのテストは、diff応答とcommit引数のpatch文字列がMCP transport境界で完全一致することを検証します。
 
 ## Gitリモートの解決
 
@@ -90,7 +134,7 @@ Dirtyの場合、またはSource Commitが欠落・空の場合は、Build Provi
 - Moyaiは`gitRemoteName`を保持し、下記の条件を満たす操作ではProviderの`remote`引数へ転送します。未指定の場合はProvider側の解決規則に委ねます。
 - `Project.GitRemoteName`は省略可能（`null`許容）とし、新規Projectの既定値`origin`は使用しません。
 - 既存Projectの`git_remote_name='origin'`は、利用者が明示した値と区別できないため、DB schema v6への移行で`null`（自動解決）へ変更します。`origin`以外の値は明示指定として保持します。
-- `gitRemoteName`が設定され、Providerが`remote_resolution` version 1 / `repository_url` modeを表明した場合だけ、remote引数を渡します。対象はGithubie／Buckettieの`repository_status`と、既存Toolがremote引数を受け取るBuckettieの`commit`です。Githubieの`commit`およびその他の操作にはremoteを送りません。未対応または能力を取得できないProviderにもremoteを送りません。
+- `gitRemoteName`が空白以外で設定され、Providerが`remote_resolution` version 1 / `repository_url` modeを表明した場合だけ、remote引数を渡します。対象はGithubie／Buckettieの`repository_status`と`repository_commit_selected`、Buckettieの`commit`と`repository_diff`です。Githubieの通常`commit`と`repository_diff`およびその他の操作にはremoteを送りません。未対応または能力を取得できないProviderにもremoteを送りません。Buckettie Diffの追加判断・互換条件は[ADR0016](../adr/0016-buckettie-diff-remote.md)を参照してください。
 - Buckettieの`commit`では、従来どおり`integration_mode=moyai`を確認してから委譲します。Assertionのscope／Repository Claim、ProviderのURL照合・ブランチ保護は変更しません。登録remoteや認証情報を変更せず、明示されたremoteをProviderの既存検証へ渡します（2026-10-08追記）。
 - Providerが返す共通エラーコード3種は、`RepositoryProviderContract`で正規化後も同じコードを利用者へ返します。
 - Moyai側の基本実装とunit testsは2026-10-03に追加しました。2026-10-07に、非`origin` remoteを持つ隔離ProjectでMoyai経由のGithubie capabilities・statusの成功を確認しました（`artifacts/nonorigin-integration/e2e-20261007.json`）。

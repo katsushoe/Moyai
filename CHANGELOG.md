@@ -1,8 +1,106 @@
 # Changelog
 
+## Unreleased
+
+## 2.1.0.3
+
+- Fixed the installer failing with Windows Installer errors 2803/2867 when Moyai is running during an upgrade. The setup now shows a files-in-use dialog that can close the running Moyai programs automatically, and an error dialog.
+
+## 2.1.0.2
+
+- Githubie owner mode no longer compares the Githubie executable's SHA-256, so updating Githubie at the same path no longer stops Moyai with `discovery_runtime_mismatch`. Path, process image, owner, session, liveness, profile and ACL checks remain. `runtimeSha256` is deprecated and ignored (CR-2026-11-27).
+
+- Added the MCP server tray submenu with four-state pill LEDs, Health checks, version display, bounded startup/shutdown, and a default-No stop confirmation warning about disconnecting all Codex/Claude Code sessions.
+
+- Added the Moyai rope knot icon with a thick black outline, white fill, and transparent background to the tray executable, its windows, the notification area and the installed-programs list. Both light and dark taskbars use the same colors.
+
+## 2.1.0.1
+
+- Added an About dialog to the tray menu with the product name, tray version, publisher, and application description.
+
+## 2.1.0.0
+
+- Added a settings window to the Windows notification area for startup updates and Provider request timeout.
+- Added automatic installation of signed stable MSI releases at tray startup while the MCP host is stopped.
+
+## 2.0.4.4 - 2026-11-13 (development build)
+
+- Clarify Windows-owner versus assertion authentication in settings design and PR tool metadata; preserve authentication and Provider policy behavior.
+- Freeze the complete delivery/build input list, including resources, installer configuration and pinned tools, before packaging; verify file membership and hashes afterward. Git-state completeness remains a separate pre-commit gate.
+
+## 2.0.4.3 - 2026-11-11 (development build)
+
+- Accept the canonical `githubie` Provider name for settings GET and explicit Githubie settings updates, including the publication allowlist and routes, over the existing Windows owner authentication path. Preserve Provider binding, approval and refusal handling. Actual Provider acceptance remains separate.
+
+## 2.0.4.2 - 2026-11-10 (development build)
+
+- Preserve Githubie's PR publication source allowlist and PR routes in settings GET, explicit updates and changed fields across MCP/CLI. Distinguish omitted/empty arrays and validate typed values without importing local-commit permissions.
+- Reject these Githubie-only settings for Buckettie before dispatch; retain existing authorization, Provider approval and unknown-result handling. Provider interoperability remains separate from this local compatibility correction.
+
+## 2.0.4.1 - 2026-11-03 (development build)
+
+- Prevent duplicate tray instances for the same Windows user/session before form creation or host/autostart actions. Release ownership on exit and recover after an abandoned owner. Close the legacy tray during the first upgrade to this guard.
+
+## 2.0.4.0 - 2026-11-02 (development build)
+
+- Add explicit PR source publication create/status Consumer operations and service-connected MCP/CLI, with required UUID/draft, dual capability/scope checks and Windows owner authentication.
+- Preserve verified partial publication/PR results and request context; reject mismatched responses and never automatically replay unknown mutations. Existing PR creation and frozen owner-read v5 remain unchanged.
+
+## 2.0.3.2 - 2026-11-02 (development build)
+
+- Address the live tray acceptance failure where status could not be dismissed and restart stayed disabled. Display status and safe operation errors in a modeless window and restore commands as soon as the CLI operation finishes.
+- Make status reachable from the taskbar. Close, Escape and the window close action hide only that window, preserving the tray and host without replaying any host operation.
+
+## 2.0.3.1 - 2026-11-01 (development build)
+
+- Fix installer error1943: resolve the persisted configuration-owner SID before the transaction and apply its permissions through the formatted WiX utility action instead of unsupported MSI properties in native SDDL.
+- Include old-product removal in the major-upgrade transaction so an installation failure can restore the previous version. The2.0.3.0 live-install failure is retained as evidence; package-table verification alone does not establish installed acceptance.
+
+## 2.0.3.0 - 2026-10-31 (development build)
+
+- Add Githubie classic hosting branch-protection read/update/delete through common Provider operations, MCP and service-connected CLI, with strict partial edits and dedicated authenticated capability checks.
+- Add schema8 durable operation audit independent of signing keys. Fail before dispatch when intent cannot be saved; preserve unknown outcomes and never automatically replay changes. Document Provider Desktop approval and classic/ruleset/gateway-policy distinctions. Actual Provider/GitHub/Desktop/MSI acceptance remains separate.
+
+## 2.0.2.0 - 2026-10-30 (development build)
+
+- Add secret-free loaded configuration and Provider authentication diagnostics, with byte-based configuration staleness and owner signature-not-required state.
+- Add explicit tray host restart, readable English/Japanese status and configuration state, serialized CLI actions and no automatic replay/reload. Installed-host and GUI acceptance remain separate.
+
+
 [English](CHANGELOG.md) | [日本語](CHANGELOG.ja.md)
 
-## Unreleased
+## 2.0.1.0 - 2026-10-30 (development build)
+
+- Add authenticated `pull_request_get` and SHA-pinned `pull_request_merge` through Githubie, with matching service-connected CLI commands.
+- Require explicit capabilities and merge authority, compare an authenticated source snapshot before mutation, preserve typed pending/unknown outcomes and never replay a merge automatically. Buckettie PR state routing remains disabled; actual PR acceptance and installation are separate.
+
+## 2.0.0.2 - 2026-10-25 (development build)
+
+- Use only `<INSTALLFOLDER>\config\moyai.json` for operational configuration; reject alternative paths without user-profile fallback.
+- Validate configuration before host start/restart and reserve creation for explicit initialization.
+- Protect the central configuration for the configured Windows owner and retain that SID during MSI repair/upgrade. Preserve user-scoped DB, logs and signing keys; see ADR0022.
+
+## 2.0.0.1 - 2026-10-25 (local installation)
+
+- Separate host-control connection/response deadlines, avoid a second flush after stop ACK, and report incomplete control responses explicitly.
+- Wait for the acknowledged host process to exit before restart; preserve caller cancellation and report readiness deadlines with status-check guidance.
+- Accept basic tray status, stop/start and autostart disable/restore through user GUI actions with independent CLI correlation; the running host remains unchanged during autostart toggles.
+- Encode the four-part product version into MSI ProductVersion2.0.1 for reliable upgrade ordering; see ADR0021. Local upgrade and MSI repair passed29 CLI checks each with existing profile retained; broader Windows acceptance and publication remain pending.
+
+## 2.0.0.0 - 2026-10-22 (development build)
+
+- Replace the machine-wide Windows Service host with a logged-on user host, per-user state, named-pipe controls and a tray controller.
+- Preserve the legacy service database, configuration and key material for rollback; new user profiles start empty and require Project/Provider re-registration.
+- Update MSI authoring to remove the service while retaining legacy state. Windows install/upgrade acceptance and public release remain pending.
+
+## 1.3.14.0 - 2026-10-21 (local package)
+
+- Add the `moyaimcp.exe` MCP command client alias, leading `--config`, and local `--version` while preserving `moyaictl` behavior.
+
+## 1.3.13.1 - 2026-10-20 (local package)
+
+- Preserve the assertion request guard when a `tools/call` payload is malformed.
+- This entry describes a local installation package, not a public release.
 
 ## 1.3.12.0 - 2026-10-14 (development build)
 

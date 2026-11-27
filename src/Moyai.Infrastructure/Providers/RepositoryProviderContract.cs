@@ -9,6 +9,12 @@ public static class RepositoryProviderContract
     public static string ToolName(string toolPrefix, RepositoryOperation operation) => operation switch
     {
         RepositoryOperation.ProviderVersion => "get_version",
+        RepositoryOperation.PullRequestCreate => $"{toolPrefix}_pr_create",
+        RepositoryOperation.PullRequestPublishCreate => "github_pr_publish_create",
+        RepositoryOperation.PullRequestPublishStatus => "github_pr_publish_status",
+        RepositoryOperation.PullRequestGet => $"{toolPrefix}_pr_get",
+        RepositoryOperation.PullRequestMerge => $"{toolPrefix}_pr_merge",
+        RepositoryOperation.BranchCreateLocal when string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) => "github_local_branch_create",
         RepositoryOperation.BranchSwitch when string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase) => "buckettie_branch_switch",
         _ => $"{toolPrefix}_{OperationName(operation)}",
     };
@@ -18,7 +24,67 @@ public static class RepositoryProviderContract
         ArgumentNullException.ThrowIfNull(request);
         var arguments = new Dictionary<string, object?> { ["repository"] = request.RepositoryId };
         if (request.Operation == RepositoryOperation.ProviderVersion) arguments.Clear();
+        if (request.Operation is RepositoryOperation.PullRequestPublishCreate or RepositoryOperation.PullRequestPublishStatus)
+        {
+            if (toolPrefix != "github") throw new ArgumentException("Publication requires Githubie.");
+            string operationId = request.Publication?.OperationId ?? request.PublicationOperationId ?? "";
+            PullRequestPublicationInput.ValidateOperationId(operationId);
+            arguments["operation_id"] = Guid.Parse(operationId).ToString("D");
+            if (request.Operation == RepositoryOperation.PullRequestPublishCreate)
+            {
+                PullRequestPublicationInput input = request.Publication ?? throw new ArgumentException("Publication input required.");
+                input.Validate();
+                arguments["source_branch"] = input.SourceBranch;
+                arguments["destination_branch"] = input.DestinationBranch;
+                arguments["expected_source_sha"] = input.ExpectedSourceSha.ToLowerInvariant();
+                arguments["title"] = input.Title;
+                arguments["description"] = input.Description;
+                arguments["draft"] = input.Draft;
+            }
+            return arguments;
+        }
+        if (request.Operation is RepositoryOperation.BranchProtectionGet or RepositoryOperation.BranchProtectionUpdate or RepositoryOperation.BranchProtectionDelete)
+        {
+            if (toolPrefix != "github") throw new ArgumentException("Hosting protection contract is not enabled for this Provider.");
+            BranchProtectionEdit.ValidateBranch(request.Branch);
+            arguments["branch"] = request.Branch;
+            if (request.Operation == RepositoryOperation.BranchProtectionUpdate)
+            {
+                BranchProtectionEdit edit = request.ProtectionEdit ?? throw new ArgumentException("Edit required.");
+                edit.Validate();
+                arguments["edit"] = edit;
+                arguments["create_if_missing"] = request.CreateProtectionIfMissing;
+            }
+        }
+        if (request.Operation is RepositoryOperation.PullRequestGet or RepositoryOperation.PullRequestMerge)
+        {
+            if (toolPrefix != "github") throw new ArgumentException("PR state contract is not enabled for this Provider.");
+            long id = request.PullRequestMerge?.PullRequestId ?? request.PullRequestRead?.PullRequestId ?? 0;
+            new PullRequestReadInput(id).Validate();
+            if (id > int.MaxValue) throw new ArgumentException("Githubie PR ID must fit Int32.");
+            arguments["pull_request_number"] = id;
+            if (request.Operation == RepositoryOperation.PullRequestMerge)
+            {
+                PullRequestMergeInput input = request.PullRequestMerge ?? throw new ArgumentException("Merge input is required.");
+                input.Validate();
+                if (input.Strategy == "fast_forward") throw new ArgumentException("Githubie does not support fast_forward.");
+                arguments["merge_strategy"] = input.Strategy == "repository_default" ? null : input.Strategy;
+                arguments["message"] = input.Message;
+                arguments["expected_source_commit_sha"] = input.ExpectedSourceCommit;
+            }
+        }
         if (request.Operation == RepositoryOperation.SettingsUpdate) arguments["changes"] = request.SettingsChanges?.Values ?? throw new ArgumentException("Settings changes are required.", nameof(request));
+        if (request.Operation == RepositoryOperation.PullRequestCreate)
+        {
+            PullRequestInput input = request.PullRequest ?? throw new ArgumentException("PR input is required.", nameof(request));
+            input.Validate();
+            bool github = string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase);
+            arguments[github ? "source_branch" : "sourceBranch"] = input.SourceBranch;
+            arguments[github ? "destination_branch" : "destinationBranch"] = input.DestinationBranch;
+            arguments["title"] = input.Title;
+            arguments["description"] = input.Description;
+            arguments["draft"] = input.Draft;
+        }
         if (supportsRemoteResolution && SupportsRemoteArgument(toolPrefix, request.Operation) && !string.IsNullOrWhiteSpace(request.RemoteName)) arguments["remote"] = request.RemoteName;
         if (request.Operation == RepositoryOperation.Commit) arguments["message"] = request.Message;
         if (request.Operation == RepositoryOperation.CommitSelected)
@@ -34,8 +100,8 @@ public static class RepositoryProviderContract
         }
         if (request.Operation is RepositoryOperation.StashApply or RepositoryOperation.StashDrop)
             arguments[string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) ? "stash_id" : "stashId"] = request.StashId;
-        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch) arguments["branch"] = request.Branch;
-        if (request.Operation == RepositoryOperation.BranchCreate) arguments["source"] = request.BranchSource;
+        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchDelete or RepositoryOperation.BranchSwitch or RepositoryOperation.BranchCreateLocal) arguments["branch"] = request.Branch;
+        if (request.Operation is RepositoryOperation.BranchCreate or RepositoryOperation.BranchCreateLocal) arguments["source"] = request.BranchSource;
         if (request.Operation is RepositoryOperation.TagCreate or RepositoryOperation.TagDelete or RepositoryOperation.TagPush) arguments["tag"] = request.Tag;
         if (request.Operation == RepositoryOperation.TagCreate)
         {
@@ -47,6 +113,74 @@ public static class RepositoryProviderContract
     }
 
     public static string OperationName(RepositoryOperation operation) => operation.ContractName();
+
+    /// <summary>ホスティング保護の明示capabilityだけを受理します。</summary>
+    public static bool SupportsBranchProtection(string? output, RepositoryOperation operation)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output ?? "null");
+            string flag = operation == RepositoryOperation.BranchProtectionGet ? "branch_protection_read" : "branch_protection_write";
+            return document.RootElement.GetProperty("ok").ValueKind == JsonValueKind.True
+                && document.RootElement.GetProperty("data").GetProperty(flag).ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>PRの明示能力を確認し、作成や他操作の能力から推測しません。</summary>
+    public static bool SupportsPullRequestState(string? output, bool merge)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output ?? "null");
+            JsonElement root = document.RootElement;
+            JsonElement data = root.GetProperty("data");
+            return root.GetProperty("ok").ValueKind == JsonValueKind.True
+                && data.GetProperty("pr_get").ValueKind == JsonValueKind.True
+                && (!merge || data.GetProperty("pr_merge").ValueKind == JsonValueKind.True);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>Provider別の明示PR作成capabilityだけを確認します。</summary>
+    public static bool SupportsPullRequestCreate(string toolPrefix, string? output)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output ?? "null");
+            JsonElement data = document.RootElement.GetProperty("data");
+            if (string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase))
+                return data.GetProperty("operations").GetProperty("pr_create").ValueKind == JsonValueKind.True;
+            return string.Equals(toolPrefix, "github", StringComparison.OrdinalIgnoreCase) && data.GetProperty("pr_create").ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>専用のlocal branch作成能力だけを受理し、remote branch能力へ代替しません。</summary>
+    public static bool SupportsLocalBranchCreate(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output)) return false;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            JsonElement data = document.RootElement.GetProperty("data");
+            return data.TryGetProperty("local_branch_create", out JsonElement supported) && supported.ValueKind == JsonValueKind.True;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
+    }
+
+    /// <summary>local branch作成の型付きProviderエラーコードを情報を落とさず保持します。</summary>
+    public static string NormalizeLocalBranchError(string? detail)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(detail ?? "null");
+            JsonElement code = document.RootElement.GetProperty("error").GetProperty("code");
+            if (code.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(code.GetString())) return code.GetString()!;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return NormalizeErrorCode(detail); }
+        return NormalizeErrorCode(detail);
+    }
 
     /// <summary>明示的なbranch切替能力だけを受理し、未指定や型不正では拒否します。</summary>
     public static bool SupportsBranchSwitch(string? output)
@@ -79,7 +213,7 @@ public static class RepositoryProviderContract
     }
 
     /// <summary>合意した設定Capabilityキーだけを確認します。</summary>
-    public static bool SupportsSettings(string? output, RepositoryOperation operation)
+    public static bool SupportsSettings(string? output, RepositoryOperation operation, string toolPrefix = "github")
     {
         string key = operation == RepositoryOperation.SettingsGet ? "repository_settings_read" : "repository_settings_update";
         if (string.IsNullOrWhiteSpace(output)) return false;
@@ -87,6 +221,8 @@ public static class RepositoryProviderContract
         {
             using JsonDocument document = JsonDocument.Parse(output);
             JsonElement data = document.RootElement.GetProperty("data");
+            if (string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase))
+                return data.GetProperty("operations").GetProperty(key).ValueKind == JsonValueKind.True;
             return data.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.True;
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException) { return false; }
@@ -147,7 +283,7 @@ public static class RepositoryProviderContract
     public static bool SupportsRemoteArgument(string toolPrefix, RepositoryOperation operation) =>
         operation == RepositoryOperation.Status
         || operation == RepositoryOperation.CommitSelected
-        || (operation == RepositoryOperation.Commit && string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase));
+        || ((operation is RepositoryOperation.Commit or RepositoryOperation.Diff) && string.Equals(toolPrefix, "bitbucket", StringComparison.OrdinalIgnoreCase));
 
     public static bool SupportsRemoteResolution(string? output)
     {
@@ -158,7 +294,7 @@ public static class RepositoryProviderContract
             return document.RootElement.ValueKind == JsonValueKind.Object
                 && document.RootElement.TryGetProperty("data", out JsonElement data) && data.ValueKind == JsonValueKind.Object
                 && data.TryGetProperty("remote_resolution", out JsonElement resolution) && resolution.ValueKind == JsonValueKind.Object
-                && resolution.TryGetProperty("version", out JsonElement version) && version.TryGetInt32(out int versionNumber) && versionNumber == 1
+                && resolution.TryGetProperty("version", out JsonElement version) && version.ValueKind == JsonValueKind.Number && version.TryGetInt32(out int versionNumber) && versionNumber == 1
                 && resolution.TryGetProperty("mode", out JsonElement mode) && mode.ValueKind == JsonValueKind.String
                 && string.Equals(mode.GetString(), "repository_url", StringComparison.Ordinal);
         }
@@ -210,6 +346,7 @@ public static class RepositoryProviderContract
             or "provider_capability_missing" => code,
         "repository_settings_invalid" or "repository_settings_approval_cancelled" or "repository_settings_write_failed" => code,
         "provider_unavailable" => "provider_unavailable",
+        "selected_commit_patch_invalid" or "expected_head_mismatch" or "staged_changes_present" => code,
         "provider_remote_not_found" or "provider_remote_ambiguous" or "provider_remote_mismatch" => code,
         "unauthorized" or "invalid_service_token" or "service_token_expired" or "service_token_scope_missing" => "provider_authentication_failed",
         "policy_rejected" or "protected_branch" or "forbidden" or "repository_not_allowed" => "provider_policy_rejected",

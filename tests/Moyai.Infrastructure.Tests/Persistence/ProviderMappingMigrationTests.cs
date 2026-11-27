@@ -41,7 +41,7 @@ public sealed class ProviderMappingMigrationTests
             check.CommandText = "PRAGMA foreign_key_check;";
             await using (SqliteDataReader reader = await check.ExecuteReaderAsync()) Assert.False(await reader.ReadAsync());
             check.CommandText = "SELECT version FROM schema_version;";
-            Assert.Equal(7L, await check.ExecuteScalarAsync());
+            Assert.Equal(8L, await check.ExecuteScalarAsync());
         }
         finally { Directory.Delete(root, true); }
     }

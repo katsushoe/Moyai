@@ -18,6 +18,17 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/FixtureValidation.cs" Link="Acceptance/FixtureValidation.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/FixtureJournal.cs" Link="Acceptance/FixtureJournal.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/RestartCredentialProbe.cs" Link="Acceptance/RestartCredentialProbe.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/RestartSequence.cs" Link="Acceptance/RestartSequence.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/ResponseLossHandler.cs" Link="Acceptance/ResponseLossHandler.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/RestartWorkflow.cs" Link="Acceptance/RestartWorkflow.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/RestartReservation.cs" Link="Acceptance/RestartReservation.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/RestartCandidateManifest.cs" Link="Acceptance/RestartCandidateManifest.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/RestartReadyFields.cs" Link="Acceptance/RestartReadyFields.cs" />
+    <Compile Include="../../tools/Moyai.OwnerConsumerAcceptance/RestartAgreement.cs" Link="Acceptance/RestartAgreement.cs" />
+    <Compile Include="../../tools/Moyai.GithubieOwnerConsumerAcceptance/GithubieMetadataProbe.cs" Link="Acceptance/GithubieMetadataProbe.cs" />
   </ItemGroup>
 
   <ItemGroup>

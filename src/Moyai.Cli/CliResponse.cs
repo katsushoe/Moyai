@@ -14,12 +14,25 @@ public static class CliResponse
         ArgumentNullException.ThrowIfNull(error);
         string? text = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
         string? payload = result.StructuredContent?.GetRawText() ?? text;
-        if (result.IsError is true) return Fail(command, "service_error", payload, error);
+        bool publication = command is "pull-request-publish-create" or "pull-request-publish-status";
+        if (result.IsError is true && !publication) return Fail(command, "service_error", payload, error);
         if (string.IsNullOrWhiteSpace(payload)) return Fail(command, "service_invalid_response", "Service returned no JSON result.", error);
 
         try
         {
             using JsonDocument document = JsonDocument.Parse(payload);
+            if (publication)
+            {
+                if (document.RootElement.ValueKind != JsonValueKind.Object
+                    || !document.RootElement.TryGetProperty("ok", out JsonElement status)
+                    || status.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new JsonException("Invalid publication status.");
+                bool ok = status.GetBoolean();
+                if (result.StructuredContent is not null && text is not null
+                    && !System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(payload), System.Text.Json.Nodes.JsonNode.Parse(text)))
+                    throw new JsonException("Publication result channels disagree.");
+                output.WriteLine(payload);
+                return ok && result.IsError is not true ? 0 : 1;
+            }
             if (IsFailure(document.RootElement)) return Fail(command, "service_operation_failed", payload, error);
             if (result.StructuredContent is not null && text is not null)
             {

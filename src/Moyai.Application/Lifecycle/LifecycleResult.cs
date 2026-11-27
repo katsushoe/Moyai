@@ -8,4 +8,5 @@ public sealed record LifecycleResult(
     string? ErrorCode,
     string? ErrorMessage,
     long? ResourceId = null,
-    bool AlreadyCompleted = false);
+    bool AlreadyCompleted = false,
+    bool ResultUnknown = false);

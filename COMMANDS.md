@@ -1,5 +1,58 @@
 # Moyai Commands
 
+## PR publication settings (development2.0.4.2)
+
+`repository-settings-get` also returns Githubie's `pr_publication_source_branches` and `pull_request_routes` when present. Old Provider omission remains absent; an explicit empty array remains `[]`. Update via the same connected CLI/MCP settings operation, for example:
+
+```powershell
+moyaictl repository-settings-update --project Example --changes '{"pr_publication_source_branches":["docs/topic"],"pull_request_routes":[{"source_branch":"develop","destination_branch":"main"},{"source_branch":"docs/topic","destination_branch":"main"}]}'
+```
+
+Read current settings first and include all entries to retain: each supplied array is a full replacement; omission preserves, `[]` clears, null/invalid entries and duplicates reject. Preserve case and order. The publication-source list is independent of ordinary commit permissions; no old values are imported. Githubie requires both source-list membership and an allowed exact route, rejects protected sources, and denies publication for missing/empty permission lists. Buckettie rejects these fields. Existing authentication/capability and Provider approval remain required. The example does not authorize a live update. See [ADR0012](docs/adr/0012-repository-settings-consumer.md).
+
+## Hosting branch protection (development2.0.3.0)
+
+Use `branch-protection-get`, `branch-protection-update` and `branch-protection-delete` with registered `--project` and exact `--branch`. Update takes `--edit <JSON>` (snake_case fields, null preserves) and optional `--create-if-missing true`. Changes require Provider Desktop approval and Moyai audit; unknown results are never automatically replayed. See [hosting protection](docs/branch-protection.md).
+
+## Runtime diagnostics (development 2.0.2.0)
+
+Run `moyaictl runtime-diagnostics [--project <registered-name>]` or MCP `runtime_diagnostics`. See [runtime diagnostics and tray control](docs/runtime-diagnostics.md).
+
+
+## PR read and merge (development2.0.1.0)
+
+MCP `pull_request_get(project, pullRequestId)` and CLI `moyaictl pull-request-get --project Example --pull-request-id 42` return the actual Provider PR snapshot. `project` is a registered Moyai Project name; `pullRequestId` is a positive Int64, bounded to2147483647 by Githubie before dispatch. The current implementation enables Githubie only; Buckettie state routing remains disabled.
+
+MCP `pull_request_merge(project, pullRequestId, strategy, expectedSourceCommit, message?)` corresponds to `moyaictl pull-request-merge --project Example --pull-request-id 42 --strategy merge --expected-source-commit <approved-full-40-hex-SHA>`. Require explicit user approval for that PR, strategy and SHA before calling. Strategy is required: repository_default (Provider null/default), merge, squash or rebase for Githubie. Common fast_forward is explicitly refused; no substitution is made. SHA hex case and nonblank optional message are preserved; omitted/null message retains Provider defaults, blank is rejected.
+
+Both routes require explicit capabilities and authenticated Provider access. Merge reads current PR state first and rejects source mismatch, draft/unavailable draft metadata and closed-unmerged state without mutation. An authenticated already-merged snapshot is an observation with no new merge request. Result fields are ok/operation/project/provider/pullRequest/error; snapshot includes id/url/state/sourceBranch/destinationBranch/sourceCommit/mergeCommit/draft (explicit null when unavailable). Errors include code/outcome/retryable/suggestedAction/correlationId/providerDetail. pending/unknown is never success and retryable is false. Use a separate authenticated get to reconcile; merge is never automatically replayed, including on assertion expiry. CLI failures use exit1. Installed older binaries and current scopes are unchanged by local publishing. See [ADR0018](docs/adr/0018-provider-pull-request-merge.md).
+
+## MCP command client
+
+Windows builds and packages include `moyaimcp.exe`, an executable alias of `moyaictl.exe` using the same CLI assembly and dependencies. Use `moyaimcp repository-status --project <registered-name>` to call the current user's running host. The sole configuration is `<INSTALLFOLDER>\config\moyai.json`. Optional `--config` before or after the command accepts only that same normalized path; other paths are rejected. The file's `serverUrl` selects that user's endpoint. `commands` queries tool schemas. `--help` and `--version` return local help and CLI version without loading a configuration; `version` queries the host version.
+
+Both names preserve business commands, Project selection, approval, audit, output and exit codes. `Moyai.Mcp.exe` runs in the logged-on user's session. `host start|stop|restart|status` manages its process through a current-user-only named pipe. `autostart enable|disable|status` manages logon startup separately; neither setting changes the other. Keep the alias beside the packaged CLI files. See [ADR0017](docs/adr/0017-mcp-command-client-alias.md) and [ADR0019](docs/adr/0019-user-session-mcp-host.md).
+
+## Diff remote selection (development)
+
+MCP `repository_diff(project)` / CLI `moyaictl repository-diff --project <name>` keep the same inputs. Buckettie can receive the Project's exact configured nonblank gitRemoteName after the supported remote-resolution capability is confirmed; caller-supplied remote/credentials are not added. Unsupported/failed capability preserves omission compatibility. Provider missing/ambiguous/mismatched-remote errors are preserved without origin fallback. Japanese/BOM/newline/multiple-hunk diff text is unchanged; this is local HEAD diff, not remote-branch comparison. Githubie Diff forwarding is not enabled. No fetch/push/config changes. Live acceptance and installation remain separate. See [ADR0016](docs/adr/0016-buckettie-diff-remote.md).
+
+## Pull request creation (development)
+
+MCP `pull_request_create(project, sourceBranch, destinationBranch, title, description, draft)` corresponds to `moyaictl pull-request-create --project Example --source-branch docs/proposal --destination-branch main --title "Docs update" --description "" --draft true`. All six inputs are required. Branches must be literal names; title is nonblank and at most255 characters without controls; description allows empty text, up to32768 characters without NUL. Draft is an explicit boolean. No develop/main/HEAD defaults.
+
+Githubie maps to `github_pr_create` (`source_branch/destination_branch`), Buckettie to `bitbucket_pr_create` (`sourceBranch/destinationBranch`). Require explicit PR capability, exact dedicated PR assertion scope, mapped Repository/Project identity and Provider-approved route; Buckettie requires Moyai mode. Generic read/commit/push scope and legacy tokens are insufficient. No route edits, push, merge or fallback are performed.
+
+Success returns `ok/operation/project/provider/pullRequest`. Example common data: `{"id":7,"title":"Docs update","sourceBranch":"docs/proposal","destinationBranch":"main","draft":null,"state":"open"}`, with nullable url/description. Githubie's absent draft remains explicit null; Buckettie reports its value. Errors return code/outcome/suggestedAction/providerDetail: e.g. `project_not_found`, `pull_request_invalid`, `provider_capability_missing`, `auth_scope_denied`, `pull_request_route_not_allowed`. CLI business failure exits1. Unknown outcome requires separate Provider PR inspection before another create; do not replay. Capability agreement, installed version and real external acceptance are separate. See [ADR0015](docs/adr/0015-provider-pull-request-create.md).
+
+## Local branch creation (development)
+
+MCP `branch_create_local(project, branch, source)` and CLI `moyaictl branch-create-local --project <name> --branch <new-local-branch> --source <local-branch|tag|full-SHA>` create without checkout. All arguments are required: `project` selects a registered Project, `branch` names the new local branch, `source` is a literal local branch/tag or full40-hex commit SHA. Example: `moyaictl branch-create-local --project Example --branch docs/proposal --source v1.0.1.0`. No implicit HEAD, revision expressions, fetch/push, remote branch creation or settings update.
+
+Requires Githubie's explicit `data.local_branch_create=true` and exact `github_local_branch_create: [repository.branch.write]` assertion authorization. Buckettie and legacy routes are unsupported; never fall back to remote `branch_create`. Provider enforces allowlist/policy/approval, clean tree, no unresolved conflicts, source existence and target nonexistence. Only the new local ref changes, not HEAD/current branch, upstream, commits, remote refs or index/worktree.
+
+Result: `RepositoryProviderResult` (`ok`, `operation`, `output`, `errorCode`, `errorMessage`, `resultUnknown`). Success example: `ok=true`, `operation=branch_create_local`; JSON string `output` retains Githubie `data.name/source/current_branch/head_sha`. Failure examples: pre-dispatch `provider_capability_missing` or preserved Provider `working_tree_dirty`, `unresolved_conflicts`, `branch_source_not_found`, `local_branch_already_exists`, `invalid_ref`. CLI failure exits1. Unknown post-dispatch outcome requires separate Provider-supported local-ref inspection, not replay. Source implementation does not establish installed capability or real-Provider acceptance. See [ADR0014](docs/adr/0014-provider-local-branch-create.md).
+
 ## Local branch switch (development1.3.12.0)
 
 MCP `branch_switch(project, branch)` and CLI `moyaictl branch-switch --project <name> --branch <existing-local-branch>` switch through the registered Provider. Project identity, mapped Repository ID and URL remain unchanged; gitDefaultBranch is not updated. The Tool is destructive and requires an explicit capability plus repository.branch.write on github_branch_switch or buckettie_branch_switch. Buckettie must use Moyai integration mode. Legacy is rejected.
@@ -8,9 +61,11 @@ No fetch, remote checkout, creation, source or remote argument is added. Provide
 
 ## Repository settings (development1.3.11.0)
 
+Githubie extension (development): `changes` also accepts `local_commit_branches`, an exact replacement string array. Example: `moyaictl repository-settings-update --project Example --changes '{"local_commit_branches":["codex/docs-main-v1010","develop"]}'`. Read the current list and retain desired existing entries; omission preserves, `[]` clears, and null/wrong-type/blank elements are rejected. This controls local commits, not push or PR routes. GET exposes the optional property only when Githubie returns it; absent and empty are distinct. Buckettie rejects this update field and retains the eight common settings. Existing Project-bound write scope and Provider approval are mandatory. Implementation does not change installed permissions or authorize the example update. See the extension in [ADR0012](docs/adr/0012-repository-settings-consumer.md).
+
 MCP `repository_settings_get(project)` / `repository_settings_update(project, changes)` have CLI counterparts `moyaictl repository-settings-get --project <name>` and `moyaictl repository-settings-update --project <name> --changes '<JSON object>'` (plus `--config` as needed). Example changes: `{"commit_author_name":"Test Author","commit_author_email":"test@example.invalid"}`. CLI connects to the service, never the DB.
 
-Only agreed Githubie routing is enabled. Get returns eight registered settings, with null authors when unset. Update accepts only specified fields; omission preserves, false is explicit, arrays replace. Reject empty changes, unknown/null/wrong-type fields and incomplete/invalid author pairs. Policy validation and human approval remain Provider-owned. The typed result exposes ok/operation/project/provider/settings/changedFields/approved/error, never raw Provider output. Errors retain auth/capability/settings codes and safe correlation IDs. Update success requires approved=true. Unknown transport/save outcomes return error.outcome=unknown and require a separate get before another update; no automatic update retry. No local Git/config changes or direct/legacy fallback. See [ADR0012](docs/adr/0012-repository-settings-consumer.md).
+Agreed Githubie and Buckettie routing is implemented; runtime enablement and live acceptance are separate. Exact capability flags and assertion scopes are required; Buckettie requires Moyai integration mode even for get. Get returns eight common registered settings plus the optional Githubie extension above, with null authors when unset. Update accepts only specified fields; omission preserves, false is explicit, arrays replace. Reject empty changes, unknown/null/wrong-type fields and incomplete/invalid author pairs. Buckettie's extra `pull_request_routes` is outside these eight fields. Policy validation and human approval remain Provider-owned. The typed result exposes ok/operation/project/provider/settings/changedFields/approved/error, with provider identifying githubie or buckettie on success, never raw Provider output. Errors retain auth/capability/settings codes and safe correlation IDs. Update success requires approved=true. Unknown transport/save outcomes return error.outcome=unknown and require a separate get before another update; no automatic update retry. No local Git/config changes or direct/legacy fallback. See [ADR0012](docs/adr/0012-repository-settings-consumer.md).
 
 [English](COMMANDS.md) | [日本語](COMMANDS.ja.md)
 
@@ -20,9 +75,11 @@ This document is the public command contract for `moyaictl.exe`. MCP tools use t
 
 ## Service connection and management
 
-All business commands, including `version`, connect to the service. `--config <path>` selects JSON settings. `commands` returns the running service's commands and input schemas. `help` works offline.
+All business commands, including `version`, connect to the service. Only `<INSTALLFOLDER>\config\moyai.json` supplies JSON settings; `--config` cannot select another file. `commands` returns the running service's commands and input schemas. `help` works offline.
 
-SCM commands are `service start`, `service stop`, `service pause`, `service resume`, `service register`, `service unregister`, and `service status`. Registration uses the adjacent MCP executable and configuration, Auto/LocalService and required directory permissions. Unregister requires Stopped. `config-init` creates initial JSON only when absent. Management commands use Windows SCM and never execute business logic or access SQLite directly.
+Host commands are `host start|stop|restart|status`; autostart commands are `autostart enable|disable|status`. `profile-init` initializes the canonical configuration when absent and user-scoped runtime directories and enables autostart for a new profile. `profile-uninstall` removes only the product-owned startup entry; user data remains. The old `service` command family is no longer supported. Management commands do not execute business logic or access SQLite directly.
+
+`host start` waits up to 60 seconds for readiness. A connected control response has its own 10-second limit. A timeout or a connection lost before the response does not establish that the host stopped: check `host status` before repeating a lifecycle command. `host restart` waits up to 15 seconds for the acknowledged process to exit and aborts without launching a replacement if exit is unconfirmed. See [ADR0019](docs/adr/0019-user-session-mcp-host.md).
 
 ## Command Groups
 
@@ -138,6 +195,8 @@ Review Provider targets before commit, push, pull, build, release, or deploy. `r
 
 Moyai v1 models exactly one Repository as part of each Project. It has no independent `repository-register` or `repository-unregister` command; archive the Project to stop using the association.
 # Repository branches
+
+For explicit fixed-SHA PR source publication, use the dedicated [create/status commands](docs/pr-source-publication.md). Both connect to the same user host; create requires an explicit draft boolean and original operation UUID. Ordinary pull-request-create does not publish a source branch.
 
 `branch_create` requires `project`, `branch`, and an explicit `source`. `source` must be a literal branch name or a full 40-character commit SHA. Moyai never substitutes `main`, `develop`, or the current `HEAD` when it is omitted.
 `tag_create` likewise requires `project`, `tag`, and an explicit literal branch or full commit SHA `source`; Moyai forwards it unchanged when the Provider supports explicit tag sources.

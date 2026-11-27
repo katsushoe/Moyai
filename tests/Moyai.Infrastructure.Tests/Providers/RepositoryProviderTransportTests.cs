@@ -28,6 +28,22 @@ public sealed class RepositoryProviderTransportTests
         Assert.Equal(expectedTools, handler.CalledTools);
     }
 
+    [Fact]
+    public async Task SelectedCommitPreservesPatchTextAcrossMcpJsonTransport()
+    {
+        const string patch = "diff --git a/COMMANDS.ja.md b/COMMANDS.ja.md\n--- a/COMMANDS.ja.md\n+++ b/COMMANDS.ja.md\n@@ -1,2 +1,3 @@\n 日本語の説明\n+追加行\n@@ -8,3 +9,2 @@\n-削除行\n 維持行\ndiff --git a/src/Program.cs b/src/Program.cs\nnew file mode 100644\n--- /dev/null\n+++ b/src/Program.cs\n@@ -0,0 +1,2 @@\n+\uFEFFusing System;\n+Console.WriteLine(\"日本語\");\n";
+        using var handler = new SelectedCommitCapabilityHandler(true);
+        var provider = new McpRepositoryProvider(new McpRepositoryProviderOptions("githubbie", new Uri("http://localhost/mcp"), "github"), new FreshClientFactory(handler));
+        var request = new RepositoryProviderRequest("Moyai", "source", "url", null, RepositoryOperation.CommitSelected, "selected", null,
+            ExpectedHead: new string('a', 40), Patch: patch);
+
+        RepositoryProviderResult result = await provider.ExecuteAsync(request);
+
+        Assert.True(result.Ok, result.ErrorCode);
+        Assert.Equal(patch, handler.SelectedPatch);
+        Assert.Equal(request.ExpectedHead, handler.SelectedExpectedHead);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -244,6 +260,8 @@ public sealed class RepositoryProviderTransportTests
     {
         private static readonly string[] ProtocolVersions = ["2026-07-28"];
         public List<string> CalledTools { get; } = [];
+        public string? SelectedPatch { get; private set; }
+        public string? SelectedExpectedHead { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             using JsonDocument document = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
@@ -257,6 +275,12 @@ public sealed class RepositoryProviderTransportTests
             {
                 string tool = root.GetProperty("params").GetProperty("name").GetString()!;
                 CalledTools.Add(tool);
+                if (tool == "github_repository_commit_selected")
+                {
+                    JsonElement arguments = root.GetProperty("params").GetProperty("arguments");
+                    SelectedPatch = arguments.GetProperty("patch").GetString();
+                    SelectedExpectedHead = arguments.GetProperty("expected_head").GetString();
+                }
                 object payload = tool == "github_provider_capabilities"
                     ? new { ok = true, data = new { operations = new { repository_commit_selected = supportsSelectedCommit } } }
                     : new { ok = true, data = "done" };

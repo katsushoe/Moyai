@@ -28,6 +28,8 @@ public static class CliArguments
             string name = string.Concat(key.Split('-').Select((part, index) => index == 0 ? part : char.ToUpperInvariant(part[0]) + part[1..]));
             if (toolName == "comment_add") name = name switch { "actorType" => "authorType", "actorName" => "authorName", _ => name };
             if (!properties.TryGetProperty(name, out JsonElement property)) throw new ArgumentException($"Unknown option --{key}.");
+            if (toolName == "pull_request_publish_create" && name == "draft" && value is null)
+                throw new ArgumentException("--draft requires an explicit true or false.");
             string? type = property.TryGetProperty("type", out JsonElement element)
                 ? element.ValueKind == JsonValueKind.Array ? element.EnumerateArray().First(item => item.GetString() != "null").GetString() : element.GetString()
                 : "string";

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="$this.Text" xml:space="preserve"><value>Moyai</value></data>
+  <data name="ServerStatus" xml:space="preserve"><value>状態</value></data>
+  <data name="McpServerMenu" xml:space="preserve"><value>MCPサーバー</value></data>
+  <data name="ServerCheck" xml:space="preserve"><value>状態を確認</value></data>
+  <data name="ServerUnknown" xml:space="preserve"><value>状態: 未確認</value></data>
+  <data name="ServerStarting" xml:space="preserve"><value>状態: 起動中...</value></data>
+  <data name="ServerStopping" xml:space="preserve"><value>状態: 停止中...</value></data>
+  <data name="Server_Running" xml:space="preserve"><value>MCPサーバー: 稼働中</value></data>
+  <data name="ServerRunningVersion" xml:space="preserve"><value>MCPサーバー: 稼働中（{0}）</value></data>
+  <data name="Server_NotResponding" xml:space="preserve"><value>MCPサーバー: 応答なし</value></data>
+  <data name="Server_Error" xml:space="preserve"><value>MCPサーバー: エラー</value></data>
+  <data name="Server_Stopped" xml:space="preserve"><value>MCPサーバー: 停止中</value></data>
+  <data name="ServerStopConfirm" xml:space="preserve"><value>MCPサーバーを停止すると、再び起動するまでMoyaiを使うCodexとClaude Codeのすべてのセッションが切断されます。停止しますか？</value></data>
+  <data name="ServerStart" xml:space="preserve"><value>起動</value></data>
+  <data name="ServerStop" xml:space="preserve"><value>停止</value></data>
+  <data name="StartHost" xml:space="preserve"><value>MCPホストを起動</value></data>
+  <data name="StopHost" xml:space="preserve"><value>MCPホストを停止</value></data>
+  <data name="Autostart" xml:space="preserve"><value>Windowsログオン時に自動起動</value></data>
+  <data name="ShowStatus" xml:space="preserve"><value>ホストの状態を表示</value></data>
+  <data name="ExitTray" xml:space="preserve"><value>トレイを終了（ホストは継続）</value></data>
+  <data name="HostStatusTitle" xml:space="preserve"><value>Moyai MCPホストの状態</value></data>
+  <data name="CannotOpenStartup" xml:space="preserve"><value>ログオン自動起動の設定を開けません。</value></data>
+  <data name="CannotStartCli" xml:space="preserve"><value>Moyai CLIを起動できません。</value></data>
+  <data name="RestartHost" xml:space="preserve"><value>MCPホストを再起動</value></data>
+  <data name="Config_unchanged" xml:space="preserve"><value>設定はホストに反映済みです</value></data>
+  <data name="Config_restart_required" xml:space="preserve"><value>設定変更あり：反映にはMCPホストを再起動してください</value></data>
+  <data name="Config_missing" xml:space="preserve"><value>設定ファイルなし：ホストは読込済み設定で動作中です</value></data>
+  <data name="Config_unavailable" xml:space="preserve"><value>設定を比較できません。ファイルとホストの版を確認してください</value></data>
+  <data name="Config_unknown" xml:space="preserve"><value>状態表示で設定の反映状態を更新できます</value></data>
+  <data name="Host_running" xml:space="preserve"><value>MCPホストは起動中です</value></data>
+  <data name="Host_not_running" xml:space="preserve"><value>MCPホストは停止しています</value></data>
+  <data name="Host_stopping" xml:space="preserve"><value>MCPホストを停止中です</value></data>
+  <data name="Host_unavailable" xml:space="preserve"><value>ホスト状態を確認できません</value></data>
+  <data name="HostOperationFailed" xml:space="preserve"><value>ホスト操作の結果を確認できませんでした。再操作の前に状態を確認してください。操作は再送していません。</value></data>
+  <data name="HostStarted" xml:space="preserve"><value>ホスト起動日時</value></data>
+  <data name="ConfigLoaded" xml:space="preserve"><value>設定読込日時</value></data>
+  <data name="ConfigPath" xml:space="preserve"><value>設定ファイル</value></data>
+  <data name="DatabasePath" xml:space="preserve"><value>データベース</value></data>
+  <data name="CloseStatus" xml:space="preserve"><value>閉じる</value></data>
+  <data name="Settings" xml:space="preserve"><value>設定</value></data>
+  <data name="SettingsUnavailable" xml:space="preserve"><value>設定を開けませんでした。設定ファイルとログを確認してください。</value></data>
+  <data name="About" xml:space="preserve"><value>バージョン情報</value></data>
+</root>

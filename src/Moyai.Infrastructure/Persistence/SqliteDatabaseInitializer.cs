@@ -37,6 +37,14 @@ public sealed class SqliteDatabaseInitializer : IDatabaseInitializer
             new SqliteMigration(5, AssertionSchemaSql),
             new SqliteMigration(6, GitRemoteNameMigrationSql, DisableForeignKeys: true),
             new SqliteMigration(7, "ALTER TABLE projects ADD COLUMN provider_repository_id TEXT NULL;"),
+            new SqliteMigration(8, """
+                CREATE TABLE repository_operation_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, operation_id TEXT NOT NULL, project_id TEXT NOT NULL,
+                    provider TEXT NOT NULL, operation TEXT NOT NULL, branch_fingerprint TEXT NOT NULL,
+                    outcome TEXT NOT NULL, result_code TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE INDEX repository_operation_audit_operation ON repository_operation_audit(operation_id,id);
+                """),
         ]);
         await migrationRunner.MigrateAsync(cancellationToken).ConfigureAwait(false);
     }

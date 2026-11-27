@@ -2,7 +2,6 @@
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Hosting.WindowsServices;
 using ModelContextProtocol.Server;
 using Moyai.Application.Authentication;
 using Moyai.Application.Builds;
@@ -30,11 +29,11 @@ static async Task<int> RunAsync(string[] arguments)
     {
         string configPath = arguments.Length switch
         {
-            0 => MoyaiSettings.DefaultPath,
-            2 when arguments[0] == "--config" => Path.GetFullPath(arguments[1]),
-            _ => throw new ArgumentException("Usage: Moyai.Mcp.exe [--config <moyai.json>]."),
+            0 => MoyaiSettings.ResolveOperationalPath(),
+            2 when arguments[0] == "--config" => MoyaiSettings.ResolveOperationalPath(arguments[1]),
+            _ => throw new ArgumentException($"Usage: Moyai.Mcp.exe [--config {MoyaiSettings.DefaultPath}]."),
         };
-        MoyaiSettings settings = MoyaiSettings.Load(configPath);
+        MoyaiSettings settings = MoyaiSettings.Load(configPath, out LoadedConfigurationSnapshot configurationSnapshot);
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -46,13 +45,10 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Configuration.AddInMemoryCollection();
         builder.WebHost.UseUrls(settings.ServerUrl);
         builder.Logging.ClearProviders();
-        builder.Logging.AddSimpleConsole();
-        builder.Services.AddWindowsService(options => options.ServiceName = "Moyai");
-        builder.Services.AddSingleton<ServiceAdmission>();
-        if (WindowsServiceHelpers.IsWindowsService()) builder.Services.AddSingleton<IHostLifetime, PausableServiceLifetime>();
-        builder.Services.Configure<Microsoft.Extensions.Logging.EventLog.EventLogSettings>(settings => settings.SourceName = "Application");
+        builder.Logging.AddProvider(new UserFileLoggerProvider(MoyaiSettings.DefaultLogDirectory));
         var options = new SqliteDatabaseOptions(new SqliteConnectionStringBuilder { DataSource = settings.DatabasePath }.ToString());
         builder.Services.AddSingleton(options);
+        builder.Services.AddSingleton(configurationSnapshot);
         builder.Services.AddSingleton<SqliteProjectRepository>();
         builder.Services.AddSingleton<SqliteWorkItemRepository>();
         builder.Services.AddSingleton<SqliteWorkItemCollaborationRepository>();
@@ -74,6 +70,13 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddSingleton<ServiceTokenLifecycleService>(serviceProvider => new ServiceTokenLifecycleService(serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddHttpClient();
         ProviderAuthenticationSettings auth = settings.ProviderAuthentication;
+        builder.Services.AddSingleton<ISigningReadiness>(new SqliteSigningReadiness(options, auth.Issuer, auth.KeyNamespace,
+            auth.ActiveKeyVersion, TimeProvider.System, auth.ProtectorMode == "cng" && OperatingSystem.IsWindows()
+                ? (version, token) => new CngKeyEncryptionProvider(auth.KeyNamespace, version).IsAvailableAsync(token) : null));
+        builder.Services.AddSingleton(services => new HostDiagnosticsService(settings, configurationSnapshot,
+            services.GetRequiredService<ISigningReadiness>(),
+            new SqliteProjectRepository(options with { ConnectionString = new SqliteConnectionStringBuilder(options.ConnectionString)
+                { Mode = SqliteOpenMode.ReadOnly, Pooling = false, DefaultTimeout = 2 }.ToString(), BusyTimeoutMilliseconds = 2000 }), TimeProvider.System));
         IKeyEncryptionKeyProvider? protector = null;
         SqliteSigningKeyRing? signingKeys = null;
         if (auth.Issuer.Length != 0)
@@ -126,17 +129,30 @@ static async Task<int> RunAsync(string[] arguments)
         {
             builder.Services.AddHttpClient(provider.Name, client => client.Timeout = TimeSpan.FromSeconds(settings.RequestTimeoutSeconds))
                 .RemoveAllLoggers().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-            var providerOptions = new McpRepositoryProviderOptions(provider.Name, new Uri(provider.Endpoint), provider.ToolPrefix);
-            if (provider.Repository) builder.Services.AddSingleton<IRepositoryProvider>(services => new McpRepositoryProvider(providerOptions, services.GetRequiredService<IHttpClientFactory>(), services.GetService<IAssertionIssuer>(),
+            var providerOptions = new McpRepositoryProviderOptions(provider.Name,
+                string.IsNullOrEmpty(provider.Endpoint) ? null : new Uri(provider.Endpoint), provider.ToolPrefix)
+            {
+                ConnectionMode = provider.ConnectionMode,
+                RuntimeDirectory = provider.RuntimeDirectory,
+                RuntimeExecutable = provider.RuntimeExecutable,
+                RuntimeSha256 = provider.RuntimeSha256,
+                ExpectedMcpPath = provider.ExpectedMcpPath,
+                AuthenticationMode = provider.AuthenticationMode,
+            };
+            if (provider.Repository && providerOptions.UsesWindowsOwnerAuthentication)
+                builder.Services.AddSingleton<IRepositoryProvider>(services => new McpRepositoryProvider(providerOptions, services.GetRequiredService<IHttpClientFactory>()));
+            else if (provider.Repository) builder.Services.AddSingleton<IRepositoryProvider>(services => new McpRepositoryProvider(providerOptions, services.GetRequiredService<IHttpClientFactory>(), services.GetService<IAssertionIssuer>(),
                 new AssertionCapability(provider.AssertionProviderId, provider.AssertionProviderId, "1", "ES256", true, provider.AssertionToolScopes), new SqliteAssertionAudit(options, TimeProvider.System)));
-            builder.Services.AddSingleton<ILifecycleProvider>(services => new McpLifecycleProvider(
+            if (providerOptions.UsesWindowsOwnerAuthentication)
+                builder.Services.AddSingleton<ILifecycleProvider>(services => new McpLifecycleProvider(providerOptions, services.GetRequiredService<IHttpClientFactory>()));
+            else builder.Services.AddSingleton<ILifecycleProvider>(services => new McpLifecycleProvider(
                 providerOptions,
                 services.GetRequiredService<IHttpClientFactory>(),
                 services.GetService<IAssertionIssuer>(),
                 new SqliteAssertionAudit(options, TimeProvider.System),
                 auth.Mode == "assertion" ? new AssertionCapability(provider.AssertionProviderId, provider.AssertionProviderId, "1", "ES256", true, provider.AssertionToolScopes) : null));
         }
-        builder.Services.AddSingleton<ProviderRoutingService>(serviceProvider => new ProviderRoutingService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<IRepositoryProvider>(), serviceProvider.GetRequiredService<TimeProvider>(), new RepositoryAuthentication(auth.Mode, auth.LegacyStartedAt, auth.LegacyUntil)));
+        builder.Services.AddSingleton<ProviderRoutingService>(serviceProvider => new ProviderRoutingService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<IRepositoryProvider>(), serviceProvider.GetRequiredService<TimeProvider>(), new RepositoryAuthentication(auth.Mode, auth.LegacyStartedAt, auth.LegacyUntil), new SqliteRepositoryOperationAudit(options, TimeProvider.System)));
         builder.Services.AddSingleton<LifecycleService>(serviceProvider => new LifecycleService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteServiceTokenRepository>(), serviceProvider.GetServices<ILifecycleProvider>(), serviceProvider.GetRequiredService<SqliteLifecycleEventWriter>(), serviceProvider.GetRequiredService<TimeProvider>(), new RepositoryAuthentication(auth.Mode, auth.LegacyStartedAt, auth.LegacyUntil)));
         builder.Services.AddSingleton<BuildService>(serviceProvider => new BuildService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<ProviderRoutingService>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<DeploymentService>(serviceProvider => new DeploymentService(serviceProvider.GetRequiredService<SqliteProjectRepository>(), serviceProvider.GetRequiredService<SqliteBuildRepository>(), serviceProvider.GetRequiredService<SqliteReleaseRepository>(), serviceProvider.GetRequiredService<SqliteDeploymentRepository>(), serviceProvider.GetRequiredService<LifecycleService>(), serviceProvider.GetRequiredService<TimeProvider>()));
@@ -144,20 +160,14 @@ static async Task<int> RunAsync(string[] arguments)
         builder.Services.AddMcpServer(options => options.ServerInstructions = "Before every project operation, call list_projects and select the registered project name that matches the user's conversation context. Do not guess or synthesize project names.")
             .WithHttpTransport(transport => transport.Stateless = true)
             .WithTools<MoyaiTools>()
+            .WithTools<DiagnosticTools>()
             .WithTools<AssertionTools>();
 
-        var app = builder.Build();
-        ServiceAdmission admission = app.Services.GetRequiredService<ServiceAdmission>();
-        app.Use(async (context, next) =>
-        {
-            if (admission.IsPaused)
-            {
-                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                await context.Response.WriteAsJsonAsync(new { ok = false, error = "service_paused" });
-                return;
-            }
-            await next(context);
-        });
+        builder.Services.AddSingleton<IHostedService>(services => new UserHostControlService(services.GetRequiredService<IHostApplicationLifetime>(), settings.ServerUrl,
+            services.GetRequiredService<ILogger<UserHostControlService>>(), configuration: configurationSnapshot));
+        await using var app = builder.Build();
+        app.UseMiddleware<HealthEndpoint>();
+        app.UseMiddleware<UserTokenAuthentication>(settings.ApiToken);
         await new SqliteDatabaseInitializer(options).InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<ServiceTokenLifecycleService>().DeleteExpiredAsync("system", "startup", app.Lifetime.ApplicationStopping);
         app.MapMcp("/mcp");
@@ -182,11 +192,6 @@ static void WriteError(Exception exception, bool fatal)
 {
     string message = JsonSerializer.Serialize(new { ok = false, fatal, error = new { code = exception.GetType().Name.Replace("Exception", string.Empty, StringComparison.Ordinal).ToLowerInvariant(), message = exception.Message } }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
     Console.Error.WriteLine(message);
-    if (WindowsServiceHelpers.IsWindowsService())
-    {
-        try { EventLog.WriteEntry("Application", "Moyai MCP: " + message, EventLogEntryType.Error); }
-        catch (Exception loggingException) { Console.Error.WriteLine(loggingException); }
-    }
 }
 
 static void ReportFatalError(Exception exception)

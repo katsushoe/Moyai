@@ -53,6 +53,7 @@ try {
     if ($control.Count -ne 1 -or $control[0][2] -ne '163' -or $control[0][4] -ne '1') { throw 'Incorrect service start/stop/delete control.' }
     $files = @(Read-MsiRows 'SELECT * FROM File')
     if (@($files | Where-Object { $_[0] -eq 'CliExecutable' -and $_[2] -match '(^|\|)moyaictl\.exe$' }).Count -ne 1) { throw 'moyaictl executable missing or not connected to the initializer.' }
+    if (@($files | Where-Object { $_[2] -match '(^|\|)moyaimcp\.exe$' }).Count -ne 1) { throw 'MCP command client alias missing or duplicated.' }
     if (@($files | Where-Object { $_[2] -match '(^|\|)Moyai\.Cli\.(exe|dll)$' }).Count -ne 0) { throw 'Legacy CLI executable is still packaged.' }
     if (@($files | Where-Object { $_[2] -match '(^|\|)Moyai\.Mcp\.exe$' }).Count -ne 1) { throw 'MCP executable missing or duplicated.' }
     $permissions = @(Read-MsiRows 'SELECT * FROM MsiLockPermissionsEx')
